@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.39.0 — 2026-10-18
+
+The editor's redesign:
+- **One bar instead of two.** The app's name, then where you are as a breadcrumb (the board, then each canvas you went into), replacing the floating trail. Then a **git chip**, the save status, and on the right undo, redo, **Board**, Present, light/dark and **Share** (the old *Export ▾*).
+- **The git chip** says which branch this is and how much changed: `research · 4 changes since main`, or on main the changes not committed yet. It counts every canvas and updates as you edit. Clicking it shows those changes on the board; clicking again stops.
+- **Board** holds what were three selects in the bar: flow direction, arrow style, theme (and *Edit theme…*), and *Tidy up the layout*.
+- **The tool bar at the bottom is short:** select and hand, then box, sticky and connect, then **Blocks**, then comment. **Blocks** opens one palette with every block, each with a line on what it is:
+  - Think: mindmap, timeline, decision record, risk matrix;
+  - Plan: kanban, gantt, table, chart;
+  - Specify: sequence diagram, database table, swimlanes, decision point, section, canvas.
+  Keyboard shortcuts stay (T, N, D, S, X, C, ⌘G).
+- Zoom moves to the bottom-left; the AI button keeps the bottom-right.
+- Core `change_count`; WASM `count_changes`; `/api/since` also gives `branch` and `main`.
+
 ## 0.38.1 — 2026-10-18
 
 - The AI button's icon is a spark: one four-point star and a small one, in white on the blue button (no longer yellow glitter).

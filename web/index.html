@@ -18,23 +18,23 @@
   }
   html, body { margin: 0; height: 100%; }
   body { display: flex; flex-direction: column; font: 13px/1.45 var(--font-ui); background: var(--bg); color: var(--fg); }
-  .app-bar { height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--line); background: var(--bg); flex: none; }
-  .app-bar .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; letter-spacing: -.01em; flex: none; }
-  .app-bar .brand img { display: block; }
-  .app-bar .vsep { width: 1px; height: 20px; background: var(--line); flex: none; }
-  .app-bar .file { margin-left: auto; font: 600 12px var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .app-bar .status { margin-left: -4px; color: var(--muted); font-size: 12px; white-space: nowrap; }
-  #app-actions:empty, .app-bar .vsep:has(+ #app-actions:empty) { display: none; }
-  .app-bar .file:not(:empty) + .status:not(:empty)::before { content: "· "; }
-  .app-bar .status.dirty { color: var(--mod); }
-  .app-bar .status.error { color: var(--del); }
-  .app-bar .update { flex: none; padding: 3px 10px; border-radius: 999px; background: var(--new-bg); color: var(--new); font-size: 12px; font-weight: 600; text-decoration: none; white-space: nowrap; }
-  .app-bar .update:hover { text-decoration: underline; }
-  .app-bar .update[hidden] { display: none; }
-  .app-bar select, .app-bar button, .app-bar label.btn { font: inherit; height: 28px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--bg); color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-  .app-bar button:hover, .app-bar label.btn:hover { background: var(--bg-hover); }
+  /* the app's pieces live in the editor's bar (app.js passes them in) */
+  .app-bar { height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--line); flex: none; }
+  .app-bar .vsep, .app-bar .file { display: none; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: -.01em; flex: none; color: var(--fg); }
+  .brand img { display: block; }
+  #app-actions { display: flex; gap: 6px; }
+  #app-actions:empty { display: none; }
+  #app-actions select, #app-actions button, #app-actions label.btn { font: inherit; height: 30px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--bg); color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  #app-actions button:hover, #app-actions label.btn:hover { background: var(--bg-hover); }
+  .status { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .status.dirty { color: var(--mod); }
+  .status.error { color: var(--del); }
+  .update { flex: none; padding: 3px 10px; border-radius: 999px; background: var(--new-bg); color: var(--new); font-size: 12px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .update:hover { text-decoration: underline; }
+  .update[hidden] { display: none; }
   #editor { flex: 1; min-height: 0; }
-  @media (max-width: 640px) { .app-bar .file, .app-bar .status, .app-bar .vsep { display: none; } .app-bar { overflow-x: auto; } }
+  @media (max-width: 640px) { .status, .dge-crumbs, .dge-branch { display: none; } }
   #boot { margin: auto; color: var(--muted); }
 </style>
 </head>

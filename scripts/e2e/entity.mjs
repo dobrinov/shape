@@ -32,7 +32,7 @@ try {
   await p.waitForSelector(".dge-canvas svg");
 
   // the toolbar adds a table; its name is typed next (and its columns follow the new id)
-  await p.locator('.dge-tools [data-act="entity"]').click();
+  await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="entity"]').click();
   await p.waitForFunction(() => document.activeElement && document.activeElement.classList.contains("dge-inline"));
   await p.keyboard.press(MOD + "+a"); await p.keyboard.type("Users"); await p.keyboard.press("Enter");
   await sleep(600);

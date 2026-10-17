@@ -327,6 +327,12 @@ pub fn git_show_pub(reference: &str, file: &str) -> Result<String, String> {
 /// did not exist yet); on the main branch, the last commit. None when the
 /// file is not in git (or not committed yet).
 pub fn git_since(file: &str) -> Option<(String, String)> {
+    git_since_on(file).map(|s| (s.0, s.1))
+}
+
+/// [`git_since`], with the branch this is on and the main branch
+/// (`research`, `main`; on the main branch both are its name).
+pub fn git_since_on(file: &str) -> Option<(String, String, String, String)> {
     let abs = std::fs::canonicalize(file).ok()?;
     let dir = abs.parent().unwrap_or(Path::new("."));
     let git = |args: &[&str]| -> Option<String> {
@@ -356,13 +362,23 @@ pub fn git_since(file: &str) -> Option<(String, String)> {
         if let Some(base) = git(&["merge-base", "HEAD", &main]) {
             if git(&["rev-parse", "HEAD"]).as_deref() != Some(base.as_str()) {
                 let label = format!("where the branch `{branch}` left `{short}`");
-                return Some((git_show(&base, file).unwrap_or_default(), label));
+                return Some((
+                    git_show(&base, file).unwrap_or_default(),
+                    label,
+                    branch.clone(),
+                    short.to_string(),
+                ));
             }
         }
     }
-    git_show("HEAD", file)
-        .ok()
-        .map(|s| (s, "the last commit".to_string()))
+    git_show("HEAD", file).ok().map(|s| {
+        let on = if branch.is_empty() || branch == "HEAD" {
+            short.to_string()
+        } else {
+            branch.clone()
+        };
+        (s, "the last commit".to_string(), on.clone(), on)
+    })
 }
 
 fn parse_doc(src: &str, what: &str) -> Result<Document, String> {

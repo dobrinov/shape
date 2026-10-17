@@ -39,6 +39,7 @@ try {
   const pick = 'select[title="Theme of this board"]';
 
   // a preset
+  await p.locator("[data-act=board]").click();
   await p.selectOption(pick, "paper"); await sleep(600);
   assert.match(readFileSync(file, "utf8"), /^title: Themed\ntheme: paper\n/);
   assert.equal(await canvasBg(p), "#f6f1e7");

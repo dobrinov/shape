@@ -47,7 +47,7 @@ try {
   await badge.click();
   await p.waitForURL(/file=plans%2Fdelivery\.diagram&focus=m1/);
   await p.waitForSelector(".dge-canvas svg"); await sleep(400);
-  assert.equal(await p.locator("#file").textContent(), "plans/delivery.diagram");
+  assert.match(await p.locator(".dge-crumbs strong").getAttribute("title"), /plans\/delivery\.diagram$/);
   assert.equal(await p.locator('.dg-node.sel[data-id="m1"]').count(), 1);
 
   // edits on it go to that file; "Link to a board…" offers ../discovery.diagram

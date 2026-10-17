@@ -33,7 +33,7 @@ try {
 
   // the selected box goes into To do
   await p.locator('.dg-node[data-id="login"]').click();
-  await p.locator('[data-act="kanban"]').click(); await sleep(200);
+  await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="kanban"]').click(); await sleep(200);
   await p.keyboard.type("Sprint 12"); await p.keyboard.press("Enter"); await sleep(600);
   assert.match(saved(), /kanban sprint-12: Sprint 12 \{\n  column todo: To do \{\n    login: Login page\n  \}\n  column doing: Doing \{\n  \}\n  column done: Done \{\n  \}\n\}/, saved());
 

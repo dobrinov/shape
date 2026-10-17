@@ -35,7 +35,7 @@ try {
   await p.waitForSelector(".dge-canvas svg");
 
   // the toolbar adds a bar chart; its title is typed next
-  await p.locator('.dge-tools [data-act="chart"]').click();
+  await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="chart"]').click();
   await p.locator(".dge-menu button", { hasText: "Bars" }).click();
   await p.waitForFunction(() => document.activeElement && document.activeElement.classList.contains("dge-inline"));
   await p.keyboard.press(MOD + "+a"); await p.keyboard.type("Revenue"); await p.keyboard.press("Enter");

@@ -403,11 +403,11 @@ pub fn serve(
             }
             // what a rethink takes as the new information (see `git_since`)
             (Method::Get, "/api/since") => {
-                let since = crate::git_since(&display);
+                let since = crate::git_since_on(&display);
                 respond_json(
                     req,
                     200,
-                    json!({ "ok": true, "source": since.as_ref().map(|s| &s.0), "label": since.as_ref().map(|s| &s.1) }),
+                    json!({ "ok": true, "source": since.as_ref().map(|s| &s.0), "label": since.as_ref().map(|s| &s.1), "branch": since.as_ref().map(|s| &s.2), "main": since.as_ref().map(|s| &s.3) }),
                 )
             }
             (Method::Get, p) => match assets::get(p) {

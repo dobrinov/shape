@@ -31,7 +31,7 @@ try {
   await p.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded" });
   await p.waitForSelector(".dge-canvas svg"); await sleep(300);
 
-  await p.locator('[data-act="sequence"]').click(); await sleep(200);
+  await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="sequence"]').click(); await sleep(200);
   await p.keyboard.type("Checkout"); await p.keyboard.press("Enter"); await sleep(600);
   assert.match(saved(), /sequence checkout: Checkout \{\n  client: Client\n  server: Server\n  client -> server: request\n  server \.\.> client: response\n\}/, saved());
   assert.equal(await p.locator(".dg-lifelines line").count(), 2);

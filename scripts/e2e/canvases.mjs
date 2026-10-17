@@ -42,7 +42,7 @@ try {
 
   // open it: an empty board and the trail; add a box inside
   await p.locator('.dg-node[data-id="payments-flow-link"]').dblclick(); await sleep(500);
-  assert.equal(await p.locator(".dge-trail").textContent(), "Checkout›Payments flow");
+  assert.equal(await p.locator(".dge-crumbs").textContent(), "Checkout/Payments flow");
   assert.match(p.url(), /canvas=payments-flow/);
   assert.equal(await p.locator('.dg-node[data-id="api"]').count(), 0);
   await p.locator(".dge-canvas").dblclick({ position: { x: 600, y: 400 } }); await sleep(200);
@@ -54,8 +54,8 @@ try {
   await p.reload({ waitUntil: "domcontentloaded" }); await p.waitForSelector(".dge-canvas svg"); await sleep(400);
   assert.equal(await p.locator('.dg-node[data-id="confirm-card"]').count(), 1);
   await p.screenshot({ path: join(dir, "inside.png") });
-  await p.locator(".dge-trail button", { hasText: "Checkout" }).click(); await sleep(400);
-  assert.equal(await p.locator(".dge-trail").count(), 0);
+  await p.locator(".dge-crumbs button", { hasText: "Checkout" }).click(); await sleep(400);
+  assert.equal(await p.locator(".dge-crumbs").textContent(), "Checkout");
   assert.equal(await p.locator('.dg-node[data-id="api"]').count(), 1);
   assert.doesNotMatch(p.url(), /canvas=/);
 
@@ -80,7 +80,7 @@ try {
   await dk.goto(`http://127.0.0.1:${port}/?canvas=payments`, { waitUntil: "domcontentloaded" });
   await dk.waitForSelector(".dge-canvas svg"); await sleep(500);
   await dk.screenshot({ path: join(dir, "dark-inside.png") });
-  await dk.locator(".dge-trail button").click(); await sleep(400);
+  await dk.locator(".dge-crumbs button").click(); await sleep(400);
   await dk.screenshot({ path: join(dir, "dark-top.png") });
   assert.deepEqual(errors, []);
   await browser.close();

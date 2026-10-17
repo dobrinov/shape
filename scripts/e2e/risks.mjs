@@ -69,7 +69,7 @@ try {
   assert.doesNotMatch(saved(), /Unknowns/);
 
   // the toolbar adds a matrix with one risk in the middle
-  await p.locator('.dge-tools [data-act="risks"]').click();
+  await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="risks"]').click();
   await sleep(300); await p.keyboard.press("Escape"); await sleep(600);
   assert.match(saved(), /risks risks: Risks \{\n  New risk \[id: risk-1, p: 3, i: 3\]\n\}/, saved());
   assert.deepEqual(errors, []);

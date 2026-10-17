@@ -134,6 +134,22 @@ pub fn render_svg(doc: &Document, opts: &RenderOptions) -> String {
 }
 
 /// Render `new` with what changed since `old` highlighted.
+/// How many elements changed from `old` to `new` (added, removed or
+/// changed), canvases included.
+pub fn change_count(old: &Document, new: &Document) -> usize {
+    fn walk(old: &Document, new: &Document) -> usize {
+        let d = diff::diff(old, new);
+        let here = d.entries.iter().filter(|e| e.kind != "setting").count();
+        let empty = Document::default();
+        here + new
+            .canvases
+            .iter()
+            .map(|c| walk(old.canvas(&c.id).map(|o| &o.doc).unwrap_or(&empty), &c.doc))
+            .sum::<usize>()
+    }
+    walk(old, new)
+}
+
 pub fn render_diff(old: &Document, new: &Document, opts: &RenderOptions) -> Rendered {
     let (merged, changes) = diff::merge(old, new);
     let mut o = opts.clone();
@@ -603,6 +619,17 @@ mod tests {
             s.apply("{\"note\": \"Fine as it is.\", \"ops\": []}")["ok"],
             true
         );
+    }
+
+    #[test]
+    fn changes_are_counted_in_every_canvas() {
+        let old = parse("a: A\nb: B\npay: P [canvas: c]\n\ncanvas c: C {\n  x: X\n}\n").unwrap();
+        let new =
+            parse("a: A changed\npay: P [canvas: c]\nn: New\n\ncanvas c: C {\n  x: X\n  y: Y\n}\n")
+                .unwrap();
+        // a changed, b removed, n added; y added inside the canvas
+        assert_eq!(change_count(&old, &new), 4);
+        assert_eq!(change_count(&new, &new), 0);
     }
 
     #[test]

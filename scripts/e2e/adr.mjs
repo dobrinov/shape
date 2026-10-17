@@ -32,7 +32,7 @@ try {
   await p.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded" });
   await p.waitForSelector(".dge-canvas svg"); await sleep(300);
 
-  await p.locator('[data-act="adr"]').click(); await sleep(200);
+  await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="adr"]').click(); await sleep(200);
   await p.keyboard.type("Use Postgres"); await p.keyboard.press("Enter"); await sleep(600);
   assert.match(saved(), /adr use-postgres: Use Postgres \[proposed\] \{\n  context: What is going on, and why decide now\?\n  options: What we considered\n  decision: What we chose\n  consequences: What gets easier or harder\n\}/, saved());
 

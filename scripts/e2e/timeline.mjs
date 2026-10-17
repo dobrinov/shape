@@ -42,7 +42,7 @@ try {
   assert.match(saved(), /timeline log: Log \[x: 0, y: 400\] \{\n  Dec 2024: Deal signed\n  7–14 May 2026: Visa approves\n\}/);
 
   // the Timeline tool, then an event added from its menu, then starred
-  await p.locator('.dge-tool[data-act="timeline"]').click(); await sleep(300);
+  await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="timeline"]').click(); await sleep(300);
   await p.keyboard.type("Launch"); await p.keyboard.press("Enter"); await sleep(600);
   assert.match(saved(), /timeline launch: Launch \{\n  \d{4}-\d\d-\d\d: Today \[important\]\n/);
   const tl = await p.locator('.dg-group[data-id="launch"]').first().boundingBox();

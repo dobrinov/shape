@@ -188,7 +188,7 @@ try {
   // swimlanes around a map: the map goes in the first lane; removing them keeps the map
   const lanesBefore = saved();
   await topic("ideas").click();
-  await p.locator('.dge-tools [data-act="lanes"]').click();
+  await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="lanes"]').click();
   await p.waitForFunction(() => document.activeElement && document.activeElement.classList.contains("dge-inline"));
   await key(MOD + "+a"); await type("Teams"); await key("Enter");
   await sleep(600);
@@ -212,7 +212,7 @@ try {
   // a gantt chart: two tasks starting today; drag a bar's end, Duration…, dependencies, scale; Delete takes it all
   const ganttBefore = saved();
   await key("Escape");
-  await p.locator('.dge-tools [data-act="gantt"]').click();
+  await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="gantt"]').click();
   await p.waitForFunction(() => document.activeElement && document.activeElement.classList.contains("dge-inline"));
   await key(MOD + "+a"); await type("Roadmap"); await key("Enter");
   await sleep(600);

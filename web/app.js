@@ -12,6 +12,8 @@
   var statusEl = document.getElementById("status");
   var fileEl = document.getElementById("file");
   var actions = document.getElementById("app-actions");
+  var brand = document.querySelector(".app-bar .brand");
+  var update = document.getElementById("update");
   var editor = null;
 
   function status(text, cls) {
@@ -28,7 +30,11 @@
     host.innerHTML = "";
     // the sidebars are hidden for now; ?sidebars brings them back
     var sidebars = /[?&]sidebars\b/.test(location.search);
-    editor = DiagramEditor.create(host, Object.assign({ wasm: wasm, source: source, shareUrl: SHARE_URL, code: sidebars, panel: sidebars }, extra));
+    // one bar: the app's name, its actions and the save status go into the editor's
+    var lead = [brand, actions].filter(Boolean), stat = [statusEl, update].filter(Boolean);
+    editor = DiagramEditor.create(host, Object.assign({ wasm: wasm, source: source, shareUrl: SHARE_URL, code: sidebars, panel: sidebars, lead: lead, status: stat }, extra));
+    var bar = document.querySelector(".app-bar");
+    if (bar) bar.remove();
     window.diagramEditor = editor; // handy from the console
     return editor;
   }
@@ -119,7 +125,7 @@
         // Rethink takes what changed in git as the new information
         since: function () {
           return fetch(api("api/since")).then(function (r) { return r.json(); }).then(function (v) {
-            return v.ok && v.source != null ? { source: v.source, label: v.label } : null;
+            return v.ok && v.source != null ? { source: v.source, label: v.label, branch: v.branch, main: v.main } : null;
           });
         },
         onChange: function (text) {

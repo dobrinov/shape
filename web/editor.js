@@ -61,6 +61,8 @@
     section: '<rect x="3" y="8" width="18" height="12" rx="2"/><rect x="3" y="3" width="9" height="3.5" rx="1.2" fill="currentColor" stroke="none"/>',
     fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     magic: '<path d="M10 3.5c.5 3.9 2.6 6 6.5 6.5-3.9.5-6 2.6-6.5 6.5-.5-3.9-2.6-6-6.5-6.5 3.9-.5 6-2.6 6.5-6.5z" fill="currentColor" stroke="none"/><path d="M18 13.5c.25 1.9 1.1 2.75 3 3-1.9.25-2.75 1.1-3 3-.25-1.9-1.1-2.75-3-3 1.9-.25 2.75-1.1 3-3z" fill="currentColor" stroke="none"/>',
+    branch: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3.5-11 6.5"/>',
+    blocks: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
     timeline: '<path d="M3 12h18"/><circle cx="6.5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M17.5 8.6l1.05 2.15 2.35.33-1.7 1.65.4 2.35-2.1-1.1-2.1 1.1.4-2.35-1.7-1.65 2.35-.33z" fill="currentColor" stroke="none"/><path d="M6.5 10V6M12 14v4"/>',
     ask: '<path d="M4 5.5A2.5 2.5 0 016.5 3h11A2.5 2.5 0 0120 5.5v8a2.5 2.5 0 01-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 014 14.5z"/><path d="M10 7.8a2 2 0 113 1.7c-.7.4-1 .8-1 1.5"/><circle cx="12" cy="13.2" r=".6" fill="currentColor"/>',
     rethink: '<rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M14 7h3.5a2 2 0 012 2v2M10 17H6.5a2 2 0 01-2-2v-2"/><path d="M17.5 9.5l2 2 2-2M6.5 14.5l-2-2-2 2"/>',
@@ -265,67 +267,134 @@
       return b;
     }
 
+    /* The blocks the Blocks palette offers: [icon, name, what it is, act]. */
+    function blockKinds() {
+      var go = function (f) { return function () { closeBlocks(); canvas.focus({ preventScroll: true }); f(); }; };
+      return [
+        ["Think", [
+          ["mindmap", "Mindmap", "T · branch with Tab", go(function () { setTool("mindmap"); })],
+          ["timeline", "Timeline", "What happened when", go(addTimeline)],
+          ["adr", "Decision record", "Context, options, choice", go(addRecord)],
+          ["risks", "Risk matrix", "Likelihood × impact", go(addRisks)]
+        ]],
+        ["Plan", [
+          ["kanban", "Kanban", "Cards in columns", go(addKanban)],
+          ["gantt", "Gantt chart", "Tasks and forecast", go(addGantt)],
+          ["table", "Table", "Rows and columns", go(addTable)],
+          ["chart", "Chart", "Bars, lines, pie…", function (e) { closeBlocks(); chartMenu(blocksBtn); }]
+        ]],
+        ["Specify", [
+          ["sequence", "Sequence diagram", "Who talks to whom", go(addSequence)],
+          ["entity", "Database table", "Columns and keys", go(addEntity)],
+          ["lanes", "Swimlanes", "Steps across teams", go(addSwimlanes)],
+          ["decision", "Decision point", "D · a diamond", go(function () { setTool("decision"); })],
+          ["section", "Section", MOD + "G · around the selection", go(groupSelection)],
+          ["canvas", "Canvas", "A board inside this one", go(function () {
+            var r = canvas.getBoundingClientRect();
+            st.menuAt = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+            newCanvas(toDiagram(st.menuAt.x, st.menuAt.y));
+          })]
+        ]]
+      ];
+    }
+    var blocksBtn = null, blocksMenu = null, boardMenu = null;
+    function closeBlocks() { if (blocksMenu) blocksMenu.hidden = true; if (blocksBtn) blocksBtn.classList.remove("on"); }
+    function toggleBlocks() {
+      if (!blocksMenu.hidden) return closeBlocks();
+      closeAiMenu();
+      blocksMenu.hidden = false;
+      blocksBtn.classList.add("on");
+    }
+    function buildBlocks() {
+      blocksMenu = h("div", { class: "dge-blocks", role: "menu", "aria-label": "Add a block", hidden: true });
+      blockKinds().forEach(function (sec) {
+        blocksMenu.appendChild(h("div", { class: "dge-blocks-head" }, [sec[0]]));
+        var grid = h("div", { class: "dge-blocks-grid" });
+        sec[1].forEach(function (k) {
+          grid.appendChild(h("button", { role: "menuitem", "data-block": k[0], onclick: k[3] }, [
+            h("span", { class: "dge-blocks-ico", html: icon(k[0] === "canvas" ? "section" : k[0]) }),
+            h("span", { class: "dge-blocks-text" }, [h("b", {}, [k[1]]), h("span", {}, [k[2]])])
+          ]));
+        });
+        blocksMenu.appendChild(grid);
+      });
+      ["pointerdown", "dblclick", "contextmenu"].forEach(function (ev) { blocksMenu.addEventListener(ev, function (e) { e.stopPropagation(); }); });
+      canvas.appendChild(blocksMenu);
+    }
+    /* Board: flow direction, arrow routing, theme and tidy up, out of the bar. */
+    function toggleBoardMenu(anchor) {
+      if (boardMenu.hidden === false) { boardMenu.hidden = true; return; }
+      var r = anchor.getBoundingClientRect(), host = el.getBoundingClientRect();
+      boardMenu.hidden = false;
+      boardMenu.style.top = (r.bottom - host.top + 6) + "px";
+      boardMenu.style.left = Math.max(8, Math.min(r.right - host.left - boardMenu.offsetWidth, host.width - boardMenu.offsetWidth - 8)) + "px";
+    }
     function buildToolbar() {
       toolbar.innerHTML = "";
       tools.innerHTML = "";
       tools.hidden = view;
+      // the host's own things first (the app's name, its actions)
+      if (opts.lead) toolbar.appendChild(h("div", { class: "dge-group dge-lead" }, [].concat(opts.lead)));
+      toolbar.crumbs = h("nav", { class: "dge-crumbs", "aria-label": "Where you are" });
+      toolbar.appendChild(toolbar.crumbs);
+      toolbar.branch = h("button", { class: "dge-branch", hidden: true, onclick: function () { toggleBranchChanges(); } });
+      toolbar.appendChild(toolbar.branch);
+      if (opts.status) [].concat(opts.status).forEach(function (s) { toolbar.appendChild(s); });
+      toolbar.baseChip = h("span", { class: "dge-chip", hidden: true });
+      toolbar.appendChild(toolbar.baseChip);
+      toolbar.appendChild(h("div", { class: "dge-spacer" }));
+      toolbar.extra = h("div", { class: "dge-group dge-extra" });
+      toolbar.appendChild(toolbar.extra);
+      (st.extraButtons || []).forEach(function (b) { toolbar.extra.appendChild(b); });
+      var right = h("div", { class: "dge-group" });
       if (!view) {
         [
           [["select", "Select (V): click or drag a box around things; drag them to move them. Hold Space to pan."], ["hand", "Hand (H): drag anywhere to pan"]],
-          [["mindmap", "Mindmap (T): click to start one, then Tab adds a branch, Enter a sibling"], ["node", "Box (N): click to place one"], ["decision", "Decision (D): click to place a diamond"], ["sticky", "Sticky note (S): click to place one"], ["connect", "Connect (X): drag from one block to another, or drag a block's handle"]],
-          [["comment", "Comment (C): click a block to comment on it, or anywhere on the canvas"]]
+          [["node", "Box (N): click to place one"], ["sticky", "Sticky note (S): click to place one"], ["connect", "Connect (X): drag from one block to another, or drag a block's handle"]]
         ].forEach(function (set, i) {
           if (i) tools.appendChild(h("span", { class: "dge-tools-sep" }));
           set.forEach(function (t) {
             tools.appendChild(btn({ class: "dge-tool", "data-tool": t[0], title: t[1], "aria-pressed": "false", onclick: function () { setTool(t[0]); canvas.focus({ preventScroll: true }); } }, icon(t[0])));
           });
-          // sections and swimlanes sit with the blocks
-          if (i === 1) {
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "lanes", title: "Swimlanes: lanes the flow runs across; the selected blocks go in the first lane. Drop blocks into a lane to move them there.", onclick: function () { canvas.focus({ preventScroll: true }); addSwimlanes(); } }, icon("lanes")));
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "kanban", title: "Kanban: columns of cards; the selected blocks go in the first column. Drag a card to another column or place in one.", onclick: function () { canvas.focus({ preventScroll: true }); addKanban(); } }, icon("kanban")));
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "sequence", title: "Sequence diagram: participants side by side, messages top to bottom. Connect two participants to add a message; drag a participant sideways to reorder.", onclick: function () { canvas.focus({ preventScroll: true }); addSequence(); } }, icon("sequence")));
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "gantt", title: "Gantt chart: tasks on a timeline. Drag a bar to reschedule it; right-click a task to change its length or add one after it.", onclick: function () { canvas.focus({ preventScroll: true }); addGantt(); } }, icon("gantt")));
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "table", title: "Table: rows and columns of text. Right-click it to edit it as text or add a row.", onclick: function () { canvas.focus({ preventScroll: true }); addTable(); } }, icon("table")));
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "timeline", title: "Timeline: events by date, important ones starred. Right-click it to add an event or edit it as text; a date | event table converts with Show as timeline.", onclick: function () { canvas.focus({ preventScroll: true }); addTimeline(); } }, icon("timeline")));
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "entity", title: "Database table: columns with types and keys; a foreign key is drawn to the column it references. Right-click to edit the columns.", onclick: function () { canvas.focus({ preventScroll: true }); addEntity(); } }, icon("entity")));
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "chart", title: "Chart: bars, lines, areas, pie, donut or scatter from a small table. Right-click it to change the type or edit the data.", onclick: function (e) { chartMenu(e.currentTarget); } }, icon("chart")));
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "adr", title: "Decision record: context, options, decision and consequences, with a status. Right-click it to change the status or edit it as text.", onclick: function () { canvas.focus({ preventScroll: true }); addRecord(); } }, icon("adr")));
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "risks", title: "Risk matrix: risks by probability and impact. Drag a dot to another cell to re-rate it; hover it for its description.", onclick: function () { canvas.focus({ preventScroll: true }); addRisks(); } }, icon("risks")));
-            tools.appendChild(btn({ class: "dge-tool", "data-act": "section", title: "Section (" + MOD + "G): put the selected blocks in a titled section. Drag blocks in or out of a section to change what is in it.", onclick: function () { canvas.focus({ preventScroll: true }); groupSelection(); } }, icon("section")));
-          }
         });
-        toolbar.appendChild(h("div", { class: "dge-group" }, [
-          btn({ title: "Undo (" + MOD + "Z)", onclick: undo }, icon("undo")),
-          btn({ title: "Redo (" + MOD + "⇧Z)", onclick: redo }, icon("redo"))
-        ]));
+        tools.appendChild(h("span", { class: "dge-tools-sep" }));
+        blocksBtn = h("button", { class: "dge-tool dge-blocks-btn", "data-act": "blocks", "aria-haspopup": "menu", title: "Blocks: mindmaps, timelines, kanban, gantt, tables, charts, sequence and ER diagrams, decision records, risk matrices, swimlanes, sections and canvases", onclick: function () { toggleBlocks(); }, html: icon("blocks") + "<span>Blocks</span>" });
+        tools.appendChild(blocksBtn);
+        tools.appendChild(h("span", { class: "dge-tools-sep" }));
+        tools.appendChild(btn({ class: "dge-tool", "data-tool": "comment", title: "Comment (C): click a block to comment on it, or anywhere on the canvas", "aria-pressed": "false", onclick: function () { setTool("comment"); canvas.focus({ preventScroll: true }); } }, icon("comment")));
+        if (!blocksMenu) buildBlocks();
+
+        right.appendChild(btn({ title: "Undo (" + MOD + "Z)", onclick: undo }, icon("undo")));
+        right.appendChild(btn({ title: "Redo (" + MOD + "⇧Z)", onclick: redo }, icon("redo")));
         var dir = h("select", { title: "Direction", class: "dge-select", onchange: function (e) { applyOps([{ op: "set", key: "direction", value: e.target.value }]); } });
         [["right", "→ Right"], ["down", "↓ Down"], ["left", "← Left"], ["up", "↑ Up"]].forEach(function (d) { dir.appendChild(h("option", { value: d[0] }, [d[1]])); });
         var routing = h("select", { title: "Edge style", class: "dge-select", onchange: function (e) { applyOps([{ op: "set", key: "routing", value: e.target.value }]); } });
         [["orthogonal", "Elbow"], ["curved", "Curved"], ["straight", "Straight"]].forEach(function (d) { routing.appendChild(h("option", { value: d[0] }, [d[1]])); });
         var themeSel = h("select", { title: "Theme of this board", class: "dge-select", onchange: function (e) {
           var v = e.target.value;
-          if (v === "__edit") { e.target.value = currentTheme(); editTheme(); return; }
+          if (v === "__edit") { e.target.value = currentTheme(); boardMenu.hidden = true; editTheme(); return; }
           applyOps([{ op: "set", key: "theme", value: v || "light" }]);
         } });
-        toolbar.appendChild(h("div", { class: "dge-group" }, [dir, routing, themeSel, btn({ title: "Tidy up: let the layout place every node again", onclick: function () { applyOps([{ op: "unpin" }]); fitSoon(); } }, icon("tidy"))]));
         toolbar.dirSel = dir; // not `dir`: elements have a `dir` (text direction) of their own
         toolbar.routing = routing;
         toolbar.theme = themeSel;
+        if (boardMenu) boardMenu.remove();
+        var row = function (label, ctl) { return h("label", { class: "dge-board-row" }, [h("span", {}, [label]), ctl]); };
+        boardMenu = h("div", { class: "dge-board-menu", role: "dialog", "aria-label": "Board", hidden: true }, [
+          row("Flow", dir), row("Arrows", routing), row("Theme", themeSel),
+          h("button", { class: "dge-board-tidy", onclick: function () { boardMenu.hidden = true; applyOps([{ op: "unpin" }]); fitSoon(); } }, [h("span", { html: icon("tidy") }), "Tidy up the layout"])
+        ]);
+        el.appendChild(boardMenu);
+        right.appendChild(h("button", { class: "dge-bar-btn", "data-act": "board", title: "Board: flow direction, arrow style, theme, tidy up", onclick: function (e) { toggleBoardMenu(e.currentTarget); }, html: icon("tidy") + "<span>Board</span>" }));
         setTimeout(fillThemes); // the first render came before the toolbar
       }
-      toolbar.appendChild(h("div", { class: "dge-spacer" }));
-      toolbar.extra = h("div", { class: "dge-group dge-extra" });
-      toolbar.appendChild(toolbar.extra);
-      (st.extraButtons || []).forEach(function (b) { toolbar.extra.appendChild(b); });
-      toolbar.baseChip = h("span", { class: "dge-chip", hidden: true });
-      toolbar.appendChild(toolbar.baseChip);
-      var right = h("div", { class: "dge-group" });
       right.appendChild(btn({ title: "Present: the board's sections and blocks one at a time (← →, Esc)", onclick: function () { present(); } }, icon("present")));
-      right.appendChild(h("button", { title: "Export and share", onclick: function (e) { openExport(e.currentTarget); } }, ["Export ▾"]));
       if (!view && hasCode) right.appendChild(btn({ "data-act": "code", title: "Code (" + MOD + "/)", onclick: function () { showCode = !showCode; applyChrome(); } }, icon("code")));
       if (hasPanel) right.appendChild(btn({ "data-act": "panel", title: "Inspector & comments", onclick: function () { showPanel = !showPanel; applyChrome(); renderPanel(); } }, icon("panel")));
       right.appendChild(btn({ title: "Light / dark", onclick: function () { st.dark = !st.dark; applyChrome(); render(); } }, icon("theme")));
+      right.appendChild(h("button", { class: "dge-share", title: "Share: a link, an image, the source", onclick: function (e) { openExport(e.currentTarget); } }, ["Share"]));
       toolbar.appendChild(right);
+      updateTrail();
     }
 
     function buildTabs() {
@@ -343,17 +412,19 @@
     }
 
     /* Canvases inside the board: the one open, and the way back up. */
-    var trail = null;
+    /* Where you are: the board, then the canvases you went into. */
     function updateTrail() {
       var t = JSON.parse(st.session.canvas_trail());
       st.canvasPath = t[t.length - 1].path;
-      if (t.length < 2) { if (trail) { trail.remove(); trail = null; } return; }
-      if (!trail) { trail = h("nav", { class: "dge-trail", "aria-label": "Canvases" }); el.appendChild(trail); }
-      trail.innerHTML = "";
+      if (!toolbar.crumbs) return;
+      toolbar.crumbs.innerHTML = "";
+      if (t.length === 1 && t[0].title === "Board" && opts.name) t[0].title = opts.name;
       t.forEach(function (c, i) {
-        if (i) trail.appendChild(h("span", { class: "dge-trail-sep" }, ["›"]));
+        if (i) toolbar.crumbs.appendChild(h("span", { class: "dge-crumb-sep", "aria-hidden": "true" }, ["/"]));
         var last = i === t.length - 1;
-        trail.appendChild(last ? h("strong", {}, [c.title]) : h("button", { title: "Back to “" + c.title + "”", onclick: function () { openCanvas(c.path); } }, [c.title]));
+        toolbar.crumbs.appendChild(last
+          ? h("strong", { title: i === 0 && opts.file ? opts.file : c.title }, [c.title])
+          : h("button", { title: "Back to “" + c.title + "”", onclick: function () { openCanvas(c.path); } }, [c.title]));
       });
     }
     /* Open the canvas at `path` (ids from the top board; [] for the top). */
@@ -476,6 +547,7 @@
       render();
       emit("change", st.text);
       if (opts.onChange) opts.onChange(st.text, api);
+      if (since) { clearTimeout(branchTimer); branchTimer = setTimeout(paintBranch, 600); }
     }
 
     /* Apply ops through the core. `live` skips undo/code sync (used while dragging). */
@@ -3259,6 +3331,8 @@
         return;
       }
       if (!aiMenu.hidden && e.key === "Escape") { e.preventDefault(); closeAiMenu(); return; }
+      if (blocksMenu && !blocksMenu.hidden && e.key === "Escape") { e.preventDefault(); closeBlocks(); return; }
+      if (boardMenu && !boardMenu.hidden && e.key === "Escape") { e.preventDefault(); boardMenu.hidden = true; return; }
       if (!askPanel.hidden && e.key === "Escape") { e.preventDefault(); closeAsk(); return; }
       if (mod && e.key.toLowerCase() === "k" && !view) { e.preventDefault(); askAI(); return; }
       if (mod && e.key.toLowerCase() === "f") { e.preventDefault(); openFind(); return; }
@@ -3668,6 +3742,10 @@
     }
     document.addEventListener("pointerdown", function (e) { if (!menu.hidden && !menu.contains(e.target) && !e.target.closest(".dge-toolbar")) closeMenu(); });
     document.addEventListener("pointerdown", function (e) { if (!aiMenu.hidden && !aiMenu.contains(e.target) && !aiFab.contains(e.target)) closeAiMenu(); });
+    document.addEventListener("pointerdown", function (e) {
+      if (blocksMenu && !blocksMenu.hidden && !blocksMenu.contains(e.target) && !(blocksBtn && blocksBtn.contains(e.target))) closeBlocks();
+      if (boardMenu && !boardMenu.hidden && !boardMenu.contains(e.target) && !e.target.closest("[data-act=board]")) boardMenu.hidden = true;
+    });
 
     function baseName() {
       return slug((st.doc && st.doc.title) || opts.name || "diagram");
@@ -3825,6 +3903,37 @@
       });
     }
 
+    /* The branch chip: in git, which branch this is and how much changed on
+       it (since it left main, or since the last commit on main). A click
+       shows those changes on the board. */
+    var since = null, branchTimer = null;
+    function refreshBranch() {
+      if (!opts.since || !toolbar.branch) return;
+      Promise.resolve(opts.since()).then(function (v) {
+        since = v && v.source != null ? v : null;
+        paintBranch();
+      }).catch(function () { since = null; paintBranch(); });
+    }
+    function paintBranch() {
+      var b = toolbar.branch;
+      if (!b) return;
+      if (!since) { b.hidden = true; return; }
+      var n = wasm.count_changes ? wasm.count_changes(since.source, st.text) : -1;
+      var onMain = !since.branch || since.branch === since.main;
+      var what = n < 0 ? "" : n === 0 ? (onMain ? "no changes since the last commit" : "no changes since " + since.main)
+        : n + (n === 1 ? " change" : " changes") + (onMain ? " not committed" : " since " + since.main);
+      b.innerHTML = icon("branch") + "<span></span>";
+      b.lastChild.textContent = (since.branch || since.main || "git") + (what ? " · " + what : "");
+      b.title = n > 0 ? "Show what changed since " + since.label + " (click again to stop)" : "In git: " + since.label;
+      b.classList.toggle("on", st.base != null && st.baseLabel === since.label);
+      b.hidden = false;
+    }
+    function toggleBranchChanges() {
+      if (!since) return;
+      if (st.base != null && st.baseLabel === since.label) setBase(null);
+      else setBase(since.source, since.label);
+      paintBranch();
+    }
     function setBase(src, label) {
       st.base = src;
       st.baseLabel = label;
@@ -3833,7 +3942,7 @@
       toolbar.baseChip.hidden = src == null;
       toolbar.baseChip.innerHTML = "";
       if (src != null) {
-        toolbar.baseChip.appendChild(document.createTextNode("Changes since " + (label || "base") + " "));
+        toolbar.baseChip.appendChild(document.createTextNode(since && label === since.label ? "Changes shown " : "Changes since " + (label || "base") + " "));
         toolbar.baseChip.appendChild(h("button", { title: "Copy the change summary", onclick: function () { copyText(st.session.diff_markdown()).then(function () { flash("Change summary copied"); }); } }, ["copy"]));
         toolbar.baseChip.appendChild(h("button", { title: "Stop comparing", onclick: function () { setBase(null); } }, ["×"]));
       }
@@ -4012,6 +4121,9 @@
 
     buildToolbar();
     buildTabs();
+    refreshBranch();
+    // a commit made elsewhere moves the branch's base: look again on return
+    if (opts.since) root.addEventListener("focus", refreshBranch);
     applyChrome();
     load(opts.source || "", false);
     if (opts.base != null) {

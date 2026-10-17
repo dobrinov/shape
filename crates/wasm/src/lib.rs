@@ -452,6 +452,21 @@ pub fn split_markers(text: &str) -> String {
     }
 }
 
+/// How many elements changed from board `old` to board `new` (any format),
+/// canvases included; -1 when either does not parse. "" for `old`: none existed.
+#[wasm_bindgen]
+pub fn count_changes(old: &str, new: &str) -> i32 {
+    let old = if old.trim().is_empty() {
+        Ok(Default::default())
+    } else {
+        diagram_core::parse(old)
+    };
+    match (old, diagram_core::parse(new)) {
+        (Ok(o), Ok(n)) => diagram_core::change_count(&o, &n) as i32,
+        _ => -1,
+    }
+}
+
 /// What Rethink does unless told otherwise (its editable instructions).
 #[wasm_bindgen]
 pub fn rethink_default() -> String {
