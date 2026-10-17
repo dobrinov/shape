@@ -289,9 +289,18 @@ impl Diagram {
     /// open comments, organise what was collected. `since` is an earlier
     /// version of the whole board (null: none; "": the board did not exist),
     /// whose changes are new information; `label` says what it is. Its ops
-    /// apply to the top board. Returns `{prompt}` or `{error}`.
-    pub fn rethink_prompt(&self, since: Option<String>, label: &str) -> String {
-        match self.inner.rethink_prompt(since.as_deref(), label) {
+    /// apply to the top board. `instructions` replace the default ones
+    /// ([`rethink_default`]). Returns `{prompt}` or `{error}`.
+    pub fn rethink_prompt(
+        &self,
+        since: Option<String>,
+        label: &str,
+        instructions: Option<String>,
+    ) -> String {
+        match self
+            .inner
+            .rethink_prompt(since.as_deref(), label, instructions.as_deref())
+        {
             Ok(p) => json!({ "prompt": p }).to_string(),
             Err(e) => err(e),
         }
@@ -441,6 +450,12 @@ pub fn split_markers(text: &str) -> String {
         Some((b, o, t)) => json!({"base": b, "ours": o, "theirs": t}).to_string(),
         None => "null".into(),
     }
+}
+
+/// What Rethink does unless told otherwise (its editable instructions).
+#[wasm_bindgen]
+pub fn rethink_default() -> String {
+    diagram_core::prompt::RETHINK_DEFAULT.to_string()
 }
 
 /// The note in a model's reply to a rethink prompt, or "".

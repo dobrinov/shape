@@ -219,8 +219,8 @@ export class Board {
   }
 
   /** A prompt asking a model to rethink the board (organise what was collected on it); with `since` (an earlier version's source, "" if it did not exist), what changed since is the new information. The reply goes to apply(); replyNote() reads its note. */
-  rethinkPrompt({ since, label = "the earlier version" } = {}) {
-    return parseResult(this.#live().rethink_prompt(since == null ? undefined : String(since), String(label))).prompt;
+  rethinkPrompt({ since, label = "the earlier version", instructions } = {}) {
+    return parseResult(this.#live().rethink_prompt(since == null ? undefined : String(since), String(label), instructions == null ? undefined : String(instructions))).prompt;
   }
 
   /** Every gantt chart's tasks, planned against the forecast as of `today` (a Date or YYYY-MM-DD; default: now). */

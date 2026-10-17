@@ -45,8 +45,8 @@
 .dge button:active { background: var(--bg-active); }
 .dge button:disabled { color: var(--faint); cursor: default; }
 .dge button.on { background: var(--accent-bg); color: var(--accent); }
-.dge button.dge-primary { background: var(--accent-solid); border-color: var(--accent-solid); color: var(--accent-fg); font-weight: 600; }
-.dge button.dge-primary:hover { filter: brightness(1.08); }
+.dge button.dge-primary, .dge .dge-actions button.primary { background: var(--accent-solid); border-color: var(--accent-solid); color: var(--accent-fg); font-weight: 600; }
+.dge button.dge-primary:hover, .dge .dge-actions button.primary:hover { filter: brightness(1.08); }
 .dge button.danger { color: var(--danger); }
 .dge :focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .dge ::placeholder { color: var(--faint); }
@@ -170,8 +170,8 @@
 .dge button.dge-swatch.on { box-shadow: 0 0 0 2px var(--accent); }
 .dge-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .dge-actions.end { justify-content: flex-end; margin: 12px 0 0; }
-.dge-actions button:not(.dge-primary) { border-color: var(--line-strong); background: var(--bg); }
-.dge-actions button:not(.dge-primary):hover { background: var(--bg3); }
+.dge-actions button:not(.dge-primary):not(.primary) { border-color: var(--line-strong); background: var(--bg); }
+.dge-actions button:not(.dge-primary):not(.primary):hover { background: var(--bg3); }
 .dge-actions.small button { min-height: 24px; font-size: 12px; }
 .dge-muted { color: var(--muted); }
 .dge-tip { color: var(--muted); font-size: 12px; padding: 8px 10px; border-radius: var(--r-2); background: var(--bg2); }
@@ -282,6 +282,11 @@
 .dge-ai-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
 .dge-ai-text b { font-weight: 600; color: var(--fg); }
 .dge-ai-text span { color: var(--muted); font-size: 12px; white-space: normal; }
+/* Rethink: its instructions, and examples to start from */
+.dge-rethink-examples { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; }
+.dge .dge-rethink-examples button { height: 26px; min-height: 0; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg); font-size: 12px; }
+.dge .dge-rethink-examples button:hover { border-color: var(--accent); color: var(--accent); }
+.dge .dge-rethink-text { min-height: 220px; font: 13px/1.5 var(--font, inherit); }
 /* Ask: the conversation above the AI button */
 .dge-ask-panel { position: absolute; right: 16px; bottom: 80px; z-index: 7; display: flex; flex-direction: column; width: min(400px, calc(100% - 32px)); max-height: calc(100% - 110px); border: 1px solid var(--line-strong); border-radius: var(--r-3); background: var(--bg); box-shadow: var(--shadow); color: var(--fg); }
 .dge-ask-panel[hidden] { display: none; }

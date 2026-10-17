@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.38.0 — 2026-10-18
+
+- **Rethink with your own instructions:** Rethink opens a dialog with what it will do, in words you can change. The default is a better prompt:
+  1. act on every open comment, wherever it matters, and resolve it;
+  2. take in what is new and revise the older items around it;
+  3. put related items in named sections, merge duplicates, and fold stray notes in;
+  4. give items short titles, with the context in their details;
+  5. fix arrows;
+  6. never drop information.
+  Start from *For senior management* (lead with the decision, status and risks; move technical detail into details shown on hover), *Shorter, clearer titles*, or write your own. The last instructions you used are remembered in this browser. Only how to write the changes (ops, ids, canvases) stays fixed. Core `prompt::RETHINK_DEFAULT` and an `instructions` argument for `rethink` / `Session::rethink_prompt`; WASM `rethink_default`; npm `rethinkPrompt({instructions})`.
+- Dialogs show their main button in the accent colour (*Add*, *Rethink*, *Save*).
+
 ## 0.37.0 — 2026-10-18
 
 - **Timelines:** a new block for what happened when. One event per line, `DATE: what happened [important]`, with the date as you write it: `2026-10-28`, `28 Oct 2026`, `Oct 2026`, `mid Dec 2026`, `Q4 2026`, `2026`, `~6 Aug 2026`, or a span (`7–14 May 2026`). Events sit on a line by date:

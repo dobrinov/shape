@@ -887,8 +887,8 @@ export class Board {
   /** A prompt asking a model to change the board as `request` says, about `ids` (empty: the whole board). Pass the model's reply to apply(); if it throws, send askAgain(prompt, reply, error.message). */
   askPrompt(request: string, ids?: string[]): string;
 
-  /** A prompt asking a model to rethink the board: organise what was collected on it. With `since` (an earlier version's source; "" if the board did not exist), what changed since is the new information; `label` says what that version is (e.g. "where the branch left main"). Pass the reply to apply(); replyNote(reply) is its note. @throws DiagramError if `since` does not parse */
-  rethinkPrompt(options?: { since?: string; label?: string }): string;
+  /** A prompt asking a model to rethink the board: act on its open comments and organise what was collected (or follow `instructions` instead). With `since` (an earlier version's source; "" if the board did not exist), what changed since is the new information; `label` says what that version is (e.g. "where the branch left main"). Pass the reply to apply(); replyNote(reply) is its note. @throws DiagramError if `since` does not parse */
+  rethinkPrompt(options?: { since?: string; label?: string; instructions?: string }): string;
 
   /** Every gantt chart's tasks, planned against the forecast as of `today` (default: now). */
   schedule(options?: { today?: Date | string }): Schedule;

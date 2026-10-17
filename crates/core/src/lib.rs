@@ -456,7 +456,12 @@ impl Session {
     /// board, any format; "": none of it existed), what changed since is new
     /// information; `label` says what that version is. Its ops apply to the
     /// top board (`in` ops reach into canvases).
-    pub fn rethink_prompt(&self, since: Option<&str>, label: &str) -> Result<String, String> {
+    pub fn rethink_prompt(
+        &self,
+        since: Option<&str>,
+        label: &str,
+        instructions: Option<&str>,
+    ) -> Result<String, String> {
         let old = match since {
             None => None,
             Some(s) if s.trim().is_empty() => Some(Document::default()),
@@ -469,6 +474,7 @@ impl Session {
             &self.whole(),
             &self.canvas_path(),
             old.as_ref().map(|o| (o, label)),
+            instructions,
         ))
     }
 }
@@ -540,7 +546,7 @@ mod tests {
         s.set_source(now);
         s.open_canvas(&["payments".into()]).unwrap();
         let p = s
-            .rethink_prompt(Some(old), "where this branch left main")
+            .rethink_prompt(Some(old), "where this branch left main", None)
             .unwrap();
         assert!(p.starts_with("# Rethink the board \"Checkout\""), "{p}");
         assert!(
@@ -562,17 +568,29 @@ mod tests {
             "{new}"
         );
         assert!(p.contains(r#"{"op": "in", "canvas": "plan""#));
-        assert!(!s.rethink_prompt(None, "").unwrap().contains("What is new"));
         assert!(!s
-            .rethink_prompt(Some(now), "the last commit")
+            .rethink_prompt(None, "", None)
             .unwrap()
             .contains("What is new"));
-        assert!(s.rethink_prompt(Some("a -> -> ["), "x").is_err());
+        assert!(!s
+            .rethink_prompt(Some(now), "the last commit", None)
+            .unwrap()
+            .contains("What is new"));
+        assert!(s.rethink_prompt(Some("a -> -> ["), "x", None).is_err());
+        // the person's own instructions replace the default; the rules stay
+        let own = s
+            .rethink_prompt(None, "", Some("Adapt this canvas for senior management."))
+            .unwrap();
+        assert!(own.contains("## What to do\n\nAdapt this canvas for senior management.\n\nHow to change the board:") && !own.contains("Bring this canvas up to date"), "{own}");
+        assert!(s
+            .rethink_prompt(None, "", Some("  "))
+            .unwrap()
+            .contains(prompt::RETHINK_DEFAULT));
         // a resolved comment is not asked about
         let mut done = Session::new();
         done.set_source("a: A\ncomment on a: fine [resolved]\n");
         assert!(!done
-            .rethink_prompt(None, "")
+            .rethink_prompt(None, "", None)
             .unwrap()
             .contains("## Open comments"));
         assert_eq!(

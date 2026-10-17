@@ -70,6 +70,9 @@ try {
   // Rethink (from the right-click menu on the empty board): the note comes with the changes
   await p.locator(".dge-canvas").click({ position: { x: 20, y: 300 }, button: "right" });
   await p.locator(".dge-menu button, .dge-menu [role=menuitem]", { hasText: "Rethink the board" }).first().click();
+  // the dialog shows the default instructions to run or change
+  assert.match(await p.locator(".dge-modal textarea").inputValue(), /^Bring this canvas up to date/);
+  await p.locator(".dge-modal button.primary").click();
   await p.waitForSelector(".dge-preview-bar");
   assert.match(await p.locator(".dge-preview-bar").textContent(), /Put the storage in its own section\. \(1 op\)/);
   await p.locator(".dge-preview-bar button.primary").click();
@@ -84,11 +87,25 @@ try {
   ])); await sleep(700);
   await p.locator(".dge-ai-fab").click();
   await p.locator(".dge-ai-item", { hasText: "Rethink" }).click();
+  await p.locator(".dge-modal button.primary").click();
   await p.waitForSelector(".dge-preview-bar");
   assert.match(await p.locator(".dge-preview-bar").textContent(), /Scope now has both card products\. \(1 op\)/);
   await p.locator(".dge-preview-bar button.primary").click(); await sleep(700);
   assert.match(saved(), /n1: Two products: virtual cards and spend cards/);
   assert.match(saved(), /comment c1 on n1: Two card products now \[resolved, resolution: Scope updated\]/);
+
+  // own instructions reach the model, and are there the next time
+  await p.locator(".dge-ai-fab").click();
+  await p.locator(".dge-ai-item", { hasText: "Rethink" }).click();
+  await p.locator(".dge-rethink-examples button", { hasText: "For senior management" }).click();
+  await p.locator(".dge-modal button.primary").click();
+  await p.waitForSelector(".dge-preview-bar");
+  assert.match(await p.locator(".dge-preview-bar").textContent(), /Adapted for management/);
+  await p.locator(".dge-preview-bar button", { hasText: "Discard" }).click(); await sleep(300);
+  await p.locator(".dge-ai-fab").click();
+  await p.locator(".dge-ai-item", { hasText: "Rethink" }).click();
+  assert.match(await p.locator(".dge-modal textarea").inputValue(), /^Adapt this canvas for senior management/);
+  await p.locator(".dge-modal button", { hasText: "Cancel" }).click();
 
   // Ask: an answer with links; a link selects what it points at; nothing changes
   const before = saved();
