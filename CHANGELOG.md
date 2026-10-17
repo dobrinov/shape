@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.38.1 — 2026-10-18
+
+- The AI button's icon is a spark: one four-point star and a small one, in white on the blue button (no longer yellow glitter).
+
 ## 0.38.0 — 2026-10-18
 
 - **Rethink with your own instructions:** Rethink opens a dialog with what it will do, in words you can change. The default is a better prompt:
