@@ -1174,6 +1174,8 @@ fn datum_svg(
             crate::entities::tooltip(node)
         } else if crate::tables::table_of(doc, node).is_some() {
             crate::tables::tooltip(doc, node)
+        } else if crate::timeline::timeline_of(doc, node).is_some() {
+            crate::timeline::tooltip(node)
         } else if crate::adr::record_of(doc, node).is_some() {
             node.display().to_string()
         } else {
@@ -2128,6 +2130,19 @@ fn node_svg(
             detail_fg,
             anchor,
             "",
+        );
+    } else if node.detail.as_deref().is_some_and(|d| !d.is_empty()) {
+        // a detail kept off the box (a kanban card): ≡ says there is more
+        let (mx, my) = (x + w - 16.0, y + h - 11.0);
+        let _ = write!(
+            s,
+            r#"<path class="dg-more" d="M{} {}h9M{} {}h9M{} {}h6" stroke="{detail_fg}" stroke-width="1.6" stroke-linecap="round"/>"#,
+            n(mx),
+            n(my - 4.0),
+            n(mx),
+            n(my),
+            n(mx),
+            n(my + 4.0)
         );
     }
     if web_link(node).is_some() {

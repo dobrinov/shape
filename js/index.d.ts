@@ -122,6 +122,10 @@ export interface Node {
   values?: (number | null)[];
   /** Table row: its cells after the first (its label). */
   cells?: string[];
+  /** Timeline event: when, as written (`2026-10-28`, `28 Oct 2026`, `Oct 2026`, `mid Dec 2026`, `Q4 2026`, `2026`, or a span `7–14 May 2026`; "" clears it). */
+  date?: string;
+  /** Timeline event: one that matters most (drawn as a star). */
+  important?: boolean;
   /** Database table column (the label is its name). */
   column?: Column;
 }
@@ -191,6 +195,8 @@ export interface Group {
   axis?: string;
   /** A table (its nodes are rows). */
   table?: boolean;
+  /** A timeline (its nodes are events, each with a `date`). */
+  timeline?: boolean;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -283,6 +289,10 @@ export interface AddNodeOp {
   values?: (number | null)[];
   /** Table row: its cells after the first (its label). */
   cells?: string[];
+  /** Timeline event: when, as written (`2026-10-28`, `28 Oct 2026`, `Oct 2026`, `mid Dec 2026`, `Q4 2026`, `2026`, or a span `7–14 May 2026`; "" clears it). */
+  date?: string;
+  /** Timeline event: one that matters most (drawn as a star). */
+  important?: boolean;
   /** Database table column. */
   column?: Column;
 }
@@ -332,6 +342,10 @@ export interface UpdateNodeOp {
   values?: (number | null)[];
   /** Table row: its cells after the first (its label). */
   cells?: string[];
+  /** Timeline event: when, as written (`2026-10-28`, `28 Oct 2026`, `Oct 2026`, `mid Dec 2026`, `Q4 2026`, `2026`, or a span `7–14 May 2026`; "" clears it). */
+  date?: string;
+  /** Timeline event: one that matters most (drawn as a star). */
+  important?: boolean;
   /** Database table column. */
   column?: Column;
 }
@@ -478,6 +492,8 @@ export interface AddGroupOp {
   axis?: string;
   /** A table (its nodes are rows). */
   table?: boolean;
+  /** A timeline (its nodes are events, each with a `date`). */
+  timeline?: boolean;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -520,6 +536,8 @@ export interface UpdateGroupOp {
   axis?: string;
   /** A table (its nodes are rows). */
   table?: boolean;
+  /** A timeline (its nodes are events, each with a `date`). */
+  timeline?: boolean;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -704,6 +722,8 @@ export interface GroupBox extends Rect {
   chart?: ChartKind;
   /** A table. */
   table?: boolean;
+  /** A timeline. */
+  timeline?: boolean;
   /** A database table. */
   entity?: boolean;
 }

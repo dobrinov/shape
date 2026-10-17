@@ -61,6 +61,7 @@
     section: '<rect x="3" y="8" width="18" height="12" rx="2"/><rect x="3" y="3" width="9" height="3.5" rx="1.2" fill="currentColor" stroke="none"/>',
     fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     magic: '<path d="M11.6 6.8Q13.76 12.54 18.8 15Q13.76 17.46 11.6 23.2Q9.44 17.46 4.4 15Q9.44 12.54 11.6 6.8Z M4.6 3.8Q5.5 6.32 7.6 7.4Q5.5 8.48 4.6 11Q3.7 8.48 1.6 7.4Q3.7 6.32 4.6 3.8Z M12.3 0.5Q12.9 2.18 14.3 2.9Q12.9 3.62 12.3 5.3Q11.7 3.62 10.3 2.9Q11.7 2.18 12.3 0.5Z M19.6 5.5Q20.29 7.46 21.9 8.3Q20.29 9.14 19.6 11.1Q18.91 9.14 17.3 8.3Q18.91 7.46 19.6 5.5Z" fill="currentColor" stroke="none"/>',
+    timeline: '<path d="M3 12h18"/><circle cx="6.5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M17.5 8.6l1.05 2.15 2.35.33-1.7 1.65.4 2.35-2.1-1.1-2.1 1.1.4-2.35-1.7-1.65 2.35-.33z" fill="currentColor" stroke="none"/><path d="M6.5 10V6M12 14v4"/>',
     ask: '<path d="M4 5.5A2.5 2.5 0 016.5 3h11A2.5 2.5 0 0120 5.5v8a2.5 2.5 0 01-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 014 14.5z"/><path d="M10 7.8a2 2 0 113 1.7c-.7.4-1 .8-1 1.5"/><circle cx="12" cy="13.2" r=".6" fill="currentColor"/>',
     rethink: '<rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M14 7h3.5a2 2 0 012 2v2M10 17H6.5a2 2 0 01-2-2v-2"/><path d="M17.5 9.5l2 2 2-2M6.5 14.5l-2-2-2 2"/>',
     add: '<path d="M5 4h14v11l-5 5H5z"/><path d="M12 8v7M8.5 11.5h7"/>'
@@ -285,6 +286,7 @@
             tools.appendChild(btn({ class: "dge-tool", "data-act": "sequence", title: "Sequence diagram: participants side by side, messages top to bottom. Connect two participants to add a message; drag a participant sideways to reorder.", onclick: function () { canvas.focus({ preventScroll: true }); addSequence(); } }, icon("sequence")));
             tools.appendChild(btn({ class: "dge-tool", "data-act": "gantt", title: "Gantt chart: tasks on a timeline. Drag a bar to reschedule it; right-click a task to change its length or add one after it.", onclick: function () { canvas.focus({ preventScroll: true }); addGantt(); } }, icon("gantt")));
             tools.appendChild(btn({ class: "dge-tool", "data-act": "table", title: "Table: rows and columns of text. Right-click it to edit it as text or add a row.", onclick: function () { canvas.focus({ preventScroll: true }); addTable(); } }, icon("table")));
+            tools.appendChild(btn({ class: "dge-tool", "data-act": "timeline", title: "Timeline: events by date, important ones starred. Right-click it to add an event or edit it as text; a date | event table converts with Show as timeline.", onclick: function () { canvas.focus({ preventScroll: true }); addTimeline(); } }, icon("timeline")));
             tools.appendChild(btn({ class: "dge-tool", "data-act": "entity", title: "Database table: columns with types and keys; a foreign key is drawn to the column it references. Right-click to edit the columns.", onclick: function () { canvas.focus({ preventScroll: true }); addEntity(); } }, icon("entity")));
             tools.appendChild(btn({ class: "dge-tool", "data-act": "chart", title: "Chart: bars, lines, areas, pie, donut or scatter from a small table. Right-click it to change the type or edit the data.", onclick: function (e) { chartMenu(e.currentTarget); } }, icon("chart")));
             tools.appendChild(btn({ class: "dge-tool", "data-act": "adr", title: "Decision record: context, options, decision and consequences, with a status. Right-click it to change the status or edit it as text.", onclick: function () { canvas.focus({ preventScroll: true }); addRecord(); } }, icon("adr")));
@@ -957,6 +959,24 @@
       ]);
       setTimeout(function () { input.focus(); }, 0);
     }
+    /* A box's details: the context its title leaves out. */
+    function editDetails(id) {
+      var n = node(id);
+      if (!n) return;
+      var input = h("textarea", { class: "dge-chart-data", rows: "6", placeholder: "What is this about? Who is on it, what is known, links to threads…" });
+      input.value = n.detail || "";
+      var save = function () {
+        closeModal();
+        if (input.value.trim() !== (n.detail || "")) applyOps([{ op: "update_node", id: id, detail: input.value.trim() }]);
+        canvas.focus({ preventScroll: true });
+      };
+      input.addEventListener("keydown", function (e) { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") save(); });
+      showModal("Details: " + (n.label || id), h("div", {}, [input]), [
+        h("button", { onclick: closeModal }, ["Cancel"]),
+        h("button", { class: "primary", onclick: save }, ["Save (" + MOD + "↵)"])
+      ]);
+      setTimeout(function () { input.focus(); }, 0);
+    }
     /* Ask: the conversation lasts while the panel is open; nothing is saved. */
     function openAsk() {
       closeAiMenu();
@@ -1522,9 +1542,41 @@
           ["Delete row", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
         ];
       }
+      if (t.type === "node" && !view && timelineOf(t.id)) {
+        var ev = node(t.id), tlg = timelineOf(t.id);
+        return [
+          ["Rename", function () { editLabel(t.id); }],
+          ["Change date…", function () {
+            askAt(st.menuAt, ev.date || "", "e.g. 28 Oct 2026, Oct 2026, 7–14 May 2026", function (v) { if (v) applyOps([{ op: "update_node", id: t.id, date: v }]); });
+          }, ev.date || ""],
+          [ev.important ? "Not important" : "Mark important", function () { applyOps([{ op: "update_node", id: t.id, important: !ev.important }]); }, "Important events are starred and sit closest to the line"],
+          [ev.detail ? "Edit details…" : "Add details…", function () { editDetails(t.id); }, "Shown on hover"],
+          ["Colour…", function () { colourMenu(t.id, "update_node", ev.color); }],
+          ["Edit as text…", function () { editTimeline(tlg.id); }, "The whole timeline"],
+          "-",
+          ["Delete event", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
+        ];
+      }
+      if (gr && !view && gr.timeline) return [
+        ["Rename", function () { editLabel(t.id); }],
+        ["Add event…", function () {
+          askAt(st.menuAt, "", "DATE: what happened, e.g. 28 Oct 2026: Open beta", function (v) {
+            var e = v && eventLine(v);
+            if (!e) return v && flash("Write it as DATE: what happened", true);
+            var base = t.id + "." + slug(e.label || e.date), id = base, k = 2;
+            while (idTaken(id)) id = base + "-" + k++;
+            applyOps([{ op: "add_node", id: id, label: e.label, group: t.id, date: e.date, important: e.important }]);
+          });
+        }],
+        ["Edit as text…", function () { editTimeline(t.id); }, "One event per line: DATE: what happened"],
+        ["Colour…", function () { colourMenu(t.id, "update_group", gr.color); }],
+        "-",
+        ["Delete", function () { applyOps([{ op: "remove", id: t.id, keep_members: false }]); select([]); }, "The timeline and its events"]
+      ];
       if (gr && !view && gr.table) return [
         ["Rename", function () { editLabel(t.id); }],
         ["Edit as text…", function () { editTable(t.id); }, "Rows and columns, separated by |"],
+        ["Show as timeline", function () { tableToTimeline(t.id); }, "When the first column is dates: each row becomes an event"],
         ["Add row", function () {
           var rows = [gr.columns || []].concat(st.doc.nodes.filter(function (n) { return n.group === t.id; }).map(function (n) { return [n.label || n.id].concat(n.cells || []); }));
           rows.push(["New row"]);
@@ -1607,6 +1659,7 @@
       }
       if (t.type === "node" && !mapInfo(t.id) && !view) return [
         ["Rename", function () { editLabel(t.id); }],
+        [node(t.id).detail ? "Edit details…" : "Add details…", function () { editDetails(t.id); }, "More context: shown under the title, or on hover for a kanban card"],
         ["Shape…", function () { shapeMenu(t.id); }],
         ["Colour…", function () { colourMenu(t.id, "update_node", node(t.id).color); }],
         "-",
@@ -2250,6 +2303,7 @@
       return placed ? null : g.id;
     }
     function chartOf(id) { var n = node(id), g = n && n.group && group(n.group); return g && g.gantt ? g : null; }
+    function timelineOf(id) { var n = node(id), g = n && n.group && group(n.group); return g && g.timeline ? g : null; }
     function matrixOf(id) { var n = node(id), g = n && n.group && group(n.group); return g && g.risks ? g : null; }
     /* Themes: the board's choice ("" = default), and the picker's options. */
     function currentTheme() { return (st.doc && st.doc.settings && st.doc.settings.palette) || ""; }
@@ -2470,6 +2524,87 @@
       });
       have.slice(Math.max(rows.length - 1, 0)).forEach(function (n) { ops.push({ op: "remove", id: n.id }); });
       return ops;
+    }
+    /* Timelines: a line per event, `DATE: what happened`, `[important]` to star it. */
+    function addTimeline() {
+      var gid = freshId("timeline"), t = today();
+      var res = applyOps([{ op: "merge", dsl: "timeline " + gid + ": Timeline {\n  " + isoDay(t) + ": Today [important]\n  " + isoDay(t + 30) + ": Next step\n}" }]);
+      if (res.ok) {
+        select([gid]);
+        reveal(gid);
+        editLabel(gid, true);
+      }
+    }
+    function timelineText(gid) {
+      return st.doc.nodes.filter(function (n) { return n.group === gid; }).map(function (n) {
+        return (n.date || "?") + ": " + (n.label || "") + (n.important ? " [important]" : "");
+      }).join("\n");
+    }
+    /* `DATE: what happened [important]` → {date, label, important}. */
+    function eventLine(line) {
+      var important = /\s*\[important\]\s*$/i.test(line);
+      line = line.replace(/\s*\[important\]\s*$/i, "");
+      var k = line.indexOf(": ");
+      if (k < 0 && /:\s*$/.test(line)) k = line.lastIndexOf(":");
+      if (k < 0) return null;
+      return { date: line.slice(0, k).trim(), label: line.slice(k + 1).trim(), important: important };
+    }
+    function timelineOps(gid, lines) {
+      var ops = [], have = st.doc.nodes.filter(function (n) { return n.group === gid; }), taken = [];
+      // a line keeps the event with its label, else the next one left (its comments and links go along)
+      var used = [], match = lines.map(function (e) {
+        var k = have.findIndex(function (n, j) { return used.indexOf(j) < 0 && (n.label || "") === e.label; });
+        if (k >= 0) used.push(k);
+        return k;
+      });
+      match = match.map(function (k) {
+        if (k >= 0) return k;
+        k = have.findIndex(function (n, j) { return used.indexOf(j) < 0; });
+        if (k >= 0) used.push(k);
+        return k;
+      });
+      lines.forEach(function (e, i) {
+        var old = match[i] >= 0 ? have[match[i]] : null;
+        if (old) {
+          ops.push({ op: "update_node", id: relabel(old, gid, e.label || e.date, ops, taken), label: e.label, date: e.date, important: e.important, index: i });
+        } else {
+          var base = gid + "." + slug(e.label || e.date), id = base, k = 2;
+          while (idTaken(id) || taken.indexOf(id) >= 0) id = base + "-" + k++;
+          taken.push(id);
+          ops.push({ op: "add_node", id: id, label: e.label, group: gid, date: e.date, important: e.important });
+        }
+      });
+      have.forEach(function (n, j) { if (used.indexOf(j) < 0) ops.push({ op: "remove", id: n.id }); });
+      return ops;
+    }
+    function editTimeline(gid) {
+      var ta = h("textarea", { class: "dge-chart-data", spellcheck: "false", rows: "12" });
+      ta.value = timelineText(gid);
+      var save = function () {
+        var lines = ta.value.split("\n").filter(function (l) { return l.trim(); });
+        var events = lines.map(eventLine), bad = lines.filter(function (l, i) { return !events[i]; });
+        if (bad.length) return flash("Write each event as DATE: what happened (not “" + bad[0] + "”)", true);
+        if (applyOps(timelineOps(gid, events)).ok) closeModal();
+      };
+      showModal("Timeline: " + (group(gid).label || gid), h("div", {}, [
+        h("p", { class: "dge-muted" }, ["One event per line: DATE: what happened. Dates as you write them: 2026-10-28, 28 Oct 2026, Oct 2026, mid Dec 2026, Q4 2026, 2026, or a span like 7–14 May 2026. Add [important] to star one."]),
+        ta
+      ]), [
+        h("button", { onclick: closeModal }, ["Cancel"]),
+        h("button", { class: "primary", onclick: save }, ["Save"])
+      ]);
+      setTimeout(function () { ta.focus(); }, 0);
+    }
+    /* A table whose first column is dates becomes a timeline: each row an
+       event, the rest of its cells its label. Ids, comments and links stay. */
+    function tableToTimeline(gid) {
+      var ops = [{ op: "update_group", id: gid, table: false, columns: [], timeline: true }], taken = [];
+      st.doc.nodes.filter(function (n) { return n.group === gid; }).forEach(function (r) {
+        var label = (r.cells || []).filter(Boolean).join(" · ") || "";
+        ops.push({ op: "update_node", id: relabel(r, gid, label || r.label, ops, taken), date: r.label || r.id, label: label, cells: [] });
+      });
+      var res = applyOps(ops);
+      if (res.ok) flash("Now a timeline (" + MOD + "Z turns it back into a table)");
     }
     /* Edit as text…: the table as lines of cells separated by |. */
     function editTable(gid) {
@@ -3730,6 +3865,7 @@
     function showTip(target) {
       var text = target.getAttribute("data-tip");
       if (!text) return;
+      tip.classList.remove("dge-card-tip");
       var t = tipParts(text);
       tip.innerHTML = "";
       var head = h("div", { class: "dge-tip-head" }, [t.name]);
@@ -3778,6 +3914,7 @@
       tipTimer = setTimeout(function () {
         if (tipFor !== pin || !bubble.hidden) return;
         tip.innerHTML = "";
+        tip.classList.remove("dge-card-tip");
         var head = h("div", { class: "dge-tip-head" }, [(c.author || "Comment") + (c.status === "resolved" ? " · resolved" : "")]);
         if (repliesText(c)) head.appendChild(h("kbd", {}, [repliesText(c)]));
         tip.appendChild(head);
@@ -3788,6 +3925,49 @@
         tip.style.top = (r.top - box.top - tip.offsetHeight - 8 < 8 ? r.bottom - box.top + 8 : r.top - box.top - tip.offsetHeight - 8) + "px";
         tipShownAt = Date.now();
       }, Date.now() - tipShownAt < 600 ? 0 : 250);
+    });
+    /* A box's hover card: its whole title, its detail (a kanban card keeps it
+       off the card, marked ≡) and what else is known: owner, dates, tags,
+       link, open comments. Nothing to add beyond the title: no card. */
+    function nodeFacts(n, summary) {
+      var meta = [];
+      if (n.owner) meta.push("owner: " + n.owner);
+      if (n.date) meta.push(n.date + (n.important ? " ★" : ""));
+      if (n.start) meta.push("from " + n.start + (n.days ? ", " + n.days + " days" : ""));
+      if (n.probability && n.impact) meta.push("probability " + n.probability + ", impact " + n.impact);
+      if (n.done) meta.push(n.done + "% done");
+      (n.tags || []).forEach(function (t) { meta.push("#" + t); });
+      if (n.link) meta.push("→ " + n.link.replace(/^https?:\/\//, ""));
+      var open = (st.doc.comments || []).filter(function (c) { return c.on === n.id && c.status !== "resolved"; }).length;
+      if (open) meta.push(open + (open === 1 ? " open comment" : " open comments"));
+      var body = n.detail || (summary && summary !== n.label && summary !== n.id ? summary : "");
+      return { title: n.label || n.id, body: body, meta: meta };
+    }
+    canvas.addEventListener("mouseover", function (e) {
+      var g = e.target.closest && e.target.closest(".dg-node");
+      if (!g || g === tipFor || st.drag || e.target.closest(".dg-pin, .dg-link, .dg-open, .dge-ctl")) return;
+      var n = node(g.getAttribute("data-id"));
+      if (!n) return;
+      // the drawing's own hover text (a table row's cells…) goes in the card instead
+      var t = g.querySelector(":scope > title");
+      if (t) { g.setAttribute("data-summary", t.textContent); t.remove(); }
+      var f = nodeFacts(n, g.getAttribute("data-summary"));
+      if (!f.body && !f.meta.length) return;
+      hideTip();
+      tipFor = g;
+      tipTimer = setTimeout(function () {
+        if (tipFor !== g || !bubble.hidden || !menu.hidden || st.drag) return;
+        tip.innerHTML = "";
+        tip.classList.add("dge-card-tip");
+        tip.appendChild(h("div", { class: "dge-tip-head" }, [f.title]));
+        if (f.body) tip.appendChild(h("div", { class: "dge-tip-body" }, [f.body]));
+        if (f.meta.length) tip.appendChild(h("div", { class: "dge-tip-more" }, [f.meta.join(" · ")]));
+        tip.hidden = false;
+        var box = el.getBoundingClientRect(), r = g.getBoundingClientRect();
+        tip.style.left = Math.max(8, Math.min(r.left - box.left, box.width - tip.offsetWidth - 8)) + "px";
+        tip.style.top = (r.bottom - box.top + 8 + tip.offsetHeight > box.height - 8 ? r.top - box.top - tip.offsetHeight - 8 : r.bottom - box.top + 8) + "px";
+        tipShownAt = Date.now();
+      }, Date.now() - tipShownAt < 600 ? 0 : 450);
     });
     el.addEventListener("pointerdown", hideTip, true);
     el.addEventListener("wheel", hideTip, { passive: true });

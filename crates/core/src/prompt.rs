@@ -142,6 +142,7 @@ pub const OPS_REFERENCE: &str = r#"Operations (fields in [] are optional; ids ar
 - Sequence diagram: {"op":"add_group","id":"login","label":"Sign in","sequence":true}; participants are nodes in it, messages are add_edge between them (in order; {"op":"update_edge","id":"web->api","index":0} moves one). Or merge: "sequence login: Sign in {\n  user: User\n  web: Web app\n  user -> web: opens /login\n  web ..> user: page\n}" (..> is a reply)
 - Decision record: {"op":"add_group","id":"db","label":"Use Postgres","adr":"proposed"} (status: proposed, accepted, rejected, superseded, deprecated); its fields are add_node / update_node with "id":"db.context","label":"context","group":"db","detail":"the text". Or merge: "adr db: Use Postgres [accepted] {\n  context: …\n  decision: …\n}"
 - Kanban: {"op":"add_group","id":"sprint","label":"Sprint 12","kanban":true}, its columns {"op":"add_group","id":"doing","label":"Doing","parent":"sprint"}; a card is a node in a column; move one with {"op":"update_node","id":"login","group":"doing","index":0}. Or merge: "kanban sprint: Sprint 12 {\n  column todo: To do {\n    login: Login page\n  }\n  column doing: Doing {}\n}"
+- Timeline: {"op":"add_group","id":"history","label":"History","timeline":true}; its events are add_node / update_node with "group":"history","label":"Open beta","date":"2026-10-28" (also "Oct 2026", "Q4 2026", "2026", or a span "7–14 May 2026") and ["important":true,"color","detail"]. Or merge: "timeline history: History {\n  2026-10-28: Open beta [important]\n  Dec 2024: Airwallex deal\n}"
 - Table: {"op":"add_group","id":"opts","label":"Options","columns":["option","cost","notes"]}; its rows are add_node / update_node with "group":"opts","label":"Local" (the first cell),"cells":["$0","needs a GPU"]. Or merge: "table opts: Options {\n  option | cost | notes\n  Local | $0 | needs a GPU\n}"
 - Chart: {"op":"add_group","id":"rev","label":"Revenue","chart":"bar|line|area|pie|donut|scatter",["stacked":true,"horizontal":true,"unit":"%","series":["EU","US"],"axis":"quarter"]}; its rows are add_node / update_node with "group":"rev","label":"Q1","values":[120,80] (one per series, null for none). Or simpler, merge: "chart rev: Revenue [bar] {\n  quarter | EU | US\n  Q1 | 120 | 80\n}"
 - Risk matrix: {"op":"add_group","id":"risks","label":"Risks","risks":true,["levels":3|4|5]}; its risks are add_node / update_node with "group":"risks" and ["probability":1-5,"impact":1-5,"owner","detail" (the description)]
@@ -904,6 +905,8 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
             format!(" (database table `{}`)", g.id)
         } else if g.table {
             " (table)".to_string()
+        } else if g.timeline {
+            " (timeline)".to_string()
         } else if let Some(c) = g.chart {
             let mut k = format!(" ({} chart", c.as_str());
             if g.stacked {
@@ -1025,6 +1028,27 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
             chart_table(doc, g, out, seen);
         } else if g.table {
             data_table(doc, g, out, seen);
+        } else if g.timeline {
+            // in time order, important ones marked
+            let mut list = crate::timeline::events_of(doc, &g.id);
+            list.sort_by_key(|x| {
+                x.date
+                    .as_deref()
+                    .and_then(crate::timeline::parse)
+                    .map_or(i64::MAX, |d| d.0)
+            });
+            for x in list {
+                seen.push(x.id.clone());
+                let label = link_md(doc, &x.display().replace('\n', " "), x.link.as_deref());
+                let when = x.date.as_deref().unwrap_or("?");
+                let star = if x.important { " (important)" } else { "" };
+                let mut line = format!("- {when}: {label}{star}");
+                if let Some(d) = &x.detail {
+                    line.push_str(&format!(" — {}", d.replace('\n', " ")));
+                }
+                out.push_str(&line);
+                out.push('\n');
+            }
         } else if g.entity {
             column_table(doc, g, out, seen);
         } else if g.risks {

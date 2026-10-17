@@ -395,6 +395,7 @@ impl Parser {
         };
         let word = match word {
             "group" | "gantt" | "risks" | "chart" | "table" | "entity" | "adr" | "mindmap"
+            | "timeline"
                 if !opens =>
             {
                 ""
@@ -483,6 +484,10 @@ impl Parser {
             "table" if c.rest()[5..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(5);
                 return self.table_decl(c);
+            }
+            "timeline" if c.rest()[8..].starts_with(|ch: char| ch.is_whitespace()) => {
+                c.advance(8);
+                return self.timeline_decl(c);
             }
             "entity" if c.rest()[6..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(6);
@@ -1013,6 +1018,105 @@ impl Parser {
         Ok(())
     }
 
+    /// `timeline id: Title [color] {` … one event per line (`DATE: what
+    /// happened [important]`) … `}`.
+    fn timeline_decl(&mut self, mut c: Cursor) -> Result<(), String> {
+        c.skip_ws();
+        let (id, qlabel) = c.reference()?;
+        let (label, attrs) = label_and_attrs_until_brace(&mut c)?;
+        c.skip_ws();
+        if !c.eat('{') {
+            return Err(
+                "a timeline needs a body: `timeline id: Title {` … one event per line (`2026-10-28: Open beta`) … `}`"
+                    .into(),
+            );
+        }
+        c.skip_ws();
+        let closes_inline = c.eat('}');
+        if !c.at_end() {
+            return Err("put the timeline's events on the following lines".into());
+        }
+        if self.doc.node(&id).is_some() {
+            return Err(format!("`{id}` is already a node"));
+        }
+        let parent = self.group();
+        if self.doc.group(&id).is_none() {
+            self.doc.groups.push(Group {
+                id: id.clone(),
+                ..Default::default()
+            });
+        }
+        let g = self.doc.group_mut(&id).unwrap();
+        g.parent = parent;
+        g.timeline = true;
+        if let Some(l) = label.or(qlabel) {
+            g.label = l;
+        }
+        for (k, v) in &attrs {
+            match (k.as_str(), v) {
+                ("color" | "colour", Some(v)) => g.color = Some(color(v)?),
+                (c, None) if valid_color(c) => g.color = Some(c.to_string()),
+                ("x", Some(v)) => g.x = Some(num("x", v)?),
+                ("y", Some(v)) => g.y = Some(num("y", v)?),
+                ("w" | "width", Some(v)) => g.w = Some(num("w", v)?),
+                (k, _) => return Err(format!("unknown timeline attribute `{k}` (color, x, y, w)")),
+            }
+        }
+        self.touched.push(Elem::Group(id.clone()));
+        if !closes_inline {
+            self.gantt = Some((id, self.line));
+        }
+        Ok(())
+    }
+
+    /// An event of a timeline: `2026-10-28: Open beta [important, red]`.
+    fn event_line(&mut self, timeline: &str, t: &str) -> Result<(), String> {
+        let t = crate::mindmap::strip_bullet(t);
+        let (text, attrs) = split_attrs(t);
+        let text = text.trim();
+        let (when, label) = text
+            .split_once(": ")
+            .or_else(|| text.strip_suffix(':').map(|w| (w, "")))
+            .ok_or_else(|| {
+                format!("an event is `DATE: what happened`, e.g. `2026-10-28: Open beta` (not `{text}`)")
+            })?;
+        let when = when.trim();
+        if crate::timeline::parse(when).is_none() {
+            return Err(crate::timeline::date_error(when));
+        }
+        let label = unescape_label(label.trim());
+        let mut attrs = parse_attrs(attrs.unwrap_or(""))?;
+        let mut explicit = None;
+        attrs.retain(|(k, v)| match (k.as_str(), v) {
+            ("id", Some(v)) => {
+                explicit = Some(v.clone());
+                false
+            }
+            _ => true,
+        });
+        let key = if label.is_empty() {
+            when
+        } else {
+            label.as_str()
+        };
+        let wanted = explicit.clone().unwrap_or_else(|| row_id(timeline, key));
+        let id = if !self.doc.id_taken(&wanted) {
+            wanted
+        } else if explicit.is_some() {
+            return Err(format!("id `{wanted}` is already used"));
+        } else {
+            self.doc.fresh_id(&wanted)
+        };
+        let mut n = Node::new(&id);
+        n.label = label;
+        n.group = Some(timeline.to_string());
+        n.date = Some(when.to_string());
+        apply_node_attrs(&mut n, &attrs)?;
+        self.touched.push(Elem::Node(n.id.clone()));
+        self.doc.nodes.push(n);
+        Ok(())
+    }
+
     /// `adr id: Title [accepted] {` … one field per line … `}`.
     fn adr_decl(&mut self, mut c: Cursor) -> Result<(), String> {
         c.skip_ws();
@@ -1228,6 +1332,9 @@ impl Parser {
         }
         if self.doc.group(&block).is_some_and(|g| g.table) {
             return self.table_line(&block, t);
+        }
+        if self.doc.group(&block).is_some_and(|g| g.timeline) {
+            return self.event_line(&block, t);
         }
         if self.doc.group(&block).is_some_and(|g| g.entity) {
             return self.column_line(&block, t);
@@ -1701,7 +1808,7 @@ fn is_flag(item: &str) -> bool {
     Shape::parse(item).is_some()
         || Line::parse(item).is_some()
         || valid_color(&item.to_ascii_lowercase())
-        || matches!(item, "resolved" | "open" | "done" | "collapsed" | "folded" | "milestone")
+        || matches!(item, "resolved" | "open" | "done" | "collapsed" | "folded" | "milestone" | "important")
         // charts
         || ChartKind::parse(item).is_some()
         || matches!(item, "stacked" | "horizontal")
@@ -1740,6 +1847,8 @@ const KEYS: &[&str] = &[
     "duration",
     "after",
     "milestone",
+    "date",
+    "important",
     "done",
     "progress",
     "owner",
@@ -1878,6 +1987,13 @@ pub fn apply_node_attrs(n: &mut Node, attrs: &Attrs) -> Result<(), String> {
             }
             ("after", Some(v)) => n.after = v.split_whitespace().map(String::from).collect(),
             ("milestone", None) => n.milestone = true,
+            ("date" | "when", Some(v)) => {
+                if crate::timeline::parse(v).is_none() {
+                    return Err(crate::timeline::date_error(v));
+                }
+                n.date = Some(v.clone());
+            }
+            ("important", None) => n.important = true,
             ("done", None) => n.done = Some(100.0),
             ("done" | "progress", Some(v)) => {
                 n.done = Some(percent(v)?).filter(|d| *d > 0.0);
@@ -1893,7 +2009,7 @@ pub fn apply_node_attrs(n: &mut Node, attrs: &Attrs) -> Result<(), String> {
             (k, None) if valid_color(k) => n.color = Some(k.to_string()),
             (k, _) => {
                 return Err(format!(
-                    "unknown node attribute `{k}` (shape, color, detail, link, tags, x, y, w, h, collapsed, layout, parent, start, days, after, milestone, done, owner, p, i)"
+                    "unknown node attribute `{k}` (shape, color, detail, link, tags, x, y, w, h, collapsed, layout, parent, start, days, after, milestone, done, owner, p, i, date, important)"
                 ))
             }
         }
@@ -2369,6 +2485,55 @@ pub(crate) fn adr_block(doc: &Document, g: &Group, pad: &str, out: &mut String) 
     out.push_str(&format!("{pad}}}\n"));
 }
 
+/// `timeline id: Title {` … `DATE: label [attrs]` per event … `}`.
+pub(crate) fn timeline_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
+    let mut head = id_text(&g.id);
+    if !g.label.is_empty() && g.label != g.id {
+        head.push_str(": ");
+        head.push_str(&label_text(&g.label));
+    }
+    let mut a = Vec::new();
+    if let Some(c) = &g.color {
+        a.push(if c.starts_with('#') {
+            format!("color: {c}")
+        } else {
+            c.clone()
+        });
+    }
+    if let Some(w) = g.w {
+        a.push(format!("w: {}", fmt_num(w)));
+    }
+    a.extend(group_pos(g));
+    head.push_str(&attrs_text(&a));
+    let events: Vec<&Node> = doc
+        .nodes
+        .iter()
+        .filter(|n| n.group.as_deref() == Some(g.id.as_str()))
+        .collect();
+    if events.is_empty() {
+        out.push_str(&format!("{pad}timeline {head} {{}}\n"));
+        return;
+    }
+    out.push_str(&format!("{pad}timeline {head} {{\n"));
+    for n in events {
+        let when = n.date.clone().unwrap_or_default();
+        let mut m = n.clone();
+        m.date = None;
+        let mut a = node_attrs(&m);
+        let key = if n.label.is_empty() { &when } else { &n.label };
+        if row_id(&g.id, key) != n.id {
+            a.insert(0, format!("id: {}", attr_value(&n.id)));
+        }
+        let label = if n.label.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", label_text(&n.label))
+        };
+        out.push_str(&format!("{pad}  {when}:{label}{}\n", attrs_text(&a)));
+    }
+    out.push_str(&format!("{pad}}}\n"));
+}
+
 pub(crate) fn table_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
     let mut head = id_text(&g.id);
     if !g.label.is_empty() && g.label != g.id {
@@ -2727,6 +2892,12 @@ fn node_attrs(n: &Node) -> Vec<String> {
     if n.milestone {
         a.push("milestone".into());
     }
+    if let Some(d) = &n.date {
+        a.push(format!("date: {}", attr_value(d)));
+    }
+    if n.important {
+        a.push("important".into());
+    }
     match n.done {
         Some(d) if d >= 100.0 => a.push("done".into()),
         Some(d) => a.push(format!("done: {}%", fmt_num(d))),
@@ -3020,6 +3191,10 @@ pub(crate) fn group_block(
     }
     if g.table {
         table_block(doc, g, &pad, out);
+        return;
+    }
+    if g.timeline {
+        timeline_block(doc, g, &pad, out);
         return;
     }
     if g.entity {

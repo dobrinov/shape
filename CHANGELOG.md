@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.37.0 — 2026-10-18
+
+- **Timelines:** a new block for what happened when. One event per line, `DATE: what happened [important]`, with the date as you write it: `2026-10-28`, `28 Oct 2026`, `Oct 2026`, `mid Dec 2026`, `Q4 2026`, `2026`, `~6 Aug 2026`, or a span (`7–14 May 2026`). Events sit on a line by date:
+  - busy weeks spread out and quiet years shrink;
+  - labels go above and below, out of each other's way, and their connectors do not cross other labels;
+  - a span is a bar; an important event is a star, nearest the line, in bold;
+  - ticks carry the year where it changes.
+  In the editor: the *Timeline* tool; right-click → *Add event…*, *Edit as text…*, and on an event *Change date…*, *Mark important*, details, colour. **Show as timeline** turns a `date | event` table into a timeline, keeping ids, comments and links (⌘Z turns it back). A date that cannot be read is refused with what dates look like. Ask, Rethink and prompts read events in time order. Core `timeline` module; `timeline` on groups, `date` and `important` on nodes (DSL, JSON, ops, typings).
+- **More context on boxes:** hovering a box shows a card with its whole title, its detail, and what else is known (owner, dates, tags, link, open comments). Kanban cards stay compact: their detail moves to the hover card, and a small ≡ marks the cards that have one. Right-click a box → **Add details…** / **Edit details…** writes them. Before, details could only be edited in the hidden inspector.
+- The tool bar at the bottom no longer runs under the code pane when the board is narrow: it scrolls instead.
+
 ## 0.36.0 — 2026-10-17
 
 - **Rethink acts on your comments, across the whole board.** Before, Rethink saw only the open canvas and treated comments as discussion to tidy up, so a comment like "we are shipping two card products now" changed nothing. Now:

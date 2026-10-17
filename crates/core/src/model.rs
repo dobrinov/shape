@@ -289,6 +289,13 @@ pub struct Node {
     /// A table's row: its cells after the first (which is its label).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub cells: Vec<String>,
+    /// A timeline's event: when, as written (`2026-10-28`, `Oct 2026`,
+    /// `7–14 May 2026`; see [`crate::timeline::parse`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+    /// A timeline's event that matters most: drawn as a star.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub important: bool,
     /// A database table's column (the node's label is its name).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub column: Option<Column>,
@@ -417,6 +424,9 @@ pub struct Group {
     /// A table: its nodes are rows; these are its columns' names.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub table: bool,
+    /// A timeline: its nodes are events, each with a `date`.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub timeline: bool,
     /// A decision record, with its status (`proposed`, `accepted`, …): its
     /// nodes are its fields (context, options, decision, consequences).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -473,7 +483,7 @@ impl Group {
     /// Drawn from a plot with its nodes at fixed places: a chart, a table, a
     /// database table or a decision record.
     pub fn plotted(&self) -> bool {
-        self.chart.is_some() || self.table || self.entity || self.adr.is_some()
+        self.chart.is_some() || self.table || self.entity || self.adr.is_some() || self.timeline
     }
 
     pub fn display(&self) -> &str {
@@ -598,6 +608,16 @@ impl Document {
             Some((first, rest)) => self.canvas_mut(first)?.doc.at_mut(rest),
         }
     }
+    /// Whether `n` is a card on a kanban board (a node in one of its columns).
+    pub fn kanban_card(&self, n: &Node) -> bool {
+        n.group
+            .as_deref()
+            .and_then(|c| self.group(c))
+            .and_then(|c| c.parent.as_deref())
+            .and_then(|b| self.group(b))
+            .is_some_and(|b| b.kanban)
+    }
+
     /// How many elements a board holds, its canvases included.
     pub fn size(&self) -> usize {
         self.nodes.len()

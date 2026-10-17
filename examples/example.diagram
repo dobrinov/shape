@@ -215,6 +215,17 @@ canvas plan: Delivery plan {
     Hosted | $1.2k / month | 300 ms  | Data leaves the laptop [red]
   }
 
+  timeline history: How we got here {
+    Q1 2026: Checkout is 38% of support tickets
+    12 Mar 2026: Interviews: shoppers re-enter their card every time [detail: 6 of 8 shoppers; see the Discovery canvas]
+    2026-04-20: Saved cards chosen as the fix [important]
+    4–15 May 2026: Prototype tested with 12 shoppers [blue]
+    Jun 2026: One payment provider for everything [link: #psp]
+    ~Sep 2026: Apple Pay asked for again
+    2026-10-12: Build starts
+    2026-11-30: Launch day [important, green]
+  }
+
   wallets -> cart: supersedes
 
   comment on beta by mia: Do we need a second week?

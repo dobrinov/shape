@@ -356,6 +356,11 @@ pub fn layout_at(doc: &Document, today: Option<i64>) -> Layout {
             .flatten();
         let (lines, detail, w, h) = if forest.in_map(i) {
             mindmap::measure(n, st)
+        } else if doc.kanban_card(n) && n.detail.is_some() {
+            // a card stays compact: its detail shows on hover (marked ≡)
+            let mut card = n.clone();
+            card.detail = None;
+            measure(&card)
         } else {
             measure(n)
         };

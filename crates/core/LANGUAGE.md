@@ -311,6 +311,25 @@ table options: Hosting options {
 - In the editor: the *Table* tool; right-click a table → *Edit as text…*, *Add row*, *Add column*; right-click a row → *Edit row…* (its cells, separated by `|`), *Add row below*, *Colour…*, *Delete row*. Renaming a row's label renames its id; renaming a table renames its rows.
 - Prompts show it as a Markdown table. In JSON a table is a group with `table` and `columns`; its rows are nodes whose `label` is the first cell and `cells` the rest. Ops can place a row with `index`.
 
+### Timelines
+
+```diagram
+timeline history: How we got here {
+  Dec 2024: Airwallex: no markup on issuing
+  18 Jun 2025: Push provisioning priced at £15k per region
+  7–14 May 2026: Visa approves use cases and card art [blue]
+  ~6 Aug 2026: First demo
+  2026-10-28: Open beta [important]
+  mid Dec 2026: Spend Cards beta
+}
+```
+
+- One event per line: `DATE: what happened [attrs]`. The date is kept as written: a day (`2026-10-28`, `28 Oct 2026`, `Oct 28, 2026`), a month (`Oct 2026`, `2026-10`, `early` / `mid` / `late Oct 2026`), a quarter (`Q4 2026`), a year (`2026`), `~` or `about` for an approximate one, or a span (`7–14 May 2026`, `7 May – 2 Jun 2026`, `2026-05-07..2026-05-14`). A date that cannot be read is an error.
+- Events are placed by date on a line: busy stretches spread out and quiet ones shrink, so labels stay readable; labels go above and below the line, out of each other's way. A span is a bar on the line; `important` makes an event a star, nearest the line, in bold (red unless it has a colour). `[attrs]`: `important`, a colour, `detail` (shown on hover), `link`, `id`.
+- An event's id comes from its label within the timeline (`history.open-beta`), as table rows do. On another node, `date:` and `important` are attributes like any other.
+- In the editor: the *Timeline* tool; right-click a timeline → *Add event…*, *Edit as text…*; right-click an event → *Change date…*, *Mark important*, details, *Colour…*. A table whose first column is dates turns into a timeline with *Show as timeline* (⌘Z turns it back).
+- Prompts list the events in time order. In JSON a timeline is a group with `timeline`; its events are nodes with a `date` (and `important`).
+
 ### Charts
 
 ```diagram

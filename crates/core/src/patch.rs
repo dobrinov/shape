@@ -104,6 +104,10 @@ fn block_text(doc: &Document, head: &Elem, pad: &str) -> Option<String> {
                 dsl::table_block(doc, g, pad, &mut out);
                 return Some(out);
             }
+            if g.timeline {
+                dsl::timeline_block(doc, g, pad, &mut out);
+                return Some(out);
+            }
             if g.entity {
                 dsl::entity_block(doc, g, pad, &mut out);
                 return Some(out);
@@ -375,6 +379,7 @@ fn edit_lines(
                     || n.risks != g.risks
                     || n.chart.is_some() != g.chart.is_some()
                     || n.table != g.table
+                    || n.timeline != g.timeline
                     || n.entity != g.entity
                     || n.adr.is_some() != g.adr.is_some() =>
             {

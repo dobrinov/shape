@@ -101,6 +101,8 @@ pub fn plot_any(doc: &Document, g: &Group) -> Plot {
         crate::tables::plot(doc, g)
     } else if g.adr.is_some() {
         crate::adr::plot(doc, g)
+    } else if g.timeline {
+        crate::timeline::plot(doc, g)
     } else {
         plot(doc, g)
     }

@@ -70,6 +70,13 @@ pub enum Op {
         /// Gantt task: a milestone (a point in time, not a bar).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         milestone: Option<bool>,
+        /// Timeline event: when, as people write it (`2026-10-28`, `Oct 2026`,
+        /// `7–14 May 2026`; "" clears it).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        date: Option<String>,
+        /// Timeline event: one that matters most (drawn as a star).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        important: Option<bool>,
         /// Gantt task: percent done, 0–100 (0 clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         done: Option<f64>,
@@ -143,6 +150,13 @@ pub enum Op {
         /// Gantt task: a milestone (a point in time, not a bar).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         milestone: Option<bool>,
+        /// Timeline event: when, as people write it (`2026-10-28`, `Oct 2026`,
+        /// `7–14 May 2026`; "" clears it).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        date: Option<String>,
+        /// Timeline event: one that matters most (drawn as a star).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        important: Option<bool>,
         /// Gantt task: percent done, 0–100 (0 clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         done: Option<f64>,
@@ -329,6 +343,9 @@ pub enum Op {
         /// A table (its nodes are rows).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         table: Option<bool>,
+        /// A timeline (its nodes are events, each with a `date`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeline: Option<bool>,
         /// A database table (its nodes are columns).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         entity: Option<bool>,
@@ -386,6 +403,9 @@ pub enum Op {
         /// A table (its nodes are rows).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         table: Option<bool>,
+        /// A timeline (its nodes are events, each with a `date`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeline: Option<bool>,
         /// A database table (its nodes are columns).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         entity: Option<bool>,
@@ -541,6 +561,22 @@ fn chart_start(v: &Option<String>) -> Result<Option<Option<String>>, String> {
             .transpose()
         })
         .transpose()
+}
+
+/// Timeline fields of a node: "" clears the date.
+fn event(n: &mut Node, date: &Option<String>, important: &Option<bool>) -> Result<(), String> {
+    if let Some(d) = opt(date) {
+        if let Some(d) = &d {
+            if crate::timeline::parse(d).is_none() {
+                return Err(crate::timeline::date_error(d));
+            }
+        }
+        n.date = d;
+    }
+    if let Some(i) = important {
+        n.important = *i;
+    }
+    Ok(())
 }
 
 /// Gantt fields of a node: "" clears the start, 0 the duration, [] `after`.
@@ -826,6 +862,8 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             days,
             after,
             milestone,
+            date,
+            important,
             done,
             owner,
             probability,
@@ -867,6 +905,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 n.mindmap = Some(map_layout(m)?);
             }
             task(&mut n, start, days, after, milestone, done, owner)?;
+            event(&mut n, date, important)?;
             risk(&mut n, probability, impact)?;
             if let Some(v) = values {
                 n.values = v.clone();
@@ -907,6 +946,8 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             days,
             after,
             milestone,
+            date,
+            important,
             done,
             owner,
             probability,
@@ -979,6 +1020,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 n.collapsed = *c;
             }
             task(n, start, days, after, milestone, done, owner)?;
+            event(n, date, important)?;
             risk(n, probability, impact)?;
             if let Some(v) = values {
                 n.values = v.clone();
@@ -1537,6 +1579,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             series,
             axis,
             table,
+            timeline,
             columns,
             entity,
             adr,
@@ -1568,6 +1611,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             };
             chart_fields(&mut g, chart, stacked, horizontal, unit, series, axis)?;
             g.table = table.unwrap_or(false) || columns.is_some();
+            g.timeline = timeline.unwrap_or(false);
             g.entity = entity.unwrap_or(false);
             g.adr = adr_status(adr)?;
             g.columns = columns.clone().unwrap_or_default();
@@ -1605,6 +1649,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             series,
             axis,
             table,
+            timeline,
             columns,
             entity,
             adr,
@@ -1649,6 +1694,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             chart_fields(g, chart, stacked, horizontal, unit, series, axis)?;
             if let Some(t) = table {
                 g.table = *t;
+            }
+            if let Some(t) = timeline {
+                g.timeline = *t;
             }
             if let Some(c) = columns {
                 g.columns = c.clone();

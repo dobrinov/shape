@@ -40,6 +40,7 @@ pub mod sequence;
 pub mod tables;
 pub mod text;
 pub mod theme;
+pub mod timeline;
 
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -192,6 +193,8 @@ pub fn json_schema() -> Value {
                 "impact": {"type": "integer", "minimum": 1, "maximum": 5, "description": "risk: how bad"},
                 "values": {"type": "array", "items": {"type": ["number", "null"]}, "description": "chart row: one value per series"},
                 "cells": {"type": "array", "items": {"type": "string"}, "description": "table row: its cells after the first (the label)"},
+                "date": {"type": "string", "description": "timeline event: when, as written (2026-10-28, 28 Oct 2026, Oct 2026, Q4 2026, 2026, or a span: 7–14 May 2026)"},
+                "important": {"type": "boolean", "description": "timeline event: one that matters most (drawn as a star)"},
                 "column": {"type": "object", "description": "database table column", "additionalProperties": false, "properties": {
                     "type": {"type": "string"}, "pk": {"type": "boolean"}, "unique": {"type": "boolean"}, "null": {"type": "boolean"},
                     "fk": {"type": "string", "description": "the referenced column's id (teams.id) or a table (its primary key)"}, "default": {"type": "string"}, "rel": {"type": "string", "description": "the relationship's name, written on the foreign key's line"}
@@ -223,6 +226,7 @@ pub fn json_schema() -> Value {
                 "series": {"type": "array", "items": {"type": "string"}, "description": "chart: the series' names"},
                 "axis": {"type": "string", "description": "chart: what the rows are"},
                 "table": {"type": "boolean", "description": "table: the nodes inside are rows"},
+                "timeline": {"type": "boolean", "description": "timeline: the nodes inside are events, each with a date"},
                 "entity": {"type": "boolean", "description": "database table: the nodes inside are columns"},
                 "columns": {"type": "array", "items": {"type": "string"}, "description": "table: the columns' names"},
                 "w": {"type": "number"}, "h": {"type": "number"},
