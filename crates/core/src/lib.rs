@@ -457,9 +457,11 @@ impl Session {
         let mut o = opts.clone();
         o.themes.extend(self.themes.iter().cloned());
         // a perspective shows its part of the board (and of the base, to compare)
-        let seen = |d: &Document| match &o.perspective {
-            Some(p) => perspectives::view(d, p),
-            None => d.clone(),
+        // starting high level: folded but for what is opened
+        let seen = |d: &Document| match (&o.perspective, &o.open) {
+            (Some(p), Some(open)) => perspectives::fold(&perspectives::view(d, p), p, open),
+            (Some(p), None) => perspectives::view(d, p),
+            _ => d.clone(),
         };
         let doc = seen(&self.doc);
         match self.base_here() {
@@ -683,8 +685,8 @@ mod tests {
         let p = typed.rethink_prompt(None, "", None).unwrap();
         assert!(
             p.contains("## Perspectives")
-                && p.contains("- Technical: tag `tech`, shows entity, sequence, lanes, adr blocks whole; now shows 1 elements")
-                && p.contains("- Senior management: tag `exec`")
+                && p.contains("- Technical: tag `tech`, shows entity, sequence, lanes, adr, cycle blocks whole; now shows 1 elements")
+                && p.contains("- Delivery: tag `delivery`")
                 && p.contains("none is empty"),
             "{p}"
         );

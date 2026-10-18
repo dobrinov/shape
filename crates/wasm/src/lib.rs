@@ -543,6 +543,14 @@ pub fn answer_parts(reply: &str) -> String {
     }
 }
 
+/// What built-in perspective `id` is for, in a line ("" for a board's own).
+#[wasm_bindgen]
+pub fn perspective_purpose(id: &str) -> String {
+    shape_core::perspectives::purpose(id)
+        .unwrap_or("")
+        .to_string()
+}
+
 /// The names of the perspectives a board of type `kind` comes with (JSON).
 #[wasm_bindgen]
 pub fn builtin_perspectives(kind: &str) -> String {

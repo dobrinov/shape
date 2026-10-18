@@ -55,6 +55,11 @@ pub struct RenderOptions {
     /// Show the board as this perspective sees it (see [`crate::perspectives`]).
     #[serde(default)]
     pub perspective: Option<crate::model::Perspective>,
+    /// With a perspective: the top-level sections and blocks shown open; the
+    /// rest are folded into summary cards (see [`crate::perspectives::fold`]).
+    /// None: everything open.
+    #[serde(default)]
+    pub open: Option<Vec<String>>,
     /// Diff status per element id (see `diff::merge`).
     #[serde(skip)]
     pub changes: HashMap<String, Change>,

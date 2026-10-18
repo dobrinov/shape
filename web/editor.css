@@ -497,3 +497,16 @@
 .dge-presenting .dge-screenbar { display: none !important; }
 .dge .dge-persp-cards .dge-persp-card { min-width: 0; white-space: normal; }
 .dge-persp-card b, .dge-persp-card span { max-width: 100%; overflow-wrap: anywhere; }
+/* a perspective's folded blocks: cards that open on a click */
+.dg-node[data-id^="@fold/"] { cursor: pointer; }
+.dg-node[data-id^="@fold/"]:hover .dg-shape { stroke: var(--accent); stroke-width: 2; }
+.dge .dge-folds { color: var(--accent); }
+.dge-empty-view { position: absolute; left: 50%; top: 76px; z-index: 5; transform: translateX(-50%); width: min(440px, calc(100% - 32px)); padding: 20px 22px; border: 1px solid var(--line-strong); border-radius: var(--r-3); background: var(--bg); box-shadow: var(--shadow); text-align: center; }
+.dge-empty-view[hidden] { display: none; }
+.dge-empty-view { pointer-events: none; opacity: 0.96; }
+.dge-empty-view button { pointer-events: auto; }
+.dge-empty-view b { font-size: 15px; }
+.dge-empty-view p { margin: 8px 0 16px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.dge-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.dge .dge-empty-actions button { height: 32px; min-height: 0; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 13px; }
+.dge .dge-empty-actions button.primary { border-color: transparent; background: var(--accent); color: var(--accent-fg, #fff); font-weight: 600; }

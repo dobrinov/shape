@@ -17,7 +17,7 @@ const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/M
 const port = 6590 + Math.floor(Math.random() * 100);
 const dir = mkdtempSync(join(tmpdir(), "diagram-e2e-"));
 const file = join(dir, "board.shape");
-writeFileSync(file, "title: Launch\ntype: project\n\napi: Orders API [tags: tech, detail: Rust]\nbeta: Open beta [tags: exec, detail: 28 Oct]\nnote: A loose note\napi -> beta\n\nrisks r: Risks {\n  Fraud [p: 3, i: 4]\n}\n");
+writeFileSync(file, "title: Launch\ntype: project\n\napi: Orders API [tags: tech, detail: Rust]\nbeta: Open beta [tags: delivery, detail: 28 Oct]\nnote: A loose note\napi -> beta\n\nrisks r: Risks {\n  Fraud [p: 3, i: 4]\n}\n");
 const server = spawn(bin, [file, "--no-open", "--port", String(port)], {
   env: { ...process.env, SHAPE_WEB_DIR: join(root, "web"), SHAPE_NO_UPDATE_CHECK: "1" },
   stdio: "ignore",
@@ -37,18 +37,31 @@ try {
 
   // opening asks whose eyes to look through
   await p.waitForSelector(".dge-persp-card");
-  assert.deepEqual((await p.locator(".dge-persp-card b").allTextContents()).slice(0, 3), ["Full board", "Senior management", "Team"]);
+  assert.deepEqual((await p.locator(".dge-persp-card b").allTextContents()).slice(0, 3), ["Full board", "Delivery", "Product"]);
+  // each says what it is for
+  assert.match(await p.locator(".dge-persp-card", { hasText: "Delivery" }).innerText(), /Who does what by when/);
+  if (process.env.SHOTS) await p.screenshot({ path: process.env.SHOTS + "/picker-roles.png" });
   await p.locator(".dge-persp-card", { hasText: "Full board" }).click(); await sleep(300);
 
   // a project board's built-in perspectives
   const names = await p.locator(".dge-persp option").allTextContents();
-  assert.deepEqual(names.slice(0, 5), ["Full board", "Senior management", "Team", "Product", "Technical"]);
+  assert.deepEqual(names.slice(0, 5), ["Full board", "Delivery", "Product", "Technical", "Legal"]);
   assert.equal(await shown(p), "api,beta,fraud,note");
-  // Senior management: what is tagged for it and the risks, titles only; the file does not change
+  // Delivery starts high level: what is tagged for it, the risks folded into a card; the file does not change
   const before = saved();
-  await p.selectOption(".dge-persp", "exec"); await sleep(400);
+  await p.selectOption(".dge-persp", "delivery"); await sleep(400);
+  assert.equal(await shown(p), "@fold/r,beta");
+  assert.match(await p.locator('.dg-node[data-id="@fold/r"]').textContent(), /Risks[\s\S]*1 risk · Fraud/);
+  if (process.env.SHOTS) await p.screenshot({ path: process.env.SHOTS + "/folded.png" });
+  // a card opens in place; Fold all folds it again, Expand all opens everything
+  await p.locator('.dg-node[data-id="@fold/r"]').click(); await sleep(400);
   assert.equal(await shown(p), "beta,fraud");
-  assert.equal(await p.locator('.dg-node[data-id="beta"]').textContent(), "Open beta");
+  assert.equal(await p.locator('[data-act="folds"]').innerText(), "Expand all");
+  await p.locator('[data-act="folds"]').click(); await sleep(300);
+  assert.equal(await p.locator('[data-act="folds"]').innerText(), "Fold all");
+  assert.equal(await shown(p), "beta,fraud");
+  await p.locator('[data-act="folds"]').click(); await sleep(300);
+  assert.equal(await shown(p), "@fold/r,beta");
   assert.equal(saved(), before);
 
   // a new perspective is written to the board and picked; kept on reload

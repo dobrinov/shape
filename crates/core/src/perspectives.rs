@@ -22,31 +22,40 @@ fn p(id: &str, label: &str, tags: &[&str], show: &[&str], details: bool) -> Pers
     }
 }
 
-/// The perspectives a board of this type comes with.
+/// The perspectives a board of this type comes with. Each starts high
+/// level (see [`fold`]): its sections and blocks folded into summary cards,
+/// except its headline blocks ([`headline`]).
 pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
-    let exec = p(
-        "exec",
-        "Senior management",
-        &["exec"],
-        &["adr", "risks", "timeline", "chart"],
-        false,
+    let product = p(
+        "product",
+        "Product",
+        &["product"],
+        &["mindmap", "timeline", "screen", "chart", "kanban", "adr"],
+        true,
     );
     let tech = p(
         "tech",
         "Technical",
         &["tech"],
-        &["entity", "sequence", "lanes", "adr"],
+        &["entity", "sequence", "lanes", "adr", "cycle"],
         true,
     );
-    let product = p(
-        "product",
-        "Product",
-        &["product"],
-        &["mindmap", "kanban", "timeline", "lanes", "chart", "screen"],
+    let user = p(
+        "user",
+        "Users",
+        &["user"],
+        &["screen", "lanes", "sticky", "mindmap"],
+        true,
+    );
+    let delivery = p(
+        "delivery",
+        "Delivery",
+        &["delivery", "team"],
+        &["timeline", "gantt", "kanban", "risks", "table"],
         true,
     );
     // the business around it, on product and project boards alike
-    let business = || {
+    let around = || {
         vec![
             p(
                 "legal",
@@ -56,31 +65,24 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
                 true,
             ),
             p(
-                "finance",
-                "Finance",
-                &["finance"],
-                &["chart", "table", "gantt"],
+                "business",
+                "Business",
+                &["business", "finance", "commercial"],
+                &["chart", "table", "timeline"],
                 true,
             ),
             p(
                 "marketing",
                 "Marketing",
                 &["marketing"],
-                &["timeline", "chart", "mindmap"],
-                true,
-            ),
-            p(
-                "commercial",
-                "Commercial",
-                &["commercial"],
-                &["table", "chart", "kanban"],
+                &["timeline", "chart", "mindmap", "screen"],
                 true,
             ),
             p(
                 "design",
                 "Design",
                 &["design"],
-                &["mindmap", "lanes", "sticky", "screen"],
+                &["screen", "lanes", "mindmap", "sticky"],
                 true,
             ),
         ]
@@ -88,37 +90,41 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
     match kind {
         BoardKind::Sketch => Vec::new(),
         BoardKind::Product => {
-            let mut v = vec![
-                product,
-                tech,
-                p(
-                    "user",
-                    "User",
-                    &["user"],
-                    &["lanes", "mindmap", "sticky", "screen"],
-                    true,
-                ),
-                exec,
-            ];
-            v.extend(business());
+            let mut v = vec![product, tech, user];
+            v.extend(around());
             v
         }
         BoardKind::Project => {
-            let mut v = vec![
-                exec,
-                p(
-                    "team",
-                    "Team",
-                    &["team"],
-                    &["kanban", "gantt", "risks", "timeline", "table"],
-                    true,
-                ),
-                product,
-                tech,
-            ];
-            v.extend(business());
+            let mut v = vec![delivery, product, tech];
+            v.extend(around());
             v
         }
+    }
+}
+
+/// What a built-in perspective is for, in a line (for the picker).
+pub fn purpose(id: &str) -> Option<&'static str> {
+    Some(match id {
+        "product" => "What we build and why: the goals, the plan, the screens",
+        "tech" => "How it is built: the data, the services, the flows",
+        "user" => "What people see and do: screens, journeys, feedback",
+        "delivery" => "Who does what by when, and what could stop it",
+        "legal" => "Obligations, decisions and risks",
+        "business" => "Money, pricing, deals and the numbers",
+        "marketing" => "The launch, the message and the dates",
+        "design" => "Screens, flows and the user journey",
+        _ => return None,
+    })
+}
+
+/// The blocks a perspective opens with unfolded: the high-level picture
+/// that role looks at first (a chart for the business, the timeline for
+/// delivery). The rest starts folded.
+pub fn headline(id: &str) -> &'static [&'static str] {
+    match id {
+        "business" => &["chart"],
+        "delivery" | "marketing" | "product" => &["timeline"],
+        _ => &[],
     }
 }
 
@@ -263,6 +269,207 @@ pub fn view(doc: &Document, p: &Perspective) -> Document {
     v
 }
 
+/// `t` cut to about `max` characters at a word, with an ellipsis.
+fn short(t: &str, max: usize) -> String {
+    if t.chars().count() <= max {
+        return t.to_string();
+    }
+    let cut: String = t.chars().take(max).collect();
+    let cut = cut.rsplit_once(' ').map(|(a, _)| a).unwrap_or(&cut);
+    format!("{}…", cut.trim_end_matches([',', ':', '·', ' ']))
+}
+
+/// The id of the card standing for folded block `gid`.
+pub fn fold_id(gid: &str) -> String {
+    format!("@fold/{gid}")
+}
+
+/// What a folded block holds, in a line: what is in it and its first few
+/// items (`6 risks, 2 high · Fraud reporting, Apple review…`).
+pub fn summary(doc: &Document, g: &Group) -> String {
+    let members: Vec<&Node> = doc
+        .nodes
+        .iter()
+        .filter(|n| n.group.as_deref() == Some(g.id.as_str()))
+        .collect();
+    let inside: Vec<&Group> = doc
+        .groups
+        .iter()
+        .filter(|x| x.parent.as_deref() == Some(g.id.as_str()))
+        .collect();
+    let n = members.len();
+    let plural =
+        |k: usize, one: &str, many: &str| format!("{k} {}", if k == 1 { one } else { many });
+    let what = if g.risks {
+        let levels = crate::risks::levels(g);
+        let high = members
+            .iter()
+            .filter(|m| {
+                crate::risks::rating(m, levels)
+                    .is_some_and(|(p, i)| u16::from(p) * u16::from(i) >= u16::from(levels) * 3)
+            })
+            .count();
+        let mut s = plural(n, "risk", "risks");
+        if high > 0 {
+            s.push_str(&format!(", {high} high"));
+        }
+        s
+    } else if g.kanban {
+        inside
+            .iter()
+            .map(|c| {
+                let k = doc
+                    .nodes
+                    .iter()
+                    .filter(|m| m.group.as_deref() == Some(c.id.as_str()))
+                    .count();
+                format!("{k} {}", c.display().to_lowercase())
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else if g.gantt {
+        plural(n, "task", "tasks")
+    } else if g.timeline {
+        plural(n, "event", "events")
+    } else if g.table {
+        plural(n, "row", "rows")
+    } else if g.chart.is_some() {
+        "a chart".into()
+    } else if g.entity {
+        plural(n, "column", "columns")
+    } else if let Some(st) = &g.adr {
+        format!("decision, {st}")
+    } else if let Some(d) = g.screen {
+        format!(
+            "{} screen, {}",
+            d.as_str(),
+            plural(n, "component", "components")
+        )
+    } else if g.sequence {
+        plural(n, "participant", "participants")
+    } else if g.cycle {
+        plural(n, "step", "steps")
+    } else if g.lanes {
+        plural(inside.len(), "lane", "lanes")
+    } else {
+        let mut parts = vec![plural(n, "item", "items")];
+        if !inside.is_empty() {
+            parts.push(plural(inside.len(), "section", "sections"));
+        }
+        parts.join(", ")
+    };
+    // a decision says what was decided; anything else names a few items
+    let gist: Vec<String> = if g.adr.is_some() {
+        members
+            .iter()
+            .find(|m| m.display() == "decision")
+            .and_then(|m| m.detail.clone())
+            .into_iter()
+            .collect()
+    } else if g.chart.is_some() || g.screen.is_some() {
+        Vec::new()
+    } else {
+        members
+            .iter()
+            .filter(|m| m.parent.is_none())
+            .map(|m| m.display().replace('\n', " "))
+            .chain(inside.iter().map(|c| c.display().to_string()))
+            .take(3)
+            .map(|t| short(&t, 28))
+            .collect()
+    };
+    let mut line = what;
+    if !gist.is_empty() {
+        let more = if n + inside.len() > gist.len() {
+            "…"
+        } else {
+            ""
+        };
+        line.push_str(&format!(" · {}{more}", gist.join(", ")));
+    }
+    line
+}
+
+/// A perspective's high-level view: every top-level section and block not
+/// in `open` (or a headline kind of `p`) folded into a card with its title
+/// and [`summary`] (id [`fold_id`]); arrows to anything inside go to the
+/// card, mindmaps fold to their centre.
+pub fn fold(doc: &Document, p: &Perspective, open: &[String]) -> Document {
+    let keep = |g: &Group| open.contains(&g.id) || headline(&p.id).contains(&kind_of(g));
+    let mut out = doc.clone();
+    let mut moved: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for g in doc.groups.iter().filter(|g| g.parent.is_none()) {
+        if keep(g) {
+            continue;
+        }
+        let card = fold_id(&g.id);
+        // what is inside, at any depth
+        let mut groups = vec![g.id.clone()];
+        let mut k = 0;
+        while k < groups.len() {
+            let cur = groups[k].clone();
+            groups.extend(
+                doc.groups
+                    .iter()
+                    .filter(|x| x.parent.as_deref() == Some(cur.as_str()))
+                    .map(|x| x.id.clone()),
+            );
+            k += 1;
+        }
+        for id in &groups {
+            moved.insert(id.clone(), card.clone());
+        }
+        for n in doc
+            .nodes
+            .iter()
+            .filter(|n| n.group.as_ref().is_some_and(|x| groups.contains(x)))
+        {
+            moved.insert(n.id.clone(), card.clone());
+        }
+        let mut c = Node::new(&card);
+        c.label = g.display().to_string();
+        c.detail = Some(summary(doc, g));
+        c.color = g.color.clone();
+        c.shape = crate::model::Shape::Rounded;
+        (c.x, c.y) = (g.x, g.y);
+        out.nodes.push(c);
+    }
+    // a topic's own topics go with it: a mindmap folds to its centre
+    for n in out.nodes.iter_mut() {
+        if n.mindmap.is_some() && n.group.is_none() && !open.contains(&n.id) {
+            n.collapsed = true;
+        }
+    }
+    out.nodes
+        .retain(|n| !moved.contains_key(&n.id) || n.id.starts_with("@fold/"));
+    out.groups.retain(|g| !moved.contains_key(&g.id));
+    let to = |id: &str| moved.get(id).cloned().unwrap_or_else(|| id.to_string());
+    let mut seen = std::collections::HashSet::new();
+    out.edges = doc
+        .edges
+        .iter()
+        .filter_map(|e| {
+            let (a, b) = (to(&e.from), to(&e.to));
+            if a == b || !seen.insert((a.clone(), b.clone())) {
+                return None;
+            }
+            let mut e2 = e.clone();
+            // an arrow that now joins two cards says what it joined
+            if a != e.from || b != e.to {
+                e2.id = format!("{a}->{b}");
+            }
+            (e2.from, e2.to) = (a, b);
+            Some(e2)
+        })
+        .collect();
+    for c in out.comments.iter_mut() {
+        if let Some(on) = c.on.clone() {
+            c.on = Some(to(&on));
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,13 +492,13 @@ mod tests {
         // ops, written back through the patcher
         let mut s = crate::Session::new();
         s.set_source(src);
-        let r = s.apply(r#"{"ops":[{"op":"perspective","id":"team","label":"Squad"},{"op":"perspective","id":"ux","remove":true},{"op":"set","key":"type","value":"product"}]}"#);
+        let r = s.apply(r#"{"ops":[{"op":"perspective","id":"delivery","label":"Squad"},{"op":"perspective","id":"ux","remove":true},{"op":"set","key":"type","value":"product"}]}"#);
         assert_eq!(r["ok"], true, "{r}");
         let out = s.source("dsl").unwrap();
         assert!(
             out.contains("type: product\n")
                 && out.contains(
-                    "perspective team: Squad [tags: team, show: kanban gantt risks timeline table]"
+                    "perspective delivery: Squad [tags: delivery team, show: timeline gantt kanban risks table]"
                 )
                 && !out.contains("perspective ux"),
             "{out}"
@@ -303,13 +510,12 @@ mod tests {
                 "product",
                 "tech",
                 "user",
-                "exec",
                 "legal",
-                "finance",
+                "business",
                 "marketing",
-                "commercial",
                 "design",
-                "team"
+                "exec",
+                "delivery"
             ]
         );
         assert!(s.apply(r#"{"op":"perspective","id":"x","show":["nope"]}"#)["ok"] == false);
@@ -337,23 +543,23 @@ mod tests {
         assert_eq!(
             ids,
             [
-                "exec",
-                "team",
+                "delivery",
                 "product",
                 "tech",
                 "legal",
-                "finance",
+                "business",
                 "marketing",
-                "commercial",
                 "design",
+                "exec",
                 "ux"
             ]
         );
+        let lead = ps.iter().find(|p| p.id == "exec").unwrap();
         assert_eq!(
-            ps[0].label, "Leadership",
-            "the board's own overrides the built-in"
+            lead.label, "Leadership",
+            "the board's own comes after the built-in ones"
         );
-        let v = view(&doc, &ps[0]);
+        let v = view(&doc, lead);
         let nodes: Vec<&str> = v.nodes.iter().map(|n| n.id.as_str()).collect();
         assert_eq!(nodes, ["beta", "db.decision", "inner"]);
         let groups: Vec<&str> = v.groups.iter().map(|g| g.id.as_str()).collect();
@@ -368,5 +574,50 @@ mod tests {
         // a sketch has none of its own
         assert!(builtins(BoardKind::Sketch).is_empty());
         assert_eq!(builtins(BoardKind::Product)[0].id, "product");
+        assert!(builtins(BoardKind::Project)
+            .iter()
+            .all(|p| purpose(&p.id).is_some()));
+    }
+
+    #[test]
+    fn a_perspective_starts_high_level_and_opens_in_place() {
+        let doc = dsl::parse(
+            "type: project\n\nweb: Storefront\ngroup backend: Backend [blue] {\n  api: Orders API\n  db: Postgres\n  group jobs: Jobs {\n    worker: Worker\n  }\n}\nrisks r: Risks {\n  Fraud [p: 5, i: 5]\n  Delay [p: 1, i: 2]\n}\ntimeline t: History {\n  2026-10-28: Beta\n}\nweb -> api: orders\nweb -> db\napi -> worker\ncomment on db: which version?\n",
+        )
+        .unwrap();
+        let p = builtins(BoardKind::Project)
+            .into_iter()
+            .find(|p| p.id == "delivery")
+            .unwrap();
+        let v = fold(&doc, &p, &[]);
+        // the backend and the risks are cards; the timeline (delivery's headline) stays open
+        let card = v.node("@fold/backend").unwrap();
+        assert_eq!(card.label, "Backend");
+        assert_eq!(
+            card.detail.as_deref(),
+            Some("2 items, 1 section · Orders API, Postgres, Jobs")
+        );
+        assert_eq!(card.color.as_deref(), Some("blue"));
+        assert_eq!(
+            v.node("@fold/r").unwrap().detail.as_deref(),
+            Some("2 risks, 1 high · Fraud, Delay")
+        );
+        assert!(v.group("t").is_some() && v.node("@fold/t").is_none());
+        assert!(v.node("api").is_none() && v.group("jobs").is_none());
+        // arrows go to the card, once; the one inside it goes
+        let edges: Vec<(&str, &str)> = v
+            .edges
+            .iter()
+            .map(|e| (e.from.as_str(), e.to.as_str()))
+            .collect();
+        assert_eq!(edges, [("web", "@fold/backend")]);
+        assert_eq!(v.comments[0].on.as_deref(), Some("@fold/backend"));
+        // opened, it is as it was
+        let open = fold(&doc, &p, &["backend".to_string()]);
+        assert!(open.node("api").is_some() && open.node("@fold/backend").is_none());
+        assert_eq!(
+            purpose("business"),
+            Some("Money, pricing, deals and the numbers")
+        );
     }
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.54.0 — 2026-10-18
+
+- **Perspectives start high level and drill down:** a perspective opens with its sections and blocks folded into cards. Each card shows the title, what is inside (*2 risks, 1 high*, *3 to do, 1 doing*, *4 events*…) and its first few items. Arrows run between the cards. Click a card to open it in place; *Expand all* in the top bar opens everything, *Fold all* folds it back. Each role keeps open what it looks at first: charts for Business, the timeline for Delivery, Product and Marketing.
+- **Built-in perspectives, rethought:**
+  - Senior management is gone: every perspective now starts at that level.
+  - Finance and Commercial are one, *Business* (money, pricing, deals and the numbers). Boards tagged `finance` or `commercial` still show there.
+  - Team is *Delivery*: who does what by when, and what could stop it. `team` tags still count.
+  - User is *Users*, and the perspectives pick blocks for their role. Product and Design include wireframe screens; Technical includes cycles.
+  - The picker says in a line what each one is for.
+- **An empty perspective explains itself:** when nothing on the board is tagged for it yet, it says so and offers *✦ Sort the board into perspectives* or the full board.
+
 ## 0.53.2 — 2026-10-18
 
 - **Perspectives:** the whole board is *Full board* (it was *Everyone*), in the top bar and in the picker when a board opens. The picker describes each perspective in a few words (*Decisions, risks, timelines and more*) and its text wraps instead of being cut off.

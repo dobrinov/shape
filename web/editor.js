@@ -406,9 +406,14 @@
        changes). The board's type decides the built-in ones; the file can
        add its own. The pick is kept per board in this browser. */
     function perspectiveKey() { return "diagram.perspective." + (opts.file || opts.name || "board"); }
-    function fillPerspectives() {
+    function fillPerspectives(force) {
       var sel = toolbar.persp;
       if (!sel || !st.session) return;
+      if (toolbar.folds) {
+        toolbar.folds.hidden = !st.perspective;
+        toolbar.folds.textContent = st.perspOpen ? "Expand all" : "Fold all";
+        toolbar.folds.title = st.perspOpen ? "Open every folded section and block" : "Back to the high-level view: sections and blocks folded";
+      }
       var main = st.answer ? st.answer.main.session : st.session;
       var list = JSON.parse(main.perspectives());
       st.perspectives = list;
@@ -430,6 +435,7 @@
       if (id === "__new") { toolbar.persp.value = st.perspective ? st.perspective.id : ""; return newPerspective(); }
       if (id === "__sort") { toolbar.persp.value = st.perspective ? st.perspective.id : ""; return sortPerspectives(); }
       st.perspective = (st.perspectives || []).find(function (p) { return p.id === id; }) || null;
+      st.perspOpen = []; // it starts high level: everything folded
       try { if (id) localStorage.setItem(perspectiveKey(), id); else localStorage.removeItem(perspectiveKey()); } catch (e) { /* fine */ }
       fillPerspectives();
       render();
@@ -440,6 +446,7 @@
       try { id = localStorage.getItem(perspectiveKey()); } catch (e) { /* fine */ }
       fillPerspectives();
       if (id) st.perspective = (st.perspectives || []).find(function (p) { return p.id === id; }) || null;
+      st.perspOpen = [];
       fillPerspectives();
     }
     /* A new type brings other perspectives: the board is rethought so each
@@ -483,7 +490,7 @@
         h("div", { class: "dge-persp-cards" }, [card("", "Full board", "Everything on it")].concat(list.map(function (p) {
           // what it shows, briefly: its blocks (the first few), else its tag
           var show = (p.show || []).map(function (k) { return SHORT_KINDS[k] || k; }), tag = (p.tags || [])[0] || p.id;
-          var more = show.length ? show.slice(0, 3).join(", ") + (show.length > 3 ? " and more" : "") : "What is tagged “" + tag + "”";
+          var more = wasm.perspective_purpose(p.id) || (show.length ? show.slice(0, 3).join(", ") + (show.length > 3 ? " and more" : "") : "What is tagged “" + tag + "”");
           return card(p.id, p.label, more.charAt(0).toUpperCase() + more.slice(1));
         })))
       ]), []);
@@ -517,6 +524,43 @@
         h("button", { class: "primary", onclick: go }, ["Add"])
       ]);
       setTimeout(function () { name.focus(); }, 0);
+    }
+    /* A perspective that shows nothing: nothing on the board is tagged for
+       it yet. Say so, and offer to sort the board, or the full board. */
+    var empty = null;
+    function emptyView(on) {
+      if (!on) { if (empty) empty.hidden = true; return; }
+      if (!empty) {
+        // clicks go through to the board (to add a box), but for its buttons
+        empty = h("div", { class: "dge-empty-view" });
+        ["pointerdown", "dblclick", "contextmenu"].forEach(function (ev) { empty.addEventListener(ev, function (e) { if (e.target.closest("button")) e.stopPropagation(); }); });
+        canvas.appendChild(empty);
+      }
+      empty.hidden = false;
+      empty.innerHTML = "";
+      empty.appendChild(h("b", {}, ["Nothing here is marked for " + st.perspective.label + " yet"]));
+      empty.appendChild(h("p", {}, ["A perspective shows what is tagged for it and the blocks it cares about. The AI can go through the board and tag everything for the people who need it."]));
+      empty.appendChild(h("div", { class: "dge-empty-actions" }, [
+        h("button", { class: "primary", onclick: function () { sortPerspectives(); } }, ["✦ Sort the board into perspectives"]),
+        h("button", { onclick: function () { toolbar.persp.value = ""; pickPerspective(""); } }, ["Show the full board"])
+      ]));
+    }
+    /* A perspective starts high level: its sections and blocks folded into
+       summary cards. A card opens in place; the bar's button opens or folds
+       them all. */
+    function unfold(gid) {
+      if (!st.perspOpen) return;
+      if (st.perspOpen.indexOf(gid) < 0) st.perspOpen.push(gid);
+      render();
+      fillPerspectives(true);
+      var g = st.r.groups.find(function (x) { return x.id === gid; });
+      if (g) focusOn(g, 1, 1.2, 0.9);
+    }
+    function toggleFolds() {
+      st.perspOpen = st.perspOpen ? null : [];
+      render();
+      fillPerspectives(true);
+      fit();
     }
     /* The AI tags each element with the perspectives it belongs to. */
     function sortPerspectives() {
@@ -589,6 +633,8 @@
       el.appendChild(toolbar.crumbs); // not in the canvas: its pointer handling would take the clicks
       toolbar.persp = h("select", { class: "dge-persp", title: "Perspective: show the board as one audience sees it (only changes what you see)", onchange: function (e) { pickPerspective(e.target.value); } });
       toolbar.appendChild(toolbar.persp);
+      toolbar.folds = h("button", { class: "dge-bar-btn dge-folds", "data-act": "folds", hidden: true, onclick: function () { toggleFolds(); } });
+      toolbar.appendChild(toolbar.folds);
       toolbar.branch = h("button", { class: "dge-branch", hidden: true, onclick: function () { toggleBranchChanges(); } });
       toolbar.appendChild(toolbar.branch);
       if (opts.status) [].concat(opts.status).forEach(function (s) { toolbar.appendChild(s); });
@@ -921,7 +967,7 @@
 
     // --------------------------------------------------------------- render
     function render() {
-      var r = JSON.parse(st.session.render(JSON.stringify({ comments: st.showResolved ? "all" : "open", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null })));
+      var r = JSON.parse(st.session.render(JSON.stringify({ comments: st.showResolved ? "all" : "open", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null })));
       if (r.error) {
         flash(r.error, true);
         return;
@@ -975,6 +1021,7 @@
       var nodes = st.doc ? st.doc.nodes.length : 0;
       hint.textContent = nodes ? "" : view ? "Empty diagram" : "Press T and click to start a mindmap · double-click to add a box · or paste a list";
       hint.hidden = !!nodes;
+      emptyView(nodes > 0 && st.perspective && !r.nodes.length && !(r.groups || []).length);
     }
 
     function transform() {
@@ -2392,6 +2439,8 @@
       if (t && (t.type === "link" || t.type === "open") && st.tool !== "select" && st.tool !== "hand" && !view) t = { type: "node", id: t.id };
       if (e.button === 0 && t && t.type === "link" && !st.linking) { e.preventDefault(); followLink(t.link); return; }
       if (e.button === 0 && t && t.type === "open") { e.preventDefault(); openCanvas(st.canvasPath.concat([t.canvas])); return; }
+      // a folded block in a perspective: it opens in place
+      if (t && t.type === "node" && /^@fold\//.test(t.id)) { e.preventDefault(); if (e.button === 0) unfold(t.id.slice(6)); return; }
       if (st.linking && e.button === 0) {
         // Link to…: the next click picks the target
         var from = st.linking, to = t && (t.type === "node" || t.type === "group") ? t.id : null;
@@ -2651,6 +2700,7 @@
       // the first click may have re-rendered what is under the pointer
       var under = document.elementFromPoint(e.clientX, e.clientY) || e.target;
       var t = hit(under);
+      if (t && t.type === "node" && /^@fold\//.test(t.id)) return;
       if (t && t.type === "node" && canvasOf(t.id)) { openLinked(t.id); return; }
       if (t && (t.type === "node" || t.type === "edge" || t.type === "group")) {
         editLabel(t.id);
@@ -4911,11 +4961,11 @@
 
     // -------------------------------------------------------------- exports
     function exportSVG() {
-      return JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null }))).svg;
+      return JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null }))).svg;
     }
     function exportPNG(scale) {
       scale = scale || 2;
-      var r = JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null })));
+      var r = JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null })));
       return new Promise(function (resolve, reject) {
         var img = new Image();
         var url = URL.createObjectURL(new Blob([r.svg], { type: "image/svg+xml" }));
