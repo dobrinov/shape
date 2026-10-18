@@ -116,6 +116,8 @@ Whiteboard tools are great for talking. Their output, though, ends up in a forma
 brew install dobrinov/tap/shape
 ```
 
+Had it installed as `diagram` (its name before October 2026)? Run `brew migrate diagram` once, then `brew upgrade shape` as usual.
+
 **Binaries:** download an archive for macOS (Apple silicon or Intel), Linux (x86_64 or arm64) or Windows (x86_64) from the [latest release](https://github.com/dobrinov/shape/releases/latest), unpack it and put `shape` on your `PATH` (the archive also holds `diagram`, the old name, as an alias). `SHA256SUMS` lists the checksums.
 
 **From source:** you need Rust with the `wasm32-unknown-unknown` target, and `wasm-pack`.
