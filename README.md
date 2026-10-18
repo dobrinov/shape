@@ -162,6 +162,8 @@ diagram spec [--json-schema]   diagram embed [-o diagram.embed.js]   diagram ski
 
 ### Editor shortcuts
 
+The minimap in the bottom-left corner shows the whole board; click or drag in it to move around, **M** hides it.
+
 | | |
 |---|---|
 | `V` `T` `N` `S` `C` `M` | select · mindmap · box · sticky · connect · comment |

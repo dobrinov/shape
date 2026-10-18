@@ -7,3 +7,4 @@
 /examples/stress/out*
 /scripts/e2e/node_modules
 /scripts/e2e/package-lock.json
+.claude/worktrees/

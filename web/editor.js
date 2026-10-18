@@ -61,6 +61,7 @@
     section: '<rect x="3" y="8" width="18" height="12" rx="2"/><rect x="3" y="3" width="9" height="3.5" rx="1.2" fill="currentColor" stroke="none"/>',
     fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     setup: '<path d="M9 3v4M15 3v4"/><path d="M6.5 7h11v3.5a5.5 5.5 0 01-11 0z"/><path d="M12 16v5"/>',
+    minimap: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><rect x="11" y="10" width="6" height="5" rx="1"/>',
     magic: '<path d="M10 3.5c.5 3.9 2.6 6 6.5 6.5-3.9.5-6 2.6-6.5 6.5-.5-3.9-2.6-6-6.5-6.5 3.9-.5 6-2.6 6.5-6.5z" fill="currentColor" stroke="none"/><path d="M18 13.5c.25 1.9 1.1 2.75 3 3-1.9.25-2.75 1.1-3 3-.25-1.9-1.1-2.75-3-3 1.9-.25 2.75-1.1 3-3z" fill="currentColor" stroke="none"/>',
     history: '<path d="M4 12a8 8 0 102.3-5.6"/><path d="M4 4.5v3.5h3.5"/><path d="M12 8v4.5l3 2"/>',
     branch: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3.5-11 6.5"/>',
@@ -182,8 +183,68 @@
       h("button", { title: "Zoom out (-)", onclick: function () { zoomTo(st.zoom / 1.2); } }, ["−"]),
       zoomLabel,
       h("button", { title: "Zoom in (+)", onclick: function () { zoomTo(st.zoom * 1.2); } }, ["+"]),
-      h("button", { title: "Fit (F)", html: icon("fit"), onclick: function () { fit(); } })
+      h("button", { title: "Fit (F)", html: icon("fit"), onclick: function () { fit(); } }),
+      h("button", { class: "dge-minimap-btn", title: "Minimap (M)", html: icon("minimap"), onclick: function () { toggleMinimap(); } })
     ]);
+    /* The minimap: the whole board small, with the part in view marked;
+       click or drag in it to move around. */
+    var MM_W = 200, MM_H = 132;
+    var mmBoard = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    mmBoard.setAttribute("width", MM_W);
+    mmBoard.setAttribute("height", MM_H);
+    var mmView = h("div", { class: "dge-minimap-view" });
+    var minimap = h("div", { class: "dge-minimap", title: "Minimap: click or drag to move around", hidden: true }, [mmBoard, mmView]);
+    var mmScale = function () {
+      var v = st.r.view, s = Math.min(MM_W / v.w, MM_H / v.h);
+      return { s: s, ox: (MM_W - v.w * s) / 2, oy: (MM_H - v.h * s) / 2, v: v };
+    };
+    function drawMinimap() {
+      var on = minimapOn() && st.r && st.doc && st.doc.nodes.length > 0 && !st.presenting;
+      minimap.hidden = !on;
+      zoomBar.querySelector(".dge-minimap-btn").setAttribute("aria-pressed", String(minimapOn()));
+      if (!on) return;
+      // as tall as the board's shape needs, within limits
+      MM_H = Math.round(Math.max(64, Math.min(160, MM_W * st.r.view.h / st.r.view.w)));
+      mmBoard.setAttribute("height", MM_H);
+      minimap.style.height = MM_H + "px";
+      var m = mmScale(), out = "";
+      var box = function (b, cls) {
+        return '<rect class="' + cls + '" x="' + (m.ox + (b.x - m.v.x) * m.s).toFixed(1) + '" y="' + (m.oy + (b.y - m.v.y) * m.s).toFixed(1) + '" width="' + Math.max(1.5, b.w * m.s).toFixed(1) + '" height="' + Math.max(1.5, b.h * m.s).toFixed(1) + '" rx="' + (cls === "g" ? 2 : 1) + '"/>';
+      };
+      (st.r.groups || []).forEach(function (g) { out += box(g, "g"); });
+      st.r.nodes.forEach(function (n) { out += box(n, "n"); });
+      mmBoard.innerHTML = out;
+      placeMinimapView();
+    }
+    function placeMinimapView() {
+      if (minimap.hidden || !st.r) return;
+      var m = mmScale();
+      var x0 = m.v.x - st.panX / st.zoom, y0 = m.v.y - st.panY / st.zoom;
+      var x = m.ox + (x0 - m.v.x) * m.s, y = m.oy + (y0 - m.v.y) * m.s;
+      var w = canvas.clientWidth / st.zoom * m.s, hh = canvas.clientHeight / st.zoom * m.s;
+      // clipped to the minimap
+      var l = Math.max(0, x), t = Math.max(0, y), r = Math.min(MM_W, x + w), b = Math.min(MM_H, y + hh);
+      mmView.style.cssText = "left:" + l + "px;top:" + t + "px;width:" + Math.max(0, r - l) + "px;height:" + Math.max(0, b - t) + "px";
+    }
+    function minimapGo(e) {
+      var rect = mmBoard.getBoundingClientRect(), m = mmScale();
+      var wx = m.v.x + (e.clientX - rect.left - m.ox) / m.s, wy = m.v.y + (e.clientY - rect.top - m.oy) / m.s;
+      st.panX = canvas.clientWidth / 2 - (wx - m.v.x) * st.zoom;
+      st.panY = canvas.clientHeight / 2 - (wy - m.v.y) * st.zoom;
+      transform();
+    }
+    minimap.addEventListener("pointerdown", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      minimap.setPointerCapture(e.pointerId);
+      minimapGo(e);
+      var move = function (ev) { minimapGo(ev); };
+      var up = function () { minimap.removeEventListener("pointermove", move); minimap.removeEventListener("pointerup", up); canvas.focus({ preventScroll: true }); };
+      minimap.addEventListener("pointermove", move);
+      minimap.addEventListener("pointerup", up);
+    });
+    function minimapOn() { return lsGet("diagram.minimap") !== "off"; }
+    function toggleMinimap() { lsSet("diagram.minimap", minimapOn() ? "off" : "on"); drawMinimap(); }
     var hint = h("div", { class: "dge-hint" });
     /* The AI: a round button in the corner opens what it can do. */
     var aiItem = function (ico, name, more, tip, key, fn) {
@@ -234,7 +295,7 @@
     [tools, zoomBar, aiFab, aiMenu, askPanel].forEach(function (bar) {
       ["pointerdown", "dblclick", "contextmenu"].forEach(function (ev) { bar.addEventListener(ev, function (e) { e.stopPropagation(); }); });
     });
-    var canvas = h("div", { class: "dge-canvas", tabindex: "0" }, [stage, tools, zoomBar, hint].concat(view ? [] : [aiMenu, askPanel, aiFab]));
+    var canvas = h("div", { class: "dge-canvas", tabindex: "0" }, [stage, tools, zoomBar, minimap, hint].concat(view ? [] : [aiMenu, askPanel, aiFab]));
     var inspector = h("div", { class: "dge-inspector" });
     var commentsEl = h("div", { class: "dge-comments" });
     var panel = h("aside", { class: "dge-panel" }, [inspector, commentsEl]);
@@ -871,6 +932,7 @@
         fit();
         st.fitted = true;
       }
+      drawMinimap();
       transform();
       markSelection();
       drawOverlay();
@@ -892,6 +954,7 @@
       stage.style.transform = "translate(" + st.panX + "px," + st.panY + "px) scale(" + st.zoom + ")";
       zoomLabel.textContent = Math.round(st.zoom * 100) + "%";
       placeTitles();
+      placeMinimapView();
     }
     /* Zoomed out, section titles get too small to read: they are shown on
        top at a readable size instead. */
@@ -3871,6 +3934,7 @@
         case "x": case "X": setTool("connect"); break;
         case "d": case "D": setTool("decision"); break;
         case "f": fit(); break;
+        case "m": case "M": toggleMinimap(); break;
         case "0": zoomTo(1); break;
         case "+": case "=": zoomTo(st.zoom * 1.2); break;
         case "-": zoomTo(st.zoom / 1.2); break;
@@ -3881,7 +3945,7 @@
         case "ArrowRight": e.preventDefault(); nudge(e.shiftKey ? 40 : 8, 0); break;
         case "ArrowUp": e.preventDefault(); nudge(0, e.shiftKey ? -40 : -8); break;
         case "ArrowDown": e.preventDefault(); nudge(0, e.shiftKey ? 40 : 8); break;
-        case "?": flash("V select · H hand · T mindmap · N box · S sticky · X connect · C comment · double-click to add/edit · " + MOD + "G section · " + MOD + "⇧C copy as prompt · " + MOD + "D duplicate · F fit · space+drag pan. Mindmaps: Tab branch · Enter sibling · ⇧Tab outdent (on the centre: a new centre above it) · right-click for more · F2 rename · . fold · arrows move · ⌥↑↓ reorder · paste a list", false, 9000); break;
+        case "?": flash("V select · H hand · T mindmap · N box · S sticky · X connect · C comment · double-click to add/edit · " + MOD + "G section · " + MOD + "⇧C copy as prompt · " + MOD + "D duplicate · F fit · M minimap · space+drag pan. Mindmaps: Tab branch · Enter sibling · ⇧Tab outdent (on the centre: a new centre above it) · right-click for more · F2 rename · . fold · arrows move · ⌥↑↓ reorder · paste a list", false, 9000); break;
         default: return;
       }
     }

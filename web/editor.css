@@ -440,3 +440,13 @@
 .dge .dge-persp-cards .dge-persp-card:hover { border-color: var(--accent); }
 .dge .dge-persp-cards .dge-persp-card.on { border-color: var(--accent); background: var(--bg2); }
 .dge-persp-card span { color: var(--muted); font-size: 12px; font-weight: 400; }
+/* the minimap, above the zoom bar */
+.dge-minimap { position: absolute; left: 16px; bottom: 54px; z-index: 5; width: 200px; height: 132px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--r-3); background: var(--bg); box-shadow: var(--shadow-1); cursor: pointer; touch-action: none; }
+.dge-minimap[hidden] { display: none; }
+.dge-minimap svg { display: block; }
+.dge-minimap .g { fill: var(--bg2); stroke: var(--line-strong); stroke-width: 0.75; }
+.dge-minimap .n { fill: var(--muted); opacity: 0.55; }
+.dge-minimap-view { position: absolute; border: 1.5px solid var(--accent); border-radius: 2px; background: color-mix(in srgb, var(--accent) 10%, transparent); pointer-events: none; }
+.dge .dge-zoombar .dge-minimap-btn[aria-pressed="true"] { color: var(--accent); }
+.dge-presenting .dge-minimap { display: none !important; }
+@media (max-width: 640px) { .dge-minimap { display: none; } }

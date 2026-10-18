@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.48.0 — 2026-10-18
+
+- **Minimap:** the whole board small in the bottom-left corner, sections and boxes, with the part in view marked. Click or drag in it to move around. It takes the board's shape; **M** (or the button in the zoom bar) hides or shows it, and the choice is remembered. It is hidden while presenting and on narrow screens.
+
 ## 0.47.0 — 2026-10-18
 
 - **Rethink fills the perspectives:** on a product or project board (or one with perspectives of its own), Rethink now gets the perspectives and how many elements each shows, and tags every element for the audiences it matters to, so none stays empty. Before, perspectives showed only what someone had tagged by hand.
