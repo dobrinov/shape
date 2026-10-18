@@ -652,6 +652,14 @@ fn today(args: &Args) -> Result<Option<i64>, String> {
     Ok(None)
 }
 
+/// A prompt with today's date on top, so the model does not guess the year.
+fn dated(prompt: &str) -> String {
+    format!(
+        "Today is {}.\n\n{prompt}",
+        diagram_core::gantt::format_date(today_utc())
+    )
+}
+
 /// Today (UTC), in days since 1970.
 fn today_utc() -> i64 {
     let secs = std::time::SystemTime::now()
@@ -1143,7 +1151,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             let mut tries = 0;
             let r = loop {
                 eprintln!("asking `{cmd}`…");
-                let reply = ai::run(&cmd, &prompt)?;
+                let reply = ai::run(&cmd, &dated(&prompt))?;
                 let applied = diagram_core::ops::parse_ops(&reply)
                     .map_err(|e| e.to_string())
                     .and_then(|ops| {
@@ -1213,7 +1221,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 return ok;
             };
             eprintln!("asking `{cmd}`…");
-            let reply = ai::run(&cmd, &prompt)?;
+            let reply = ai::run(&cmd, &dated(&prompt))?;
             let outline: String = diagram_core::mindmap::parse_reply(&reply)
                 .iter()
                 .map(|l| format!("{}{}\n", "  ".repeat(l.depth), l.text))

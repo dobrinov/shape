@@ -1004,6 +1004,8 @@
     /* Ask the model. With no `ai` option the prompt is shown to copy into any
        chat or harness, and the reply is pasted back. */
     function ask(prompt, title) {
+      // the date, so the model does not guess the year
+      prompt = "Today is " + isoDay(today()) + ".\n\n" + prompt;
       if (opts.ai) return Promise.resolve(opts.ai(prompt));
       return new Promise(function (resolve, reject) {
         var pre = h("textarea", { class: "dge-preview", readonly: true, rows: 10 });

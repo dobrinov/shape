@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.44.1 — 2026-10-18
+
+- Prompts to the AI start with today's date (the editor's and `diagram ask` / `diagram expand`'s), so a model no longer guesses the year when it writes dates.
+
 ## 0.44.0 — 2026-10-18
 
 - **History:** the clock button in the top bar lists the board's versions, with who made each and when (hover a version for its exact time).
