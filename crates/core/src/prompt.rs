@@ -412,6 +412,55 @@ pub fn question(
     s
 }
 
+/// A prompt asking a model to answer `question` about the whole board
+/// (`root`, canvases included) with a small diagram of its own: a summary
+/// in a sentence or two, then a board in the `diagram` language whose
+/// elements link back to where they come from (`#/id` on the top board,
+/// `#/plan/id` inside a canvas). See [`answer_parts`].
+pub fn answer_board(
+    root: &Document,
+    history: &[(String, String)],
+    question: &str,
+    today: Option<i64>,
+) -> String {
+    let title = root.title.as_deref().unwrap_or("Untitled diagram");
+    let mut s = format!("# A question about the board \"{title}\"\n\nAnswer the question at the end by drawing a small board of your own: a diagram made for this question from what is on the board below (the top board, then each canvas inside it, in the `diagram` language with every id).\n\n");
+    s.push_str(&board_by_canvas(root, today));
+    if !history.is_empty() {
+        s.push_str("## Earlier in this conversation\n\n");
+        for (q, a) in history {
+            s.push_str(&format!("Q: {}\nA: {}\n\n", q.trim(), a.trim()));
+        }
+    }
+    s.push_str(&format!("## The question\n\n{}\n\n", question.trim()));
+    s.push_str("## How to answer\n\nFirst one or two short plain sentences that answer the question (40 words at most; the diagram carries the detail). Then one ```diagram code block: a small board that shows the answer.\n\n- Pick the form that fits the question: boxes and arrows for what depends on what, sections to group, a `timeline` for when things happened, a `table` to compare, a `mindmap` to break something down, stickies for open questions.\n- Keep it small: about 4 to 15 elements, short labels, details (`detail:`) for the rest.\n- Link every element that comes from the board to its place there: `[link: #/id]` for the top board, `[link: #/plan/id]` for an element inside canvas `plan` (the canvas path, then the id). Only ids that are on the board.\n- Start it with `title:` (a short name for the answer). Do not copy the whole board; show only what answers the question.\n- When the board does not answer it, say so in the sentences and draw what is known and what is missing (a sticky per missing piece).\n\nExample:\n\nFraud reporting is the long pole: it must ship before the open beta.\n\n```diagram\ntitle: What blocks the launch\nfraud: Fraud reporting API [red, link: #/blockers/b-fraud, detail: owner rado]\nbeta: Open beta, 28 Oct [link: #/status/beta]\nfraud -> beta: must ship first\n```\n");
+    s
+}
+
+/// A model's reply to [`answer_board`]: its sentences and its board (the
+/// `diagram` block), or why it cannot be used.
+pub fn answer_parts(reply: &str) -> Result<(String, String), String> {
+    let start = reply
+        .find("```diagram")
+        .ok_or("the reply has no ```diagram block")?;
+    let body = &reply[start + "```diagram".len()..];
+    let end = body
+        .find("```")
+        .ok_or("the ```diagram block is not closed")?;
+    let source = body[..end].trim_matches('\n').to_string() + "\n";
+    crate::dsl::parse(&source).map_err(|e| {
+        e.iter()
+            .map(|d| d.to_string())
+            .collect::<Vec<_>>()
+            .join("; ")
+    })?;
+    let summary = format!("{} {}", &reply[..start], &body[end + 3..])
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    Ok((summary, source))
+}
+
 /// A place on the board an answer points at (`[[canvas/…/id]]`).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AnswerRef {

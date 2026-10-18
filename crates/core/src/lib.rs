@@ -462,6 +462,17 @@ impl Session {
         prompt::question(&self.whole(), history, question, today)
     }
 
+    /// A prompt asking `question` about the whole board, answered with a
+    /// small board of the model's own (see [`prompt::answer_board`]).
+    pub fn answer_board_prompt(
+        &self,
+        history: &[(String, String)],
+        question: &str,
+        today: Option<i64>,
+    ) -> String {
+        prompt::answer_board(&self.whole(), history, question, today)
+    }
+
     /// The places on the board an answer points at (see [`prompt::answer_refs`]).
     pub fn answer_refs(&self, answer: &str) -> Vec<prompt::AnswerRef> {
         prompt::answer_refs(&self.whole(), answer)
@@ -511,6 +522,25 @@ mod tests {
         assert_eq!(detect(&mmd), Format::Mermaid);
         assert!(spec().contains("add_node") && !spec().contains("OPS_REFERENCE"));
         assert!(json_schema()["properties"]["nodes"].is_object());
+    }
+
+    #[test]
+    fn answers_are_small_boards_linked_back() {
+        let mut s = Session::new();
+        s.set_source("title: Checkout\npay: Payments [canvas: plan]\n\ncanvas plan: Plan {\n  sso: SSO login\n}\n");
+        let p = s.answer_board_prompt(&[], "What blocks SSO?", None);
+        assert!(
+            p.contains("## Canvas `plan`")
+                && p.contains("[link: #/plan/id]")
+                && p.contains("## The question\n\nWhat blocks SSO?"),
+            "{p}"
+        );
+        let (summary, source) = prompt::answer_parts("SSO waits on the IdP.\n\n```diagram\ntitle: SSO\nsso: SSO login [link: #/plan/sso]\nidp: Pick an IdP [sticky]\nidp -> sso\n```\nThat is all.").unwrap();
+        assert_eq!(summary, "SSO waits on the IdP. That is all.");
+        let d = dsl::parse(&source).unwrap();
+        assert_eq!(d.node("sso").unwrap().link.as_deref(), Some("#/plan/sso"));
+        assert!(prompt::answer_parts("no diagram here").is_err());
+        assert!(prompt::answer_parts("```diagram\na -> -> [\n```").is_err());
     }
 
     #[test]

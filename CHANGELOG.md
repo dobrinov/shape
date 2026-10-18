@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.40.0 — 2026-10-18
+
+- **Ask draws its answer.** A question about the board ("what blocks the launch?") is answered on a temporary canvas made for it.
+  - The AI reads the whole board and draws a small diagram: boxes and arrows, sections, a timeline, a table or a mindmap, with open questions as stickies. A one- or two-line summary sits on top.
+  - Every piece links back to its place on the board; a link goes there, into its canvas.
+  - The answer is not saved: autosave, ⌘S and undo leave the file alone.
+  - Its bar offers **Follow-up…** (the answer is drawn again), **Rethink the board from this** (your question, the answer and any comments you left on it become Rethink's instructions), **Save as canvas** (kept as a canvas with a link box on the board), and close (Esc).
+- Links to a place anywhere on the board: `#/id` on the top board, `#/plan/id` inside canvas `plan`.
+- Core `prompt::answer_board`, `prompt::answer_parts`, `Session::answer_board_prompt`; WASM `answer_board_prompt`, `answer_parts`.
+
 ## 0.39.0 — 2026-10-18
 
 The editor's redesign:

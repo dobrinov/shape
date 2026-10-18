@@ -107,21 +107,39 @@ try {
   assert.match(await p.locator(".dge-modal textarea").inputValue(), /^Adapt this canvas for senior management/);
   await p.locator(".dge-modal button", { hasText: "Cancel" }).click();
 
-  // Ask: an answer with links; a link selects what it points at; nothing changes
+  // Ask: the answer is a temporary canvas drawn for the question; nothing is saved
   const before = saved();
-  await p.locator(".dge-ai-fab").click();
-  await p.locator(".dge-ai-item", { hasText: "Ask" }).first().click();
-  await p.locator(".dge-ask-panel textarea").fill("Where does the API write?");
-  await p.keyboard.press("Enter");
-  await p.waitForSelector(".dge-ask-a button.dge-ref");
-  assert.equal(await p.locator(".dge-ask-a button.dge-ref").textContent(), "Postgres");
-  assert.equal(await p.locator(".dge-ask-a .dge-ref.missing").textContent(), "ghost");
-  await p.locator(".dge-ask-a button.dge-ref").click(); await sleep(300);
-  assert.equal(await p.locator('.dg-node.sel[data-id="db"]').count(), 1);
-  await p.keyboard.press("Escape");
-  assert.equal(await p.locator(".dge-ask-panel").isHidden(), true);
+  const ask = async (q) => {
+    await p.locator(".dge-ai-fab").click();
+    await p.locator(".dge-ai-item", { hasText: "Ask" }).first().click();
+    await p.locator(".dge-ask-panel textarea").fill(q);
+    await p.keyboard.press("Enter");
+    await p.waitForSelector(".dge-answer-bar"); await sleep(300);
+  };
+  await ask("Where does the API write?");
+  assert.match(await p.locator(".dge-answer-bar").textContent(), /Where does the API write\?.*The API writes to Postgres\..*Temporary, not saved/s);
+  assert.match(await p.locator(".dge-crumbs").textContent(), /✦ Writes$/);
+  assert.equal(await p.locator('.dg-node[data-id="writer"]').count(), 1);
   await sleep(500);
-  assert.equal(saved(), before, "asking changes nothing");
+  assert.equal(saved(), before, "an answer is not saved");
+  // its link goes to the place on the board, and the answer closes
+  await p.locator('.dg-link[data-node="store"]').click(); await sleep(400);
+  assert.equal(await p.locator(".dge-answer-bar").count(), 0);
+  assert.equal(await p.locator('.dg-node.sel[data-id="db"]').count(), 1);
+  assert.equal(saved(), before);
+
+  // Save as canvas keeps it, with a link to it on the board
+  await ask("Where does the API write?");
+  await p.locator(".dge-answer-bar button", { hasText: "Save as canvas" }).click(); await sleep(700);
+  assert.match(saved(), /writes-link: Writes \[pill, canvas: writes/);
+  assert.match(saved(), /canvas writes: Writes \{[\s\S]*store: Postgres \[link: #\/db\]/);
+
+  // Rethink the board from it: the question and the drawn answer are the instructions
+  await ask("Where does the API write?");
+  await p.locator(".dge-answer-bar button", { hasText: "Rethink the board from this" }).click();
+  await p.waitForSelector(".dge-preview-bar:not(.dge-answer-bar)");
+  assert.match(await p.locator(".dge-preview-bar").textContent(), /Took the answer in/);
+  await p.locator(".dge-preview-bar button", { hasText: "Discard" }).click(); await sleep(300);
   assert.deepEqual(errors, []);
   await browser.close();
   console.log("ok — ask e2e passed");

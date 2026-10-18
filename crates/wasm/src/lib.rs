@@ -279,6 +279,14 @@ impl Diagram {
             .question_prompt(&history, question, diagram_core::gantt::parse_date(today))
     }
 
+    /// A prompt asking `question` about the whole board, answered with a
+    /// small board of the model's own. `history`: `[[question, summary], …]`.
+    pub fn answer_board_prompt(&self, history: &str, question: &str, today: &str) -> String {
+        let history: Vec<(String, String)> = serde_json::from_str(history).unwrap_or_default();
+        self.inner
+            .answer_board_prompt(&history, question, diagram_core::gantt::parse_date(today))
+    }
+
     /// The places an answer points at: `[{ref, path, id, label}]` (label
     /// null when nothing on the board has that id).
     pub fn answer_refs(&self, answer: &str) -> String {
@@ -464,6 +472,17 @@ pub fn count_changes(old: &str, new: &str) -> i32 {
     match (old, diagram_core::parse(new)) {
         (Ok(o), Ok(n)) => diagram_core::change_count(&o, &n) as i32,
         _ => -1,
+    }
+}
+
+/// A model's answer board: `{ok, summary, source}` or `{ok: false, error}`.
+#[wasm_bindgen]
+pub fn answer_parts(reply: &str) -> String {
+    match diagram_core::prompt::answer_parts(reply) {
+        Ok((summary, source)) => {
+            json!({"ok": true, "summary": summary, "source": source}).to_string()
+        }
+        Err(e) => json!({"ok": false, "error": e}).to_string(),
     }
 }
 

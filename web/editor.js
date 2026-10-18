@@ -191,8 +191,8 @@
       ].filter(Boolean));
     };
     var aiMenu = h("div", { class: "dge-ai-menu", role: "menu", hidden: true }, [
-      aiItem("ask", "Ask", "Questions about this board, answered with links",
-        "Ask: a question about this board (all of it, canvases included), such as who owns what, what was decided, or what is still open. You get a short answer whose references take you to the places on the board. Nothing on the board changes.",
+      aiItem("ask", "Ask", "Questions answered with a diagram drawn for them",
+        "Ask: a question about this board (all of it, canvases included), such as what blocks the launch or who owns what. The AI draws the answer on a temporary canvas, each piece linked to its place on the board. Save it as a canvas, comment on it, or rethink the board from it. Nothing changes until you do.",
         "", function () { openAsk(); }),
       aiItem("rethink", "Rethink", "Act on the comments and bring the board up to date",
         "Rethink: the AI reads the whole board, every canvas included. It acts on the open comments first (changing the board everywhere a comment affects it, then resolving the comment), then organises: related items in sections, duplicates merged, stale items updated. In git, what changed on this branch counts as new information too. Nothing is lost, and you see the changes before keeping them.",
@@ -414,6 +414,20 @@
     /* Canvases inside the board: the one open, and the way back up. */
     /* Where you are: the board, then the canvases you went into. */
     function updateTrail() {
+      if (st.answer) {
+        // the board you were on, then the answer
+        if (!toolbar.crumbs) return;
+        var mt = JSON.parse(st.answer.main.session.canvas_trail());
+        toolbar.crumbs.innerHTML = "";
+        mt.forEach(function (c, i) {
+          if (i) toolbar.crumbs.appendChild(h("span", { class: "dge-crumb-sep", "aria-hidden": "true" }, ["/"]));
+          toolbar.crumbs.appendChild(h("button", { title: "Back to “" + c.title + "”", onclick: function () { closeAnswer(); openCanvas(c.path); } }, [i === 0 && c.title === "Board" && opts.name ? opts.name : c.title]));
+        });
+        toolbar.crumbs.appendChild(h("span", { class: "dge-crumb-sep", "aria-hidden": "true" }, ["/"]));
+        toolbar.crumbs.appendChild(h("strong", { class: "dge-crumb-answer", title: "A temporary answer, not saved" }, ["✦ " + (st.doc && st.doc.title || st.answer.question)]));
+        st.canvasPath = []; // the answer is a board of its own
+        return;
+      }
       var t = JSON.parse(st.session.canvas_trail());
       st.canvasPath = t[t.length - 1].path;
       if (!toolbar.crumbs) return;
@@ -545,6 +559,7 @@
       if (syncText) syncCode(true);
       showErrors();
       render();
+      if (st.answer) return; // a temporary answer is not the board
       emit("change", st.text);
       if (opts.onChange) opts.onChange(st.text, api);
       if (since) { clearTimeout(branchTimer); branchTimer = setTimeout(paintBranch, 600); }
@@ -722,9 +737,11 @@
       var cw = canvas.clientWidth, ch = canvas.clientHeight;
       if (!cw || !ch) return;
       var v = st.r.view;
-      st.zoom = Math.max(0.1, Math.min(1.5, Math.min(cw / v.w, ch / v.h) * 0.94));
+      // an answer's bar covers the top: fit below it
+      var top = st.answer && st.answer.bar && st.answer.bar.isConnected ? st.answer.bar.offsetTop + st.answer.bar.offsetHeight : 0;
+      st.zoom = Math.max(0.1, Math.min(1.5, Math.min(cw / v.w, (ch - top) / v.h) * 0.94));
       st.panX = (cw - v.w * st.zoom) / 2;
-      st.panY = (ch - v.h * st.zoom) / 2;
+      st.panY = top + (ch - top - v.h * st.zoom) / 2;
       transform();
     }
     function fitSoon() { setTimeout(fit, 0); }
@@ -1055,30 +1072,41 @@
       askPanel.hidden = false;
       setTimeout(function () { askInput.focus(); }, 0);
     }
-    function closeAsk() {
+    function closeAsk(keep) {
       askPanel.hidden = true;
-      st.askHistory = [];
-      askThread.innerHTML = "";
+      if (!keep) {
+        st.askHistory = [];
+        askThread.innerHTML = "";
+      }
       canvas.focus({ preventScroll: true });
     }
     function sendQuestion() {
       var q = askInput.value.trim();
       if (!q || st.asking) return;
       askInput.value = "";
-      var a = h("div", { class: "dge-ask-a dge-muted" }, [opts.ai ? "✦ Thinking…" : "✦ Waiting for the reply you paste…"]);
+      var a = h("div", { class: "dge-ask-a dge-muted" }, [opts.ai ? "✦ Drawing an answer…" : "✦ Waiting for the reply you paste…"]);
       askThread.appendChild(h("div", { class: "dge-ask-q" }, [q]));
       askThread.appendChild(a);
       askThread.scrollTop = askThread.scrollHeight;
       var history = (st.askHistory || []).slice(-4);
-      var prompt = st.session.question_prompt(JSON.stringify(history), q, isoDay(today()));
+      // the question is about the board, also when an answer is open
+      var board = st.answer ? st.answer.main.session : st.session;
+      var prompt = board.answer_board_prompt(JSON.stringify(history), q, isoDay(today()));
       st.asking = true;
-      ask(prompt, "✦ Ask: " + q).then(function (text) {
-        text = String(text || "").trim();
-        if (!text) throw new Error("The reply was empty");
-        st.askHistory = history.concat([[q, text]]);
+      var round = function (p, n) {
+        return ask(p, "✦ Ask: " + q).then(function (text) {
+          var r = JSON.parse(wasm.answer_parts(String(text || "")));
+          if (!r.ok && opts.ai && n < 2) return round(wasm.ask_again(prompt, String(text || ""), r.error), n + 1);
+          if (!r.ok) throw new Error(r.error);
+          return r;
+        });
+      };
+      round(prompt, 0).then(function (r) {
+        st.askHistory = history.concat([[q, r.summary]]);
         a.className = "dge-ask-a";
-        a.innerHTML = "";
-        renderAnswer(a, text);
+        a.textContent = r.summary || "Answered on its own canvas.";
+        closeAsk(true);
+        openAnswer(q, r.summary, r.source);
       }, function (e) {
         a.className = "dge-ask-a dge-ask-err";
         a.textContent = e && e.message === "cancelled" ? "Cancelled." : "No answer: " + (e && e.message || e);
@@ -1087,6 +1115,80 @@
         askThread.scrollTop = askThread.scrollHeight;
         if (!askPanel.hidden) askInput.focus();
       });
+    }
+
+    /* An answer: a temporary canvas the AI drew for the question. It has a
+       session of its own and is never saved with the board (autosave, ⌘S
+       and undo leave the file alone) until "Save as canvas". */
+    function openAnswer(question, summary, source) {
+      var main = st.answer ? st.answer.main : { session: st.session, text: st.text, undo: st.undo, redo: st.redo, path: st.canvasPath.slice() };
+      if (st.answer) { st.answer.session.free(); st.answer.bar.remove(); }
+      if (st.preview) discardPreview();
+      var session = new wasm.Diagram();
+      session.set_source(source);
+      st.answer = { question: question, summary: summary, session: session, main: main };
+      st.session = session;
+      st.text = source;
+      st.undo = [];
+      st.redo = [];
+      select([]);
+      refreshDoc();
+      render();
+      var said = h("span", { class: "dge-answer-summary" });
+      (summary || "").split(/(\*\*[^*]+\*\*)/).forEach(function (part) {
+        var b = /^\*\*([^*]+)\*\*$/.exec(part);
+        said.appendChild(b ? h("b", {}, [b[1]]) : document.createTextNode(part));
+      });
+      var bar = h("div", { class: "dge-preview-bar dge-answer-bar", role: "status" }, [
+        h("span", { title: (summary || "").replace(/\*\*/g, "") }, [h("b", {}, ["✦ " + question]), summary ? said : null].filter(Boolean)),
+        h("span", { class: "dge-muted dge-answer-temp" }, ["Temporary, not saved"]),
+        h("button", { title: "Ask a follow-up question; the answer is drawn again", onclick: function () { openAsk(); } }, ["Follow-up…"]),
+        h("button", { title: "Rethink the board with this answer and your comments on it as the instructions", onclick: function () { rethinkFromAnswer(); } }, ["Rethink the board from this"]),
+        h("button", { class: "primary", title: "Keep this answer as a canvas of the board, with a link to it", onclick: function () { saveAnswer(); } }, ["Save as canvas"]),
+        h("button", { "aria-label": "Close the answer", title: "Back to the board (Esc)", onclick: function () { closeAnswer(); } }, ["×"])
+      ]);
+      st.answer.bar = bar;
+      el.appendChild(bar);
+      fit();
+    }
+    function closeAnswer() {
+      if (!st.answer) return;
+      var a = st.answer, m = a.main;
+      a.bar.remove();
+      a.session.free();
+      st.answer = null;
+      st.session = m.session;
+      st.text = m.text;
+      st.undo = m.undo;
+      st.redo = m.redo;
+      select([]);
+      refreshDoc();
+      render();
+      fit();
+      return a;
+    }
+    function rethinkFromAnswer() {
+      var a = st.answer;
+      if (!a) return;
+      var drawn = st.session.source("dsl");
+      var talk = (st.doc.comments || []).length ? " Act on the comments on it too: they say what the person thinks of the answer." : "";
+      var instructions = "The person asked: “" + a.question + "”. The answer was drawn as this small board:\n\n```diagram\n" + drawn + "```\n\nBring the board up to date with what this answer shows." + talk + " Keep every piece of information: reorganise, merge and move it, but never drop it.";
+      closeAnswer();
+      runRethink(instructions);
+    }
+    function saveAnswer() {
+      var a = st.answer;
+      if (!a) return;
+      var drawn = st.session.source("dsl");
+      var title = (st.doc.title || a.question).slice(0, 60);
+      closeAnswer();
+      var cid = canvasIdFor(title), at = freeSpot();
+      var res = applyOps([
+        { op: "add_canvas", id: cid, title: title },
+        { op: "add_node", id: freshId(slug(title) + "-link"), label: title, shape: "pill", canvas: cid, x: Math.round(at.x), y: Math.round(at.y) },
+        { op: "in", canvas: cid, ops: [{ op: "merge", dsl: drawn }] }
+      ]);
+      if (res.ok) flash("Saved as the canvas “" + title + "” (double-click its link to open it)");
     }
     /* An answer: paragraphs and bullets, **bold**, and [[canvas/id]] as links to that place. */
     function renderAnswer(into, text) {
@@ -3029,6 +3131,13 @@
       var b = boardLink(link);
       if (b) { if (opts.openBoard) opts.openBoard(b.path, b.id); else window.open(link, "_blank", "noopener"); return; }
       if (link.charAt(0) !== "#") { window.open(link, "_blank", "noopener"); return; }
+      if (link.charAt(1) === "/") {
+        // a place on the board: #/id on the top board, #/plan/id in a canvas
+        var parts = link.slice(2).split("/").filter(Boolean), target = parts.pop();
+        if (st.answer) closeAnswer();
+        if (JSON.stringify(st.canvasPath) !== JSON.stringify(parts) && !openCanvas(parts)) return;
+        return followLink("#" + target);
+      }
       var id = link.slice(1), g = geom(id);
       if (!g) { flash(kindOf(id) ? "“" + labelOf(id) + "” is folded away" : "“" + id + "” is not on the board any more", true); return; }
       focusOn(g, Math.max(st.zoom, 0.6), 1.5);
@@ -3324,6 +3433,7 @@
       }
       if (mod && e.key.toLowerCase() === "s") {
         // Arc uses ⌘S for its sidebar: save, but let the browser have the key
+        if (st.answer) { e.preventDefault(); flash("This answer is not saved with the board: Save as canvas keeps it"); return; }
         if (opts.onSave) {
           if (!isArc()) e.preventDefault();
           opts.onSave(st.text, api);
@@ -3334,6 +3444,7 @@
       if (blocksMenu && !blocksMenu.hidden && e.key === "Escape") { e.preventDefault(); closeBlocks(); return; }
       if (boardMenu && !boardMenu.hidden && e.key === "Escape") { e.preventDefault(); boardMenu.hidden = true; return; }
       if (!askPanel.hidden && e.key === "Escape") { e.preventDefault(); closeAsk(); return; }
+      if (st.answer && e.key === "Escape" && !st.sel.length) { e.preventDefault(); closeAnswer(); return; }
       if (mod && e.key.toLowerCase() === "k" && !view) { e.preventDefault(); askAI(); return; }
       if (mod && e.key.toLowerCase() === "f") { e.preventDefault(); openFind(); return; }
       if (st.presenting) {
@@ -3954,8 +4065,14 @@
     if (resizeObs) resizeObs.observe(canvas);
 
     var api = {
-      getSource: function (fmt) { return !fmt || fmt === "dsl" ? st.text : st.session.source(fmt); },
+      getSource: function (fmt) {
+        // the board, also while a temporary answer is open
+        var m = st.answer ? st.answer.main : null;
+        if (m) return !fmt || fmt === "dsl" ? m.text : m.session.source(fmt);
+        return !fmt || fmt === "dsl" ? st.text : st.session.source(fmt);
+      },
       setSource: function (src, o) {
+        if (st.answer) { st.answer.main.session.set_source(src); st.answer.main.text = src; return; }
         load(src, !(o && o.silent === true) && !!st.doc);
         syncCode(true);
         showErrors();
