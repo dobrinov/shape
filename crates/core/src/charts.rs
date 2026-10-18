@@ -39,6 +39,9 @@ pub enum Paint {
     Soft(String),
     /// A table's header band.
     Header,
+    /// A wireframe's device (a phone's body): near-black in light mode, a
+    /// dark grey in dark mode.
+    Frame,
 }
 
 /// One thing a chart draws.

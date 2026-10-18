@@ -1100,6 +1100,12 @@ fn chart_svg(
                 .map(|k| k.soft)
                 .unwrap_or_else(|| c.clone()),
             Paint::Header => p.header.to_string(),
+            Paint::Frame => if t == Theme::Dark {
+                "#3d4450"
+            } else {
+                "#1f2328"
+            }
+            .to_string(),
         }
     };
     // which block the marks belong to, so a click (or a dropped arrow) on

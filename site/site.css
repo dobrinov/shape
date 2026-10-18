@@ -163,9 +163,9 @@ footer { flex-wrap: wrap; row-gap: 8px; }
 
 /* wireframes */
 .wireframes { border-top: 1px solid var(--border); }
-.shot.wide { margin: 0 0 28px; padding: 16px; background: #f4f6f9; }
+.shot.wide { margin: 0 0 28px; padding: 16px; background: #0a0d13; }
 .shot.wide img { min-width: 0; width: 100%; border-radius: 8px; }
-.shot.wide figcaption { color: #5b6573; font-size: 13px; text-align: center; margin-top: 10px; }
+.shot.wide figcaption { color: var(--muted); font-size: 13px; text-align: center; margin-top: 10px; }
 .wireframes .grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .wireframes .grid p i { color: var(--fg); font-style: normal; font-weight: 600; }
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.1 — 2026-10-18
+
+- **Wireframes in dark mode:** a phone's or tablet's body is a dark grey there, not white. The landing page's flow picture is drawn dark like the rest of the page.
+- The website's analytics use the new site key.
+
 ## 0.53.0 — 2026-10-18
 
 - **diagram is now Shape, all the way through.**

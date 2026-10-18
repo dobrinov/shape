@@ -911,12 +911,12 @@ pub fn plot(doc: &Document, g: &Group) -> Plot {
         }
         _ => {
             // a phone or a tablet: a rounded body, the status bar
-            d.fill(-8.0, -8.0, fw + 16.0, h + 16.0, Paint::Fg, 36.0);
+            d.fill(-8.0, -8.0, fw + 16.0, h + 16.0, Paint::Frame, 36.0);
             d.fill(0.0, 0.0, fw, h, Paint::Bg, 28.0);
             d.text(24.0, 26.0, "9:41", 13.0, Paint::Fg, true);
             d.text_at(fw - 24.0, 26.0, "▂▄▆ ◔", 11.0, Paint::Fg, false, "end");
             if device == Device::Mobile {
-                d.fill(fw / 2.0 - 40.0, 10.0, 80.0, 22.0, Paint::Fg, 11.0);
+                d.fill(fw / 2.0 - 40.0, 10.0, 80.0, 22.0, Paint::Frame, 11.0);
                 d.fill(fw / 2.0 - 60.0, h - 12.0, 120.0, 4.0, Paint::Fg, 2.0);
             }
         }
