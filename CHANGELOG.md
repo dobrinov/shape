@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.41.0 — 2026-10-18
+
+- **Perspectives:** one board, seen by different audiences. A perspective shows the elements tagged for it and the blocks it cares about (with the sections, arrows and comments around them), and can hide details. It changes only what you see.
+  - **Board types bring built-in ones.** `type: product` brings Product, Technical, User and Senior management. `type: project` brings Senior management, Team, Product and Technical. Both also bring Legal, Finance, Marketing, Commercial and Design. A sketch (the default) has none.
+  - **Add your own** (*New perspective…*: a name, a tag, which blocks, details on or off), written as `perspective legal: Legal [tags: legal, show: adr]`. One with a built-in's id overrides it.
+  - **In the editor:** pick one in the top bar; the pick is kept per board. New elements get its tag, so they stay in view. *✦ Sort into perspectives* has the AI tag the board.
+- **Templates for types:** `diagram new FILE --template product` and `--template project` start boards with a type, starter content and perspective tags. The Board popover changes a board's type.
+- **The breadcrumb is back above the canvas:** it was hard to see in the top bar. It shows when you are inside a canvas or an answer.
+- Core `perspectives` module, `BoardKind`, `Session::apply_top` (ops for the whole board while a canvas is open); op `perspective`; `set` key `type`; render option `perspective`. WASM `perspectives`, `board_type`, `apply_top`.
+
 ## 0.40.2 — 2026-10-18
 
 - **Rethink just runs:** one click, no dialog. It acts on the open comments and brings the board up to date with its default instructions. The editable instructions and the examples are gone; perspectives (next) cover showing the board to other audiences.

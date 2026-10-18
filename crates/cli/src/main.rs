@@ -23,7 +23,8 @@ pub const HELP: &str = r#"diagram — lightweight diagrams as text, with review 
 USAGE
   diagram [FILE]                     open FILE in the editor (created if missing;
                                      no FILE starts a new untitled.diagram)
-  diagram new FILE [--template flow|architecture|board]   start a diagram from a template
+  diagram new FILE [--template flow|architecture|board|product|project]   start a diagram from a template
+                                     (product and project boards come with perspectives)
   --canvas ID[/ID…]                  with any command: work on that canvas inside the board
                                      (`canvas id: Title { … }`), e.g. brief, apply, svg
 
@@ -697,6 +698,9 @@ pub const TEMPLATES: &[(&str, &str)] = &[
         include_str!("../templates/architecture.diagram"),
     ),
     ("board", include_str!("../templates/board.diagram")),
+    // boards with a type, and so with perspectives
+    ("product", include_str!("../templates/product.diagram")),
+    ("project", include_str!("../templates/project.diagram")),
 ];
 
 fn run(args: Args) -> Result<ExitCode, String> {
@@ -744,7 +748,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             let (_, body) = TEMPLATES
                 .iter()
                 .find(|(n, _)| *n == name)
-                .ok_or_else(|| format!("unknown template {name} (flow, architecture, board)"))?;
+                .ok_or_else(|| format!("unknown template {name} (flow, architecture, board, product, project)"))?;
             let doc = parse_doc(body, name)?;
             save(file, &doc)?;
             eprintln!("created {file} from the {name} template — open it with `diagram {file}`");

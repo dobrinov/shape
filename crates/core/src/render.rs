@@ -52,6 +52,9 @@ pub struct RenderOptions {
     /// Only show these elements (nodes, groups): the view is cropped to them.
     #[serde(default)]
     pub focus: Vec<String>,
+    /// Show the board as this perspective sees it (see [`crate::perspectives`]).
+    #[serde(default)]
+    pub perspective: Option<crate::model::Perspective>,
     /// Diff status per element id (see `diff::merge`).
     #[serde(skip)]
     pub changes: HashMap<String, Change>,

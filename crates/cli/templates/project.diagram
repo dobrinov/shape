@@ -1,0 +1,29 @@
+title: Our project
+type: project
+description: Where the project stands: the plan, the work, the risks and the decisions. Look at it as Senior management, Team, Product or Technical (top bar).
+
+goal: The goal, in one sentence [pill, blue, tags: exec team product, detail: What done looks like]
+
+gantt plan: Plan [start: 2026-11-02, scale: week] {
+  Discovery [1w, owner: you]
+  Build [3w, after: discovery]
+  Beta [1w, after: build, milestone]
+}
+
+kanban work: Work {
+  column todo: To do {
+    first: The first task [tags: team]
+  }
+  column doing: Doing {}
+  column done: Done {}
+}
+
+risks risk: What could go wrong [scale: 5] {
+  A first risk [p: 2, i: 3, owner: you]
+}
+
+timeline history: How we got here {
+  2026-10-20: Project started [important]
+}
+
+status: Status: on track [sticky, green, tags: exec team]

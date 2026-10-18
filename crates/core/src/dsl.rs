@@ -24,6 +24,7 @@ use crate::model::*;
 pub const SETTINGS: &[&str] = &[
     "title",
     "description",
+    "type",
     "direction",
     "layout",
     "routing",
@@ -481,6 +482,10 @@ impl Parser {
                 c.advance(5);
                 return self.theme_decl(c);
             }
+            "perspective" if c.rest()[11..].starts_with(|ch: char| ch.is_whitespace()) => {
+                c.advance(11);
+                return self.perspective_decl(c);
+            }
             "table" if c.rest()[5..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(5);
                 return self.table_decl(c);
@@ -501,7 +506,16 @@ impl Parser {
                 c.advance(5);
                 return self.reply(c);
             }
-            w if SETTINGS.contains(&w) && c.rest()[w.len()..].trim_start().starts_with(':') => {
+            // `type:` is the board's type only with one for a value (`type: Database`
+            // stays a box called type)
+            w if SETTINGS.contains(&w)
+                && c.rest()[w.len()..].trim_start().starts_with(':')
+                && (w != "type"
+                    || BoardKind::parse(
+                        unquote(c.rest()[w.len()..].trim_start()[1..].trim()).as_str(),
+                    )
+                    .is_some()) =>
+            {
                 if !self.stack.is_empty() {
                     return Err(format!("`{w}` can only be set at the top level"));
                 }
@@ -538,6 +552,11 @@ impl Parser {
             "routing" => {
                 s.routing = Routing::parse(&value).ok_or_else(|| {
                     format!("unknown routing `{value}` (use {})", Routing::names())
+                })?
+            }
+            "type" => {
+                s.kind = BoardKind::parse(&value).ok_or_else(|| {
+                    format!("unknown board type `{value}` (use {})", BoardKind::names())
                 })?
             }
             "theme" => {
@@ -779,6 +798,57 @@ impl Parser {
     }
 
     /// `theme id [base: light|dark] {` … `key: value` lines … `}`.
+    /// `perspective exec: Senior management [tags: exec, show: adr risks, details: off]`
+    fn perspective_decl(&mut self, mut c: Cursor) -> Result<(), String> {
+        c.skip_ws();
+        let (id, qlabel) = c.reference()?;
+        let (label, attrs) = label_and_attrs_until_brace(&mut c)?;
+        let mut p = Perspective {
+            id: id.clone(),
+            label: label.or(qlabel).unwrap_or_else(|| id.clone()),
+            ..Default::default()
+        };
+        let words = |v: &str| -> Vec<String> {
+            v.split(|ch: char| ch.is_whitespace() || ch == ',')
+                .filter(|w| !w.is_empty())
+                .map(String::from)
+                .collect()
+        };
+        for (k, v) in &attrs {
+            match (k.as_str(), v) {
+                ("tags" | "tag", Some(v)) => p.tags = words(v),
+                ("show", Some(v)) => {
+                    p.show = words(v);
+                    if let Some(bad) = p
+                        .show
+                        .iter()
+                        .find(|k| !crate::perspectives::KINDS.contains(&k.as_str()))
+                    {
+                        return Err(format!(
+                            "a perspective cannot show `{bad}` (use {})",
+                            crate::perspectives::KINDS.join(", ")
+                        ));
+                    }
+                }
+                ("details", Some(v)) => {
+                    p.details = match v.as_str() {
+                        "on" | "yes" | "true" => true,
+                        "off" | "no" | "false" => false,
+                        _ => return Err(format!("details is on or off, not `{v}`")),
+                    }
+                }
+                (k, _) => {
+                    return Err(format!(
+                        "unknown perspective attribute `{k}` (tags, show, details)"
+                    ))
+                }
+            }
+        }
+        self.doc.perspectives.retain(|x| x.id != id);
+        self.doc.perspectives.push(p);
+        Ok(())
+    }
+
     fn theme_decl(&mut self, mut c: Cursor) -> Result<(), String> {
         c.skip_ws();
         let (id, _) = c.reference()?;
@@ -2485,6 +2555,25 @@ pub(crate) fn adr_block(doc: &Document, g: &Group, pad: &str, out: &mut String) 
     out.push_str(&format!("{pad}}}\n"));
 }
 
+/// `perspective id: Label [tags: …, show: …, details: off]`.
+pub(crate) fn perspective_line(p: &Perspective) -> String {
+    let mut head = format!("perspective {}", id_text(&p.id));
+    if !p.label.is_empty() && p.label != p.id {
+        head.push_str(&format!(": {}", label_text(&p.label)));
+    }
+    let mut a = Vec::new();
+    if !p.tags.is_empty() {
+        a.push(format!("tags: {}", p.tags.join(" ")));
+    }
+    if !p.show.is_empty() {
+        a.push(format!("show: {}", p.show.join(" ")));
+    }
+    if !p.details {
+        a.push("details: off".to_string());
+    }
+    head + &attrs_text(&a)
+}
+
 /// `timeline id: Title {` … `DATE: label [attrs]` per event … `}`.
 pub(crate) fn timeline_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
     let mut head = id_text(&g.id);
@@ -3119,6 +3208,7 @@ pub(crate) fn setting_line(doc: &Document, key: &str) -> Option<String> {
         }
         "layout" => (s.layout != def.layout).then(|| format!("layout: {}", s.layout.as_str())),
         "routing" => (s.routing != def.routing).then(|| format!("routing: {}", s.routing.as_str())),
+        "type" => (s.kind != def.kind).then(|| format!("type: {}", s.kind.as_str())),
         "theme" => match &s.palette {
             Some(p) => Some(format!("theme: {p}")),
             None => (s.theme != def.theme).then(|| format!("theme: {}", s.theme.as_str())),
@@ -3241,6 +3331,16 @@ pub fn print(doc: &Document) -> String {
         let mut s = String::new();
         theme_block(t, &mut s);
         sections.push(s);
+    }
+    if !doc.perspectives.is_empty() {
+        sections.push(
+            doc.perspectives
+                .iter()
+                .map(perspective_line)
+                .collect::<Vec<_>>()
+                .join("\n")
+                + "\n",
+        );
     }
 
     let in_map = map_members(doc);

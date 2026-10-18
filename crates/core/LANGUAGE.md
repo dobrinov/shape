@@ -59,7 +59,7 @@ Edits keep the file as it is written. Ops, the editor and `diagram apply` rewrit
 | `comment [id] [on target] [at x,y] [by author]: text [attrs]` | a review comment. Ids default to `c1`, `c2`, … |
 | `reply id [by author]: text` | a reply to a comment |
 | `theme id [base: light] {` … `}` | a theme: `key: value` lines (see *Themes*) |
-| `title:` `description:` `direction:` `layout:` `routing:` `theme:` | settings (top level only). The title is metadata (briefs, export names); it is not drawn on the board (`--title` draws it in exports) |
+| `title:` `description:` `type:` `direction:` `layout:` `routing:` `theme:` | settings (top level only). The title is metadata (briefs, export names); it is not drawn on the board (`--title` draws it in exports). `type:` is what the board is for, `sketch` (the default), `product` or `project`; it decides the built-in perspectives |
 
 Ids are made of letters, digits, `_`, and `-` or `.` between them (`orders-api`, `svc.v2`). Writing `\n` in a label starts a new line. Quote a label (`"…"`) when it should keep leading or trailing spaces.
 
@@ -310,6 +310,19 @@ table options: Hosting options {
 - A row's first cell is its label and gives its id within the table (`options.local`), so arrows, comments and links can point at a row; hovering it shows its cells by column. `[attrs]` at the end of a row: a colour tints it, `detail`, `link`, `id`. `w:` on the table sets its width.
 - In the editor: the *Table* tool; right-click a table → *Edit as text…*, *Add row*, *Add column*; right-click a row → *Edit row…* (its cells, separated by `|`), *Add row below*, *Colour…*, *Delete row*. Renaming a row's label renames its id; renaming a table renames its rows.
 - Prompts show it as a Markdown table. In JSON a table is a group with `table` and `columns`; its rows are nodes whose `label` is the first cell and `cells` the rest. Ops can place a row with `index`.
+
+### Perspectives
+
+```diagram
+type: project
+perspective legal: Legal [tags: legal, show: adr]
+
+fraud: Fraud reporting API [tags: tech exec]
+```
+
+- A perspective is a way of looking at the board: it shows the elements tagged for it (`tags`), the blocks of the kinds it names whole (`show`: mindmap, timeline, adr, risks, kanban, gantt, table, chart, entity, sequence, lanes, sticky), the sections around them and the arrows and comments between them. `details: off` shows titles only. It changes what you see, never the board.
+- The board's `type:` brings built-in ones. A product board: Product (`product`), Technical (`tech`), User (`user`), Senior management (`exec`). A project board: Senior management, Team (`team`), Product, Technical. Both also: Legal (`legal`), Finance (`finance`), Marketing (`marketing`), Commercial (`commercial`), Design (`design`). A sketch has none. `perspective id: Name [...]` adds one, or overrides a built-in with the same id.
+- An element shows in a perspective when it has the perspective's tag (`tags: tech exec`); mindmap topics go with their centre. In the editor, pick one in the top bar; new elements get its tag. *✦ Sort into perspectives* has the AI tag the board. Ops: `{"op":"perspective","id":"legal","label":"Legal","tags":["legal"],"show":["adr"]}` (`remove: true` takes it off).
 
 ### Timelines
 

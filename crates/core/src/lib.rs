@@ -31,6 +31,7 @@ pub mod mindmap;
 pub mod model;
 pub mod ops;
 pub mod patch;
+pub mod perspectives;
 pub mod prompt;
 pub mod query;
 pub mod render;
@@ -416,6 +417,28 @@ impl Session {
         self.apply_ops(&ops)
     }
 
+    /// Apply ops to the top board, also while a canvas is open (for what
+    /// belongs to the whole board: its type, its perspectives).
+    pub fn apply_top(&mut self, ops_text: &str) -> Value {
+        let ops = match ops::parse_ops(ops_text) {
+            Ok(o) => o,
+            Err(e) => return json!({"ok": false, "error": e}),
+        };
+        let path = self.canvas_path();
+        if path.is_empty() {
+            return self.apply_ops(&ops);
+        }
+        let mut root = self.whole();
+        match ops::apply(&mut root, &ops) {
+            Ok(r) => {
+                self.doc = root.at(&path).cloned().unwrap_or_default();
+                self.outer = Some((root, path));
+                json!({"ok": true, "created": r.created, "count": r.count})
+            }
+            Err(e) => json!({"ok": false, "error": e.to_string(), "index": e.index}),
+        }
+    }
+
     pub fn apply_ops(&mut self, ops: &[Op]) -> Value {
         match ops::apply(&mut self.doc, ops) {
             Ok(r) => json!({"ok": true, "created": r.created, "count": r.count}),
@@ -426,10 +449,21 @@ impl Session {
     pub fn render(&self, opts: &RenderOptions) -> Rendered {
         let mut o = opts.clone();
         o.themes.extend(self.themes.iter().cloned());
+        // a perspective shows its part of the board (and of the base, to compare)
+        let seen = |d: &Document| match &o.perspective {
+            Some(p) => perspectives::view(d, p),
+            None => d.clone(),
+        };
+        let doc = seen(&self.doc);
         match self.base_here() {
-            Some(b) => render_diff(&b, &self.doc, &o),
-            None => render::render(&self.doc, &o),
+            Some(b) => render_diff(&seen(&b), &doc, &o),
+            None => render::render(&doc, &o),
         }
+    }
+
+    /// The board's perspectives: the built-in ones of its type, then its own.
+    pub fn perspectives(&self) -> Vec<model::Perspective> {
+        perspectives::all(&self.whole())
     }
 
     /// A theme file the board names (`theme: ./brand.theme`), by that name.

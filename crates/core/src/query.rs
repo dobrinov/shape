@@ -272,6 +272,7 @@ pub fn subset(doc: &Document, ids: &[String]) -> Document {
         title: doc.title.clone(),
         description: None,
         themes: Vec::new(),
+        perspectives: Vec::new(),
         // images and canvases are kept out of what a model reads
         assets: Vec::new(),
         canvases: Vec::new(),

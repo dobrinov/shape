@@ -1,0 +1,30 @@
+title: Our product
+type: product
+description: What the product is, who it is for and how it works. Look at it as Product, Technical, User or Senior management (top bar).
+
+mindmap why: Why it exists [tags: product exec] {
+  The problem
+    Who has it
+    What it costs them today
+  What we offer
+  How we know it works
+}
+
+group users: Who uses it {
+  persona: A typical user [person, tags: user product, detail: What they want and what gets in their way]
+  journey: Their first week [tags: user, detail: Sign up, first success, coming back]
+}
+
+group how: How it works {
+  web: Web app [rounded, tags: tech]
+  api: API [tags: tech]
+  db: Database [cylinder, tags: tech]
+}
+web -> api -> db
+
+adr stack: Pick the stack [proposed] {
+  context: What we need from it
+  decision: Still open
+}
+
+question: What do we not know yet? [sticky, tags: product user]

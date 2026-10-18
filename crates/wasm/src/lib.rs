@@ -104,6 +104,12 @@ impl Diagram {
         to_json(&self.inner.errors)
     }
 
+    /// Apply ops to the top board, also while a canvas is open (the board's
+    /// type, its perspectives). Returns like `apply`.
+    pub fn apply_top(&mut self, ops: &str) -> String {
+        to_json(&self.inner.apply_top(ops))
+    }
+
     /// Apply `{"ops": [...]}` (or an LLM reply containing it).
     /// Returns `{ok, created, count}` or `{ok: false, error, index}`.
     pub fn apply(&mut self, ops: &str) -> String {
@@ -277,6 +283,18 @@ impl Diagram {
         let history: Vec<(String, String)> = serde_json::from_str(history).unwrap_or_default();
         self.inner
             .question_prompt(&history, question, diagram_core::gantt::parse_date(today))
+    }
+
+    /// What the board is for (`sketch`, `product`, `project`), from its top
+    /// board, also while a canvas is open.
+    pub fn board_type(&self) -> String {
+        self.inner.whole().settings.kind.as_str().to_string()
+    }
+
+    /// The board's perspectives: `[{id, label, tags, show, details}]`, the
+    /// built-in ones of its type first. Render with one as `perspective`.
+    pub fn perspectives(&self) -> String {
+        to_json(&self.inner.perspectives())
     }
 
     /// A prompt asking `question` about the whole board, answered with a

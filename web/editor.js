@@ -321,6 +321,82 @@
       ["pointerdown", "dblclick", "contextmenu"].forEach(function (ev) { blocksMenu.addEventListener(ev, function (e) { e.stopPropagation(); }); });
       canvas.appendChild(blocksMenu);
     }
+    /* Perspectives: one audience's view of the board (only what you see
+       changes). The board's type decides the built-in ones; the file can
+       add its own. The pick is kept per board in this browser. */
+    function perspectiveKey() { return "diagram.perspective." + (opts.file || opts.name || "board"); }
+    function fillPerspectives() {
+      var sel = toolbar.persp;
+      if (!sel || !st.session) return;
+      var main = st.answer ? st.answer.main.session : st.session;
+      var list = JSON.parse(main.perspectives());
+      st.perspectives = list;
+      var cur = st.perspective ? st.perspective.id : "";
+      var key = JSON.stringify(list) + cur;
+      if (sel._key === key) return;
+      sel._key = key;
+      sel.innerHTML = "";
+      sel.appendChild(h("option", { value: "" }, ["Everyone"]));
+      list.forEach(function (p) { sel.appendChild(h("option", { value: p.id }, [p.label])); });
+      if (!view) {
+        sel.appendChild(h("option", { disabled: true }, ["──────────"]));
+        sel.appendChild(h("option", { value: "__new" }, ["New perspective…"]));
+        if (list.length) sel.appendChild(h("option", { value: "__sort" }, ["✦ Sort into perspectives"]));
+      }
+      sel.value = cur;
+    }
+    function pickPerspective(id) {
+      if (id === "__new") { toolbar.persp.value = st.perspective ? st.perspective.id : ""; return newPerspective(); }
+      if (id === "__sort") { toolbar.persp.value = st.perspective ? st.perspective.id : ""; return sortPerspectives(); }
+      st.perspective = (st.perspectives || []).find(function (p) { return p.id === id; }) || null;
+      try { if (id) localStorage.setItem(perspectiveKey(), id); else localStorage.removeItem(perspectiveKey()); } catch (e) { /* fine */ }
+      fillPerspectives();
+      render();
+      fit();
+    }
+    function restorePerspective() {
+      var id = null;
+      try { id = localStorage.getItem(perspectiveKey()); } catch (e) { /* fine */ }
+      fillPerspectives();
+      if (id) st.perspective = (st.perspectives || []).find(function (p) { return p.id === id; }) || null;
+      fillPerspectives();
+    }
+    var KIND_NAMES = { mindmap: "Mindmaps", timeline: "Timelines", adr: "Decision records", risks: "Risk matrices", kanban: "Kanban boards", gantt: "Gantt charts", table: "Tables", chart: "Charts", entity: "Database tables", sequence: "Sequence diagrams", lanes: "Swimlanes", sticky: "Stickies" };
+    function newPerspective() {
+      var name = h("input", { class: "dge-input", placeholder: "e.g. Legal, Support, Investors" });
+      var tags = h("input", { class: "dge-input", placeholder: "e.g. legal" });
+      var details = h("input", { type: "checkbox", checked: true });
+      var kinds = Object.keys(KIND_NAMES).map(function (k) { return [k, h("input", { type: "checkbox", value: k })]; });
+      var go = function () {
+        var label = name.value.trim();
+        if (!label) return name.focus();
+        var id = slug(label) || "view", t = tags.value.split(/[\s,]+/).filter(Boolean);
+        if (!t.length) t = [id];
+        var res = applyOps([{ op: "perspective", id: id, label: label, tags: t, show: kinds.filter(function (k) { return k[1].checked; }).map(function (k) { return k[0]; }), details: details.checked }], false, true);
+        if (!res.ok) return;
+        closeModal();
+        fillPerspectives();
+        pickPerspective(id);
+        flash("Elements tagged " + t[0] + " show in “" + label + "”; ✦ Sort into perspectives tags them for you");
+      };
+      showModal("New perspective", h("div", { class: "dge-persp-form" }, [
+        h("label", {}, [h("span", {}, ["Name"]), name]),
+        h("label", {}, [h("span", {}, ["Shows elements tagged"]), tags]),
+        h("div", {}, [h("span", { class: "dge-muted" }, ["…and these blocks, whole:"]), h("div", { class: "dge-persp-kinds" }, kinds.map(function (k) { return h("label", {}, [k[1], KIND_NAMES[k[0]]]); }))]),
+        h("label", { class: "dge-persp-check" }, [details, "Show details (off: titles only)"])
+      ]), [
+        h("button", { onclick: closeModal }, ["Cancel"]),
+        h("button", { class: "primary", onclick: go }, ["Add"])
+      ]);
+      setTimeout(function () { name.focus(); }, 0);
+    }
+    /* The AI tags each element with the perspectives it belongs to. */
+    function sortPerspectives() {
+      var list = st.perspectives || [];
+      if (!list.length) return flash("This board has no perspectives yet: set its type (Board) or add one", true);
+      var lines = list.map(function (p) { return "- " + p.label + ": tag `" + (p.tags[0] || p.id) + "`" + (p.show.length ? " (it already shows " + p.show.join(", ") + " blocks whole)" : ""); }).join("\n");
+      runRethink("Sort the board into its perspectives, the audiences that look at it:\n\n" + lines + "\n\nAdd to each box's `tags` the tags of every perspective it matters to (`update_node` with the box's existing tags plus the new ones; a box can belong to several, and inside canvases too). Tag mindmap centres, not their topics. Change nothing else: no labels, sections or arrows. In the note, say how many elements each perspective now shows.");
+    }
     /* Board: flow direction, arrow routing, theme and tidy up, out of the bar. */
     function toggleBoardMenu(anchor) {
       if (boardMenu.hidden === false) { boardMenu.hidden = true; return; }
@@ -335,8 +411,12 @@
       tools.hidden = view;
       // the host's own things first (the app's name, its actions)
       if (opts.lead) toolbar.appendChild(h("div", { class: "dge-group dge-lead" }, [].concat(opts.lead)));
-      toolbar.crumbs = h("nav", { class: "dge-crumbs", "aria-label": "Where you are" });
-      toolbar.appendChild(toolbar.crumbs);
+      // where you are: above the canvas, when you are inside one (or an answer)
+      if (toolbar.crumbs) toolbar.crumbs.remove();
+      toolbar.crumbs = h("nav", { class: "dge-crumbs", "aria-label": "Where you are", hidden: true });
+      el.appendChild(toolbar.crumbs); // not in the canvas: its pointer handling would take the clicks
+      toolbar.persp = h("select", { class: "dge-persp", title: "Perspective: show the board as one audience sees it (only changes what you see)", onchange: function (e) { pickPerspective(e.target.value); } });
+      toolbar.appendChild(toolbar.persp);
       toolbar.branch = h("button", { class: "dge-branch", hidden: true, onclick: function () { toggleBranchChanges(); } });
       toolbar.appendChild(toolbar.branch);
       if (opts.status) [].concat(opts.status).forEach(function (s) { toolbar.appendChild(s); });
@@ -380,8 +460,11 @@
         toolbar.theme = themeSel;
         if (boardMenu) boardMenu.remove();
         var row = function (label, ctl) { return h("label", { class: "dge-board-row" }, [h("span", {}, [label]), ctl]); };
+        var kindSel = h("select", { title: "What the board is for: it decides the built-in perspectives", class: "dge-select", onchange: function (e) { applyOps([{ op: "set", key: "type", value: e.target.value }], false, true); fillPerspectives(); } });
+        [["sketch", "Sketch: just a diagram"], ["product", "Product: understand it"], ["project", "Project: run it"]].forEach(function (d) { kindSel.appendChild(h("option", { value: d[0] }, [d[1]])); });
+        toolbar.kind = kindSel;
         boardMenu = h("div", { class: "dge-board-menu", role: "dialog", "aria-label": "Board", hidden: true }, [
-          row("Flow", dir), row("Arrows", routing), row("Theme", themeSel),
+          row("Type", kindSel), row("Flow", dir), row("Arrows", routing), row("Theme", themeSel),
           h("button", { class: "dge-board-tidy", onclick: function () { boardMenu.hidden = true; applyOps([{ op: "unpin" }]); fitSoon(); } }, [h("span", { html: icon("tidy") }), "Tidy up the layout"])
         ]);
         el.appendChild(boardMenu);
@@ -419,6 +502,7 @@
         if (!toolbar.crumbs) return;
         var mt = JSON.parse(st.answer.main.session.canvas_trail());
         toolbar.crumbs.innerHTML = "";
+        toolbar.crumbs.hidden = false;
         mt.forEach(function (c, i) {
           if (i) toolbar.crumbs.appendChild(h("span", { class: "dge-crumb-sep", "aria-hidden": "true" }, ["/"]));
           toolbar.crumbs.appendChild(h("button", { title: "Back to “" + c.title + "”", onclick: function () { closeAnswer(); openCanvas(c.path); } }, [i === 0 && c.title === "Board" && opts.name ? opts.name : c.title]));
@@ -433,6 +517,7 @@
       if (!toolbar.crumbs) return;
       toolbar.crumbs.innerHTML = "";
       if (t.length === 1 && t[0].title === "Board" && opts.name) t[0].title = opts.name;
+      toolbar.crumbs.hidden = t.length < 2;
       t.forEach(function (c, i) {
         if (i) toolbar.crumbs.appendChild(h("span", { class: "dge-crumb-sep", "aria-hidden": "true" }, ["/"]));
         var last = i === t.length - 1;
@@ -566,11 +651,16 @@
     }
 
     /* Apply ops through the core. `live` skips undo/code sync (used while dragging). */
-    function applyOps(ops, live) {
+    /* `top`: ops for the whole board (its type, its perspectives), applied to
+       the top board also while a canvas is open. */
+    function applyOps(ops, live, top) {
       // editing while looking at the AI's changes keeps them
       if (st.preview && !live) acceptPreview();
+      // something new, made while looking through a perspective, belongs to it
+      var tag = st.perspective && st.perspective.tags && st.perspective.tags[0];
+      if (tag) ops = ops.map(function (o) { return o.op === "add_node" && !(o.tags && o.tags.length) ? Object.assign({}, o, { tags: [tag] }) : o; });
       var before = st.text;
-      var res = JSON.parse(st.session.apply(JSON.stringify({ ops: ops })));
+      var res = JSON.parse(top ? st.session.apply_top(JSON.stringify({ ops: ops })) : st.session.apply(JSON.stringify({ ops: ops })));
       if (!res.ok) {
         flash(res.error || "could not apply the change", true);
         return res;
@@ -655,7 +745,7 @@
 
     // --------------------------------------------------------------- render
     function render() {
-      var r = JSON.parse(st.session.render(JSON.stringify({ comments: st.showResolved ? "all" : "open", theme: st.dark ? "dark" : "light", today: isoDay(today()) })));
+      var r = JSON.parse(st.session.render(JSON.stringify({ comments: st.showResolved ? "all" : "open", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null })));
       if (r.error) {
         flash(r.error, true);
         return;
@@ -685,6 +775,8 @@
       markSelection();
       drawOverlay();
       renderPanel();
+      if (toolbar.kind && st.doc) toolbar.kind.value = (st.answer ? st.answer.main.session : st.session).board_type();
+      fillPerspectives();
       if (toolbar.dirSel && st.doc) {
         var s = st.doc.settings || {};
         toolbar.dirSel.value = s.direction || "right";
@@ -3959,11 +4051,11 @@
 
     // -------------------------------------------------------------- exports
     function exportSVG() {
-      return JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()) }))).svg;
+      return JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null }))).svg;
     }
     function exportPNG(scale) {
       scale = scale || 2;
-      var r = JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()) })));
+      var r = JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null })));
       return new Promise(function (resolve, reject) {
         var img = new Image();
         var url = URL.createObjectURL(new Blob([r.svg], { type: "image/svg+xml" }));
@@ -4219,6 +4311,8 @@
     showErrors();
     render();
     if (opts.base != null) setBase(opts.base, opts.baseLabel);
+    restorePerspective();
+    if (st.perspective) render();
     return api;
   }
 

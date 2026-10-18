@@ -208,6 +208,21 @@ pub enum Op {
         id: String,
         title: String,
     },
+    /// Add or change a perspective (`remove: true` takes it off the board;
+    /// a built-in one comes back). Fields left out stay as they are.
+    Perspective {
+        id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tags: Option<Vec<String>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        show: Option<Vec<String>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        details: Option<bool>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        remove: bool,
+    },
     /// Ops for a canvas inside this board: `canvas` is its path of ids
     /// (`plan`, or `plan/details` for one inside it).
     In {
@@ -1095,6 +1110,67 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             });
             created.push(cid);
         }
+        Op::Perspective {
+            id,
+            label,
+            tags,
+            show,
+            details,
+            remove,
+        } => {
+            if !crate::dsl::is_ident(id) {
+                return Err(format!("`{id}` is not an id"));
+            }
+            if *remove {
+                doc.perspectives.retain(|p| p.id != *id);
+                return Ok(());
+            }
+            if let Some(bad) = show
+                .iter()
+                .flatten()
+                .find(|k| !crate::perspectives::KINDS.contains(&k.as_str()))
+            {
+                return Err(format!(
+                    "a perspective cannot show `{bad}` (use {})",
+                    crate::perspectives::KINDS.join(", ")
+                ));
+            }
+            // a built-in one is copied onto the board the first time it changes
+            let base = crate::perspectives::all(doc)
+                .into_iter()
+                .find(|p| p.id == *id)
+                .unwrap_or_else(|| crate::model::Perspective {
+                    id: id.clone(),
+                    label: id.clone(),
+                    ..Default::default()
+                });
+            let mut p = doc
+                .perspectives
+                .iter()
+                .find(|p| p.id == *id)
+                .cloned()
+                .unwrap_or(base);
+            if let Some(l) = label.as_deref().filter(|l| !l.trim().is_empty()) {
+                p.label = l.trim().to_string();
+            }
+            if let Some(t) = tags {
+                p.tags = t
+                    .iter()
+                    .map(|t| t.trim().to_string())
+                    .filter(|t| !t.is_empty())
+                    .collect();
+            }
+            if let Some(s) = show {
+                p.show = s.clone();
+            }
+            if let Some(d) = details {
+                p.details = *d;
+            }
+            match doc.perspectives.iter_mut().find(|x| x.id == *id) {
+                Some(x) => *x = p,
+                None => doc.perspectives.push(p),
+            }
+        }
         Op::In { canvas, ops } => {
             let path: Vec<String> = canvas
                 .split('/')
@@ -1848,6 +1924,11 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 "routing" => {
                     s.routing = Routing::parse(v).ok_or_else(|| {
                         format!("unknown routing `{v}` (use {})", Routing::names())
+                    })?
+                }
+                "type" => {
+                    s.kind = BoardKind::parse(v).ok_or_else(|| {
+                        format!("unknown board type `{v}` (use {})", BoardKind::names())
                     })?
                 }
                 "theme" => match Theme::parse(v) {

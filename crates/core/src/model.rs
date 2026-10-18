@@ -25,10 +25,42 @@ pub struct Document {
     /// (`[image: img1]`). Written at the end of the file.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub assets: Vec<Asset>,
+    /// Perspectives written on the board (`perspective exec: Senior
+    /// management [tags: exec, show: adr risks, details: off]`); they add
+    /// to (and override) the built-in ones of the board's type.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub perspectives: Vec<Perspective>,
     /// Canvases inside this one, each a board of its own, opened from a box
     /// that links to it (`[canvas: payments]`).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub canvases: Vec<Canvas>,
+}
+
+/// A way of looking at a board: which of its elements to show (those with
+/// one of `tags`, and the blocks of the kinds in `show`) and whether to
+/// show their details. See [`crate::perspectives`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Perspective {
+    pub id: String,
+    pub label: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub show: Vec<String>,
+    pub details: bool,
+}
+
+impl Default for Perspective {
+    fn default() -> Self {
+        Perspective {
+            id: String::new(),
+            label: String::new(),
+            tags: Vec::new(),
+            show: Vec::new(),
+            details: true,
+        }
+    }
 }
 
 /// A board inside a board: `canvas payments: Payments { … }`. Its title is
@@ -137,6 +169,9 @@ pub struct Settings {
     /// `blueprint`, `midnight`, `contrast`) or a file (`./brand.theme`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub palette: Option<String>,
+    /// What the board is for (`type: product`): sketch, product or project.
+    #[serde(rename = "type")]
+    pub kind: BoardKind,
 }
 
 impl Settings {
@@ -180,6 +215,10 @@ keyword_enum!(
 keyword_enum!(LayoutKind { Layered = "layered" | "auto" | "flow", Grid = "grid" } default Layered);
 keyword_enum!(Routing { Orthogonal = "orthogonal" | "ortho" | "elbow", Curved = "curved" | "curve", Straight = "straight" | "line" } default Orthogonal);
 keyword_enum!(Theme { Light = "light", Dark = "dark" } default Light);
+keyword_enum!(
+    /// What a board is for; it decides the built-in perspectives.
+    BoardKind { Sketch = "sketch" | "diagram", Product = "product", Project = "project" } default Sketch
+);
 keyword_enum!(
     Shape {
         Box = "box" | "rect" | "rectangle",

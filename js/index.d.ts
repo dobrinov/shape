@@ -37,6 +37,8 @@ export interface Document {
   assets?: Asset[];
   /** Boards inside this one (`canvas id: Title { … }`); a box opens one with `canvas`. */
   canvases?: Canvas[];
+  /** Perspectives written on the board (they add to and override the built-in ones of its type). */
+  perspectives?: Perspective[];
 }
 
 /** A board inside a board: its id, and every field of a document (`title` is its name). */
@@ -70,6 +72,20 @@ export interface Settings {
   theme?: Theme;
   /** A theme by name: the board's own, a preset (paper, blueprint, midnight, contrast) or a file (`./brand.theme`). */
   palette?: string;
+  /** What the board is for; it decides the built-in perspectives (default `sketch`). */
+  type?: BoardType;
+}
+
+/** What a board is for: a sketch (just a diagram), a product, a project. */
+export type BoardType = "sketch" | "product" | "project";
+
+/** A way of looking at a board: the elements with one of `tags`, and the blocks of the kinds in `show`; `details: false` shows titles only. */
+export interface Perspective {
+  id: string;
+  label: string;
+  tags?: string[];
+  show?: string[];
+  details?: boolean;
 }
 
 /** A box, sticky, mindmap topic or gantt task. */
@@ -386,6 +402,17 @@ export interface InOp {
   ops?: Op[];
 }
 
+/** Add or change a perspective (`remove: true` takes it off the board; a built-in one comes back). */
+export interface PerspectiveOp {
+  op: "perspective";
+  id: string;
+  label?: string;
+  tags?: string[];
+  show?: string[];
+  details?: boolean;
+  remove?: boolean;
+}
+
 /** Keep an image in the board (a `data:image/…;base64,…` URI); boxes show it with `image: id`. Removing the last box that shows it removes it too. */
 export interface AddAssetOp {
   op: "add_asset";
@@ -608,7 +635,7 @@ export type Op =
   | AddNodeOp | UpdateNodeOp | AddOutlineOp | RenameOp | RemoveOp | MoveOp | NudgeOp | UnpinOp
   | AddEdgeOp | UpdateEdgeOp | AddGroupOp | UpdateGroupOp
   | AddCommentOp | ReplyOp | EditCommentOp | ResolveCommentOp | ReopenCommentOp | SetOp | MergeOp | ThemeOp
-  | AddAssetOp | AddCanvasOp | UpdateCanvasOp | InOp;
+  | AddAssetOp | AddCanvasOp | UpdateCanvasOp | InOp | PerspectiveOp;
 
 /** What Board.apply() accepts: ops, `{ops}`, one op, or a model's reply text containing that JSON. */
 export type OpsInput = Op[] | { ops: Op[] } | Op | string;
@@ -636,6 +663,8 @@ export interface RenderOptions {
   today?: Date | string;
   /** Crop the view to these elements (nodes or groups). */
   focus?: string[];
+  /** Show the board as this perspective sees it (`Board.perspectives()` lists them). */
+  perspective?: Perspective | null;
   padding?: number;
 }
 

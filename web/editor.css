@@ -358,11 +358,13 @@
 
 /* the one bar: the host's lead, where you are, git, status; actions right */
 .dge-lead { flex: none; padding-right: 12px; border-right: 1px solid var(--line); }
-.dge-crumbs { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; }
-.dge .dge-crumbs button { height: auto; min-height: 0; padding: 2px 4px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-weight: 500; }
-.dge .dge-crumbs button:hover { background: var(--bg3); color: var(--fg); }
-.dge-crumbs strong { padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--fg); }
-.dge-crumb-sep { color: var(--line-strong); }
+/* where you are, above the canvas (inside a canvas or an answer) */
+.dge-crumbs { position: absolute; top: 66px; left: 16px; z-index: 6; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 32px); box-sizing: border-box; padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg); box-shadow: var(--shadow); font-size: 13.5px; white-space: nowrap; overflow: hidden; }
+.dge-crumbs[hidden] { display: none; }
+.dge .dge-crumbs button { height: auto; min-height: 0; padding: 2px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--accent); font: inherit; font-weight: 600; }
+.dge .dge-crumbs button:hover { background: var(--accent-bg); }
+.dge-crumbs strong { padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; font-weight: 650; color: var(--fg); }
+.dge-crumb-sep { color: var(--muted); }
 .dge .dge-branch { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 26px; min-height: 0; padding: 0 10px; border: 0; border-radius: 999px; background: var(--bg3); color: var(--muted); font: 11.5px var(--mono); white-space: nowrap; }
 .dge .dge-branch:hover { color: var(--fg); }
 .dge .dge-branch.on { background: var(--accent-bg); color: var(--accent); }
@@ -393,7 +395,7 @@
 .dge-blocks-text b { font-weight: 600; }
 .dge-blocks-text span { color: var(--muted); font-size: 11.5px; }
 @container board (max-width: 900px) { .dge-blocks { bottom: 124px; } }
-@media (max-width: 640px) { .dge .dge-branch, .dge .dge-crumbs, .dge .dge-toolbar .dge-chip { display: none; } }
+@media (max-width: 640px) { .dge .dge-branch, .dge .dge-toolbar .dge-chip, .dge .dge-toolbar .dge-persp { display: none; } }
 @media (max-width: 640px) { .dge .dge-bar-btn span { display: none; } .dge .dge-bar-btn { padding: 0 8px; } }
 .dge .dge-branch[hidden] { display: none; }
 /* an answer: a temporary canvas; its bar says so and offers what to do with it */
@@ -404,3 +406,11 @@
 .dge-answer-summary b { color: var(--fg); font-weight: 600; }
 .dge-answer-temp { font-size: 12px; white-space: nowrap; }
 .dge-crumb-answer { color: var(--accent) !important; }
+/* perspectives: the switcher in the bar, and a new one */
+.dge .dge-toolbar .dge-persp { flex: none; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font: inherit; font-weight: 600; }
+.dge-persp-form { display: flex; flex-direction: column; gap: 12px; min-width: 360px; }
+.dge-persp-form > label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+.dge-persp-form input[type=text], .dge-persp-form input:not([type]) { height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg); color: var(--fg); font: inherit; font-weight: 400; }
+.dge-persp-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; margin-top: 6px; }
+.dge-persp-kinds label, .dge-persp-check { display: flex; align-items: center; gap: 6px; font-weight: 400; }
+.dge-persp-form > label.dge-persp-check { flex-direction: row; align-items: center; font-weight: 400; }
