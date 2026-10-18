@@ -189,6 +189,25 @@ lanes journey: Checkout journey {
 }
 j-browse -> j-pay -> j-charge
 "#),
+        r("user-flow", "Screens and flow", "an app's or a site's screens and how people move between them (wireframes)",
+          "section `user-flow` of `screen` blocks (mobile or web; one component per line) with arrows from the button or link on one screen to the next screen",
+          r#"
+group user-flow: User flow {
+  screen flow-start: Start [mobile] {
+    header: App
+    title: Welcome
+    text: What the app does, in a line.
+    button go: Get started [blue]
+  }
+  screen flow-home: Home [mobile] {
+    header: Home
+    search: Search
+    list: First item | Second item | Third item
+    tabbar: Home | Search | Me
+  }
+}
+flow-start.go -> flow-home: taps
+"#),
         r("tech-debt", "Tech debt register", "shortcuts and old code that slow us down, and what fixing them costs",
           "a table `tech-debt` (item | pain | effort | owner | status), rows coloured by pain",
           r#"

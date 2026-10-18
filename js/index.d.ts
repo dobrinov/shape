@@ -90,6 +90,17 @@ export interface Perspective {
   details?: boolean;
 }
 
+/** What a wireframe screen is drawn as. */
+export type Device = "mobile" | "tablet" | "web";
+
+/** A wireframe screen's component. Items of lists, tabs, menus, button rows, radios, badges, steps, breadcrumbs and table columns go in the label, separated by `|`. */
+export type Widget =
+  | "header" | "navbar" | "title" | "subtitle" | "text" | "button" | "buttons" | "link"
+  | "input" | "password" | "search" | "textarea" | "select" | "date" | "checkbox" | "radio"
+  | "toggle" | "slider" | "image" | "video" | "map" | "chart" | "avatar" | "card" | "list"
+  | "table" | "tabs" | "tabbar" | "sidebar" | "breadcrumb" | "badges" | "alert" | "progress"
+  | "stepper" | "pagination" | "rating" | "divider" | "spacer" | "footer" | "fab";
+
 /** How a slide comes in (default `glide`: the view moves across the board). */
 export type Transition = "glide" | "fade" | "zoom" | "none";
 
@@ -165,6 +176,8 @@ export interface Node {
   date?: string;
   /** Timeline event: one that matters most (drawn as a star). */
   important?: boolean;
+  /** Wireframe screen component: what it is drawn as. */
+  widget?: Widget;
   /** Database table column (the label is its name). */
   column?: Column;
 }
@@ -238,6 +251,8 @@ export interface Group {
   timeline?: boolean;
   /** A cycle (its nodes are steps on a circle, each leading to the next). */
   cycle?: boolean;
+  /** A wireframe screen drawn as this device (its nodes are components, top to bottom). */
+  screen?: Device;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -334,6 +349,8 @@ export interface AddNodeOp {
   date?: string;
   /** Timeline event: one that matters most (drawn as a star). */
   important?: boolean;
+  /** Wireframe screen component: what it is drawn as. */
+  widget?: Widget;
   /** Database table column. */
   column?: Column;
 }
@@ -387,6 +404,8 @@ export interface UpdateNodeOp {
   date?: string;
   /** Timeline event: one that matters most (drawn as a star). */
   important?: boolean;
+  /** Wireframe screen component: what it is drawn as. */
+  widget?: Widget;
   /** Database table column. */
   column?: Column;
 }
@@ -558,6 +577,8 @@ export interface AddGroupOp {
   timeline?: boolean;
   /** A cycle (its nodes are steps on a circle, each leading to the next). */
   cycle?: boolean;
+  /** A wireframe screen drawn as this device (its nodes are components, top to bottom). */
+  screen?: Device;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -604,6 +625,8 @@ export interface UpdateGroupOp {
   timeline?: boolean;
   /** A cycle (its nodes are steps on a circle, each leading to the next). */
   cycle?: boolean;
+  /** A wireframe screen drawn as this device (its nodes are components, top to bottom). */
+  screen?: Device;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -794,6 +817,8 @@ export interface GroupBox extends Rect {
   timeline?: boolean;
   /** A cycle. */
   cycle?: boolean;
+  /** A wireframe screen. */
+  screen?: Device;
   /** A database table. */
   entity?: boolean;
 }

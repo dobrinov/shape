@@ -219,6 +219,26 @@ keyword_enum!(LayoutKind { Layered = "layered" | "auto" | "flow", Grid = "grid" 
 keyword_enum!(Routing { Orthogonal = "orthogonal" | "ortho" | "elbow", Curved = "curved" | "curve", Straight = "straight" | "line" } default Orthogonal);
 keyword_enum!(Theme { Light = "light", Dark = "dark" } default Light);
 keyword_enum!(
+    /// What a wireframe screen is drawn as: a phone, a tablet or a browser window.
+    Device { Mobile = "mobile" | "phone", Tablet = "tablet", Web = "web" | "desktop" | "browser" } default Mobile
+);
+keyword_enum!(
+    /// A component of a wireframe screen (the keyword its line starts with).
+    Widget {
+        Header = "header" | "appbar", Navbar = "navbar" | "nav", Title = "title" | "h1",
+        Subtitle = "subtitle" | "h2", Text = "text" | "paragraph", Button = "button" | "btn",
+        Buttons = "buttons", Link = "link", Input = "input" | "field", Password = "password",
+        Search = "search", Textarea = "textarea", Select = "select" | "dropdown", Date = "date",
+        Checkbox = "checkbox", Radio = "radio", Toggle = "toggle" | "switch", Slider = "slider",
+        Image = "image" | "img", Video = "video", Map = "map", Chart = "chart", Avatar = "avatar",
+        Card = "card", List = "list", Table = "table", Tabs = "tabs", Tabbar = "tabbar" | "bottomnav",
+        Sidebar = "sidebar", Breadcrumb = "breadcrumb", Badges = "badges" | "chips" | "badge",
+        Alert = "alert" | "banner", Progress = "progress", Stepper = "stepper" | "steps",
+        Pagination = "pagination", Rating = "rating", Divider = "divider" | "hr",
+        Spacer = "spacer", Footer = "footer", Fab = "fab"
+    } default Text
+);
+keyword_enum!(
     /// How a slide comes in: the view glides across the board to it, fades,
     /// zooms out and back in, or cuts.
     Transition { Glide = "glide" | "slide" | "pan", Fade = "fade", Zoom = "zoom", None = "none" | "cut" } default Glide
@@ -373,6 +393,9 @@ pub struct Node {
     /// A timeline's event that matters most: drawn as a star.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub important: bool,
+    /// A wireframe screen's component: what it is drawn as.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub widget: Option<Widget>,
     /// A database table's column (the node's label is its name).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub column: Option<Column>,
@@ -507,6 +530,10 @@ pub struct Group {
     /// A cycle: its nodes are steps that come round again, drawn on a circle.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub cycle: bool,
+    /// A wireframe screen, drawn as this device: its nodes are components,
+    /// top to bottom.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub screen: Option<Device>,
     /// A decision record, with its status (`proposed`, `accepted`, …): its
     /// nodes are its fields (context, options, decision, consequences).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -569,6 +596,7 @@ impl Group {
             || self.adr.is_some()
             || self.timeline
             || self.cycle
+            || self.screen.is_some()
     }
 
     pub fn display(&self) -> &str {

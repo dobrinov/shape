@@ -77,6 +77,10 @@ pub enum Op {
         /// Timeline event: one that matters most (drawn as a star).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         important: Option<bool>,
+        /// A wireframe screen's component: what it is drawn as (`button`,
+        /// `input`, `list`…; "" clears it).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        widget: Option<String>,
         /// Gantt task: percent done, 0–100 (0 clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         done: Option<f64>,
@@ -157,6 +161,10 @@ pub enum Op {
         /// Timeline event: one that matters most (drawn as a star).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         important: Option<bool>,
+        /// A wireframe screen's component: what it is drawn as (`button`,
+        /// `input`, `list`…; "" clears it).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        widget: Option<String>,
         /// Gantt task: percent done, 0–100 (0 clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         done: Option<f64>,
@@ -380,6 +388,10 @@ pub enum Op {
         /// A cycle (its nodes are steps, each leading to the next).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cycle: Option<bool>,
+        /// A wireframe screen drawn as this device (mobile, tablet, web;
+        /// its nodes are components); "" makes it a section again.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        screen: Option<String>,
         /// A database table (its nodes are columns).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         entity: Option<bool>,
@@ -443,6 +455,10 @@ pub enum Op {
         /// A cycle (its nodes are steps, each leading to the next).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cycle: Option<bool>,
+        /// A wireframe screen drawn as this device (mobile, tablet, web;
+        /// its nodes are components); "" makes it a section again.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        screen: Option<String>,
         /// A database table (its nodes are columns).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         entity: Option<bool>,
@@ -601,6 +617,24 @@ fn chart_start(v: &Option<String>) -> Result<Option<Option<String>>, String> {
 }
 
 /// Timeline fields of a node: "" clears the date.
+fn widget_kind(w: &str) -> Result<crate::model::Widget, String> {
+    crate::model::Widget::parse(w).ok_or_else(|| {
+        format!(
+            "`{w}` is not a screen component (use {})",
+            crate::model::Widget::names()
+        )
+    })
+}
+
+fn device(d: &str) -> Result<crate::model::Device, String> {
+    crate::model::Device::parse(d).ok_or_else(|| {
+        format!(
+            "unknown device `{d}` (use {})",
+            crate::model::Device::names()
+        )
+    })
+}
+
 fn event(n: &mut Node, date: &Option<String>, important: &Option<bool>) -> Result<(), String> {
     if let Some(d) = opt(date) {
         if let Some(d) = &d {
@@ -901,6 +935,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             milestone,
             date,
             important,
+            widget,
             done,
             owner,
             probability,
@@ -943,6 +978,27 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             task(&mut n, start, days, after, milestone, done, owner)?;
             event(&mut n, date, important)?;
+            if let Some(w) = widget.as_deref().filter(|w| !w.is_empty()) {
+                n.widget = Some(widget_kind(w)?);
+            }
+            // a screen's components: `login.submit`, and drawn as something
+            if let Some(scr) = n
+                .group
+                .as_deref()
+                .and_then(|g| doc.group(g))
+                .filter(|g| g.screen.is_some())
+            {
+                let prefix = format!("{}.", scr.id);
+                if !n.id.starts_with(&prefix) {
+                    let wanted = format!("{prefix}{}", n.id);
+                    n.id = if doc.id_taken(&wanted) {
+                        doc.fresh_id(&wanted)
+                    } else {
+                        wanted
+                    };
+                }
+                n.widget.get_or_insert(crate::model::Widget::Text);
+            }
             risk(&mut n, probability, impact)?;
             if let Some(v) = values {
                 n.values = v.clone();
@@ -985,6 +1041,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             milestone,
             date,
             important,
+            widget,
             done,
             owner,
             probability,
@@ -1058,6 +1115,13 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             task(n, start, days, after, milestone, done, owner)?;
             event(n, date, important)?;
+            if let Some(w) = widget {
+                n.widget = if w.is_empty() {
+                    None
+                } else {
+                    Some(widget_kind(w)?)
+                };
+            }
             risk(n, probability, impact)?;
             if let Some(v) = values {
                 n.values = v.clone();
@@ -1732,6 +1796,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             table,
             timeline,
             cycle,
+            screen,
             columns,
             entity,
             adr,
@@ -1765,6 +1830,10 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             g.table = table.unwrap_or(false) || columns.is_some();
             g.timeline = timeline.unwrap_or(false);
             g.cycle = cycle.unwrap_or(false);
+            g.screen = match screen.as_deref().filter(|d| !d.is_empty()) {
+                Some(d) => Some(device(d)?),
+                None => None,
+            };
             g.entity = entity.unwrap_or(false);
             g.adr = adr_status(adr)?;
             g.columns = columns.clone().unwrap_or_default();
@@ -1804,6 +1873,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             table,
             timeline,
             cycle,
+            screen,
             columns,
             entity,
             adr,
@@ -1854,6 +1924,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             if let Some(c) = cycle {
                 g.cycle = *c;
+            }
+            if let Some(d) = screen {
+                g.screen = if d.is_empty() { None } else { Some(device(d)?) };
             }
             if let Some(c) = columns {
                 g.columns = c.clone();

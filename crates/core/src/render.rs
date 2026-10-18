@@ -1102,7 +1102,9 @@ fn chart_svg(
             Paint::Header => p.header.to_string(),
         }
     };
-    s.push_str(r#"<g class="dg-chart">"#);
+    // which block the marks belong to, so a click (or a dropped arrow) on
+    // them finds it
+    let _ = write!(s, r#"<g class="dg-chart" data-group="{}">"#, esc(&g.id));
     for m in &plot.marks {
         let _ = match m {
             Mark::Rect { r, paint: k, round } => write!(

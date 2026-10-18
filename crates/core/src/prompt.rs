@@ -145,6 +145,7 @@ pub const OPS_REFERENCE: &str = r#"Operations (fields in [] are optional; ids ar
 - Decision record: {"op":"add_group","id":"db","label":"Use Postgres","adr":"proposed"} (status: proposed, accepted, rejected, superseded, deprecated); its fields are add_node / update_node with "id":"db.context","label":"context","group":"db","detail":"the text". Or merge: "adr db: Use Postgres [accepted] {\n  context: …\n  decision: …\n}"
 - Kanban: {"op":"add_group","id":"sprint","label":"Sprint 12","kanban":true}, its columns {"op":"add_group","id":"doing","label":"Doing","parent":"sprint"}; a card is a node in a column; move one with {"op":"update_node","id":"login","group":"doing","index":0}. Or merge: "kanban sprint: Sprint 12 {\n  column todo: To do {\n    login: Login page\n  }\n  column doing: Doing {}\n}"
 - Cycle: {"op":"add_group","id":"loop","label":"Build loop","cycle":true}; its steps are add_node with "group":"loop", in order. Or merge: "cycle loop: Build loop {\n  Plan\n  Build\n  Measure\n}"
+- Wireframe screen: merge "screen login: Sign in [mobile] {\n  header: Acme\n  title: Welcome back\n  input email: Email\n  password: Password\n  button submit: Sign in [blue]\n  link forgot: Forgot password?\n}" (device: mobile, tablet or web). One component per line, `kind [id]: Label [attrs]`; its id is `login.submit`. Kinds: header, navbar, title, subtitle, text, button (a colour fills it), buttons, link, input, password, search, textarea, select, date, checkbox, radio, toggle, slider, image, video, map, chart, avatar, card (detail = its text), list, table, tabs, tabbar, sidebar, breadcrumb, badges, alert, progress, stepper, pagination, rating, divider, spacer, footer, fab. Items of list, tabs, tabbar, navbar, sidebar, buttons, radio, badges, stepper, breadcrumb, table (its columns) go in the label separated by ` | `. A flow is an arrow from a component to the next screen: `login.submit -> home: signs in`. Or ops: add_group with "screen":"mobile", add_node with "group":"login","widget":"button".
 - Timeline: {"op":"add_group","id":"history","label":"History","timeline":true}; its events are add_node / update_node with "group":"history","label":"Open beta","date":"2026-10-28" (also "Oct 2026", "Q4 2026", "2026", or a span "7–14 May 2026") and ["important":true,"color","detail"]. Or merge: "timeline history: History {\n  2026-10-28: Open beta [important]\n  Dec 2024: Airwallex deal\n}"
 - Table: {"op":"add_group","id":"opts","label":"Options","columns":["option","cost","notes"]}; its rows are add_node / update_node with "group":"opts","label":"Local" (the first cell),"cells":["$0","needs a GPU"]. Or merge: "table opts: Options {\n  option | cost | notes\n  Local | $0 | needs a GPU\n}"
 - Chart: {"op":"add_group","id":"rev","label":"Revenue","chart":"bar|line|area|pie|donut|scatter",["stacked":true,"horizontal":true,"unit":"%","series":["EU","US"],"axis":"quarter"]}; its rows are add_node / update_node with "group":"rev","label":"Q1","values":[120,80] (one per series, null for none). Or simpler, merge: "chart rev: Revenue [bar] {\n  quarter | EU | US\n  Q1 | 120 | 80\n}"
@@ -1022,6 +1023,11 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
             " (timeline)".to_string()
         } else if g.cycle {
             " (cycle: each step leads to the next, the last back to the first)".to_string()
+        } else if let Some(d) = g.screen {
+            format!(
+                " (wireframe screen, {}: its components top to bottom)",
+                d.as_str()
+            )
         } else if let Some(c) = g.chart {
             let mut k = format!(" ({} chart", c.as_str());
             if g.stacked {

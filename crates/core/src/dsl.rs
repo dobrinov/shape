@@ -527,6 +527,14 @@ impl Parser {
                 c.advance(5);
                 return self.timeline_decl(c, true);
             }
+            // a wireframe screen: one component per line
+            "screen"
+                if c.rest()[6..].starts_with(|ch: char| ch.is_whitespace())
+                    && (t.trim_end().ends_with('{') || t.trim_end().ends_with("{}")) =>
+            {
+                c.advance(6);
+                return self.screen_decl(c);
+            }
             "entity" if c.rest()[6..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(6);
                 return self.entity_decl(c);
@@ -1261,6 +1269,121 @@ impl Parser {
         Ok(())
     }
 
+    /// `screen login: Sign in [mobile] {` … one component per line … `}`.
+    fn screen_decl(&mut self, mut c: Cursor) -> Result<(), String> {
+        c.skip_ws();
+        let (id, qlabel) = c.reference()?;
+        let (label, attrs) = label_and_attrs_until_brace(&mut c)?;
+        c.skip_ws();
+        c.eat('{');
+        c.skip_ws();
+        let closes_inline = c.eat('}');
+        if !c.at_end() {
+            return Err("put the screen's components on the following lines".into());
+        }
+        if self.doc.node(&id).is_some() {
+            return Err(format!("`{id}` is already a node"));
+        }
+        let parent = self.group();
+        if self.doc.group(&id).is_none() {
+            self.doc.groups.push(Group {
+                id: id.clone(),
+                ..Default::default()
+            });
+        }
+        let g = self.doc.group_mut(&id).unwrap();
+        g.parent = parent;
+        g.screen = Some(Device::default());
+        if let Some(l) = label.or(qlabel) {
+            g.label = l;
+        }
+        for (k, v) in &attrs {
+            match (k.as_str(), v) {
+                (d, None) if Device::parse(d).is_some() => g.screen = Device::parse(d),
+                ("device", Some(v)) => {
+                    g.screen =
+                        Some(Device::parse(v).ok_or_else(|| {
+                            format!("unknown device `{v}` (use {})", Device::names())
+                        })?)
+                }
+                ("color" | "colour", Some(v)) => g.color = Some(color(v)?),
+                (c, None) if valid_color(c) => g.color = Some(c.to_string()),
+                ("x", Some(v)) => g.x = Some(num("x", v)?),
+                ("y", Some(v)) => g.y = Some(num("y", v)?),
+                (k, _) => {
+                    return Err(format!(
+                        "unknown screen attribute `{k}` (mobile, tablet, web, color, x, y)"
+                    ))
+                }
+            }
+        }
+        self.touched.push(Elem::Group(id.clone()));
+        if !closes_inline {
+            self.gantt = Some((id, self.line));
+        }
+        Ok(())
+    }
+
+    /// A component of a screen: `kind [id]: Label [attrs]`, e.g. `button
+    /// submit: Sign in [blue]`, `title: Welcome back`, `divider`. Its id is
+    /// the screen's and its own (`login.submit`; else the kind's).
+    fn widget_line(&mut self, screen: &str, t: &str) -> Result<(), String> {
+        let t = crate::mindmap::strip_bullet(t);
+        let end = t
+            .find(|ch: char| ch.is_whitespace() || ch == ':' || ch == '[')
+            .unwrap_or(t.len());
+        let word = &t[..end];
+        let kind = Widget::parse(word).ok_or_else(|| {
+            format!(
+                "`{word}` is not a screen component (use {})",
+                Widget::names()
+            )
+        })?;
+        let rest = t[end..].trim_start();
+        let (short, rest) = match rest.strip_prefix(':') {
+            Some(r) => (None, r),
+            None => {
+                let e = rest
+                    .find(|ch: char| ch.is_whitespace() || ch == ':' || ch == '[')
+                    .unwrap_or(rest.len());
+                let after = rest[e..].trim_start();
+                if e > 0 && after.starts_with(':') && is_ident(&rest[..e]) {
+                    (Some(rest[..e].to_string()), &after[1..])
+                } else if e > 0 && after.is_empty() && is_ident(&rest[..e]) {
+                    (Some(rest[..e].to_string()), "")
+                } else {
+                    (None, rest)
+                }
+            }
+        };
+        let (text, attrs) = split_attrs(rest);
+        let label = unescape_label(text.trim());
+        let attrs = parse_attrs(attrs.unwrap_or(""))?;
+        let wanted = format!(
+            "{screen}.{}",
+            short.clone().unwrap_or_else(|| kind.as_str().to_string())
+        );
+        let id = if !self.doc.id_taken(&wanted) {
+            wanted
+        } else if self.implicit.remove(&wanted) {
+            // a component that an arrow mentioned first
+            self.doc.nodes.retain(|n| n.id != wanted);
+            wanted
+        } else if short.is_some() {
+            return Err(format!("id `{wanted}` is already used"));
+        } else {
+            self.doc.fresh_id(&wanted)
+        };
+        let mut n = Node::new(&id);
+        n.label = label;
+        n.group = Some(screen.to_string());
+        n.widget = Some(kind);
+        apply_node_attrs(&mut n, &attrs)?;
+        self.touched.push(Elem::Node(n.id.clone()));
+        self.doc.nodes.push(n);
+        Ok(())
+    }
+
     /// A step of a cycle: `Measure [blue]`.
     fn step_line(&mut self, cycle: &str, t: &str) -> Result<(), String> {
         let t = crate::mindmap::strip_bullet(t);
@@ -1561,6 +1684,9 @@ impl Parser {
         }
         if self.doc.group(&block).is_some_and(|g| g.cycle) {
             return self.step_line(&block, t);
+        }
+        if self.doc.group(&block).is_some_and(|g| g.screen.is_some()) {
+            return self.widget_line(&block, t);
         }
         if self.doc.group(&block).is_some_and(|g| g.entity) {
             return self.column_line(&block, t);
@@ -2035,6 +2161,8 @@ fn is_flag(item: &str) -> bool {
         || Line::parse(item).is_some()
         || valid_color(&item.to_ascii_lowercase())
         || matches!(item, "resolved" | "open" | "done" | "collapsed" | "folded" | "milestone" | "important")
+        // wireframe screens
+        || Device::parse(item).is_some()
         // charts
         || ChartKind::parse(item).is_some()
         || matches!(item, "stacked" | "horizontal")
@@ -2817,6 +2945,55 @@ pub(crate) fn cycle_block(doc: &Document, g: &Group, pad: &str, out: &mut String
     out.push_str(&format!("{pad}}}\n"));
 }
 
+/// `screen id: Title [web] {` … `kind [id]: Label [attrs]` per component … `}`.
+pub(crate) fn screen_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
+    let mut head = id_text(&g.id);
+    if !g.label.is_empty() && g.label != g.id {
+        head.push_str(": ");
+        head.push_str(&label_text(&g.label));
+    }
+    let mut a = Vec::new();
+    if let Some(d) = g.screen {
+        a.push(d.as_str().to_string());
+    }
+    if let Some(c) = &g.color {
+        a.push(if c.starts_with('#') {
+            format!("color: {c}")
+        } else {
+            c.clone()
+        });
+    }
+    a.extend(group_pos(g));
+    head.push_str(&attrs_text(&a));
+    let parts: Vec<&Node> = doc
+        .nodes
+        .iter()
+        .filter(|n| n.group.as_deref() == Some(g.id.as_str()))
+        .collect();
+    if parts.is_empty() {
+        out.push_str(&format!("{pad}screen {head} {{}}\n"));
+        return;
+    }
+    out.push_str(&format!("{pad}screen {head} {{\n"));
+    for n in parts {
+        let kind = n.widget.unwrap_or_default();
+        let mut line = kind.as_str().to_string();
+        // its own id when not the kind's
+        let short = n.id.strip_prefix(&format!("{}.", g.id)).unwrap_or(&n.id);
+        if short != kind.as_str() {
+            line.push(' ');
+            line.push_str(short);
+        }
+        if !n.label.is_empty() {
+            line.push_str(": ");
+            line.push_str(&label_text(&n.label));
+        }
+        line.push_str(&attrs_text(&node_attrs(n)));
+        out.push_str(&format!("{pad}  {line}\n"));
+    }
+    out.push_str(&format!("{pad}}}\n"));
+}
+
 /// `timeline id: Title {` … `DATE: label [attrs]` per event … `}`.
 pub(crate) fn timeline_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
     let mut head = id_text(&g.id);
@@ -3532,6 +3709,10 @@ pub(crate) fn group_block(
     }
     if g.cycle {
         cycle_block(doc, g, &pad, out);
+        return;
+    }
+    if g.screen.is_some() {
+        screen_block(doc, g, &pad, out);
         return;
     }
     if g.entity {

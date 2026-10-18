@@ -338,6 +338,31 @@ fraud: Fraud reporting API [tags: tech exec]
 - The board's `type:` brings built-in ones. A product board: Product (`product`), Technical (`tech`), User (`user`), Senior management (`exec`). A project board: Senior management, Team (`team`), Product, Technical. Both also: Legal (`legal`), Finance (`finance`), Marketing (`marketing`), Commercial (`commercial`), Design (`design`). A sketch has none. `perspective id: Name [...]` adds one, or overrides a built-in with the same id.
 - An element shows in a perspective when it has the perspective's tag (`tags: tech exec`); mindmap topics go with their centre. In the editor, pick one in the top bar; new elements get its tag. *✦ Sort into perspectives* has the AI tag the board. Ops: `{"op":"perspective","id":"legal","label":"Legal","tags":["legal"],"show":["adr"]}` (`remove: true` takes it off).
 
+### Wireframe screens
+
+```diagram
+screen login: Sign in [mobile] {
+  header: Acme
+  title: Welcome back
+  input email: Email
+  password: Password
+  checkbox: Remember me
+  button submit: Sign in [blue]
+  link forgot: Forgot password?
+}
+screen home: Home [web] {
+  navbar: Acme | Docs | Pricing | Sign out
+  sidebar: Inbox | Sent | Drafts
+  list: Ana | Ben | Cleo
+}
+login.submit -> home: signs in
+```
+
+- A screen is drawn as a phone (`mobile`, the default), a `tablet` or a browser window (`web`). Its components go one per line, top to bottom: `kind [id]: text [attrs]`. A component's id is the screen's and its own (`login.submit`), or the kind's when it has none (`login.title`), so an arrow from a button to another screen draws the flow.
+- Kinds: header, navbar, title, subtitle, text, button (a colour fills it: `[blue]`), buttons, link, input, password, search, textarea, select, date, checkbox, radio, toggle, slider, image, video, map, chart, avatar, card (its `detail` is its text), list, table, tabs, tabbar (at the bottom), sidebar (on the left of a wide screen), breadcrumb, badges, alert, progress, stepper, pagination, rating, divider, spacer, footer, fab (bottom right).
+- Items of a list, tabs, tab bar, navbar, sidebar, button row, radio, badges, stepper, breadcrumb and a table's columns go in the text, separated by `|`: `tabs: Home | Search | Me`.
+- In the editor: *Blocks → Phone screen / Web page*; right-click a screen to edit it as text, add a component or change the device. Drag from a component (connect, X) to another screen; dropped on empty canvas, it makes the next screen. Ops: `add_group` with `"screen": "mobile"`, `add_node` with `"group": "login", "widget": "button"`.
+
 ### Presentations
 
 ```diagram

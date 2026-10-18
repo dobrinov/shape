@@ -58,6 +58,7 @@ group inside: Inside this board [gray] {
   data-link: Data & flows [text, canvas: data]
   metrics-link: Metrics [sticky, yellow, canvas: metrics]
   payments-flow-link: Payments, step by step [rounded, purple, canvas: data]
+  screens-link: The new checkout, screen by screen [rounded, teal, canvas: screens]
 }
 
 discovery-link -> plan-link -> data-link
@@ -365,4 +366,41 @@ canvas metrics: Metrics {
     One-page      | 8      | 7
     Guest by default | 2   | 4
   }
+}
+
+canvas screens: The new checkout, screen by screen {
+  screen cart: Cart [mobile] {
+    header: Your cart
+    list: Coffee beans | Grinder | Filters
+    alert: Free delivery over £30
+    buttons: Keep shopping | Checkout [blue]
+    tabbar: Shop | Cart | Orders | Me
+  }
+  screen pay: Pay [mobile] {
+    header: Payment
+    stepper: Cart | Pay | Done
+    card saved: Visa •••• 4242 [detail: Saved card · expires 08/28]
+    toggle: Save this card
+    button pay-now: Pay £42.00 [blue]
+    link other: Use another card
+  }
+  screen done: Order placed [mobile] {
+    header: Thank you
+    image: Order on its way
+    title: Order #1042 placed
+    text: We sent the receipt to your e-mail.
+    button track: Track the order [green]
+  }
+  screen orders: Orders admin [web] {
+    navbar: Acme | Orders | Customers | Sign out
+    sidebar: Overview | Orders | Refunds
+    title: Today's orders
+    badges: Paid | Pending | Refunded
+    table: Order | Customer | Total | Status
+    pagination
+  }
+
+  cart.buttons -> pay: checkout
+  pay.pay-now -> done: pays
+  done -> orders: shows up in
 }

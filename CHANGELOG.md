@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.51.0 — 2026-10-18
+
+- **Wireframes:** `screen login: Sign in [mobile] { … }` draws a screen as a phone, a tablet or a browser window (`web`), its components one per line, top to bottom: `kind [id]: text [attrs]`.
+  - About 40 kinds: header, navbar, title, subtitle, text, button (a colour fills it), buttons, link, input, password, search, textarea, select, date, checkbox, radio, toggle, slider, image, video, map, chart, avatar, card, list, table, tabs, tabbar, sidebar, breadcrumb, badges, alert, progress, stepper, pagination, rating, divider, spacer, footer and fab.
+  - Items go in the text, separated by `|` (`tabs: Home | Search | Me`). A tab bar and a floating button sit at the bottom; a sidebar takes the left of a wide screen.
+- **Flows:** every component is a node with its own id (`login.submit`), so an arrow from a button to another screen draws the flow. In the editor, drag from a component to a screen; dropped on empty canvas, it makes the next screen of the same device, beside the first.
+- **In the editor:** *Blocks → Phone screen* and *Web page*. Right-click a screen to edit it as text (components keep their ids and arrows), add a component, or change the device. Right-click a component to add one after it, edit its details or colour, or lead it to another screen.
+- **For the AI:** the op reference describes screens (`add_group` with `screen`, `add_node` with `widget`, or merge the block), and a new *Screens and flow* recipe. The Product, User and Design perspectives show screens. The example board has a canvas of checkout screens.
+- Fixed: clicking or dropping an arrow inside a plotted block (a chart, a table, a screen…) now finds the block.
+
 ## 0.50.0 — 2026-10-18
 
 - **Boards open in their own window:** `diagram FILE` (and double-clicking a `.diagram` file) opens the editor in a native app window instead of a browser tab: the system webview (WebKit on macOS, WebView2 on Windows). Closing the window saves what is pending and stops. On macOS it has an app menu, so ⌘C / ⌘V / ⌘Z / ⌘Q work. Links out of the editor open in your browser. `--browser` opens a tab as before; `--no-open` runs only the server. Where no window can be made, the browser opens.

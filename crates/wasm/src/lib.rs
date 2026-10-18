@@ -306,6 +306,21 @@ impl Diagram {
         )
     }
 
+    /// Screen `gid`'s components as text, one per line ("" when it is not
+    /// a screen).
+    pub fn screen_text(&self, gid: &str) -> String {
+        diagram_core::screen::text_of(&self.inner.doc, gid).unwrap_or_default()
+    }
+
+    /// The ops that make screen `gid` what `text` says: `{ok, ops}` or
+    /// `{ok: false, error}`.
+    pub fn screen_edit_ops(&self, gid: &str, text: &str) -> String {
+        match diagram_core::screen::edit_ops(&self.inner.doc, gid, text) {
+            Ok(ops) => serde_json::json!({ "ok": true, "ops": ops }).to_string(),
+            Err(e) => serde_json::json!({ "ok": false, "error": e }).to_string(),
+        }
+    }
+
     /// What the board is for (`sketch`, `product`, `project`), from its top
     /// board, also while a canvas is open.
     pub fn board_type(&self) -> String {

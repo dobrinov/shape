@@ -9,7 +9,7 @@ use crate::model::{BoardKind, Document, Group, Node, Perspective};
 /// The block kinds `show` can name.
 pub const KINDS: &[&str] = &[
     "mindmap", "timeline", "adr", "risks", "kanban", "gantt", "table", "chart", "entity",
-    "sequence", "lanes", "sticky", "cycle",
+    "sequence", "lanes", "sticky", "cycle", "screen",
 ];
 
 fn p(id: &str, label: &str, tags: &[&str], show: &[&str], details: bool) -> Perspective {
@@ -42,7 +42,7 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
         "product",
         "Product",
         &["product"],
-        &["mindmap", "kanban", "timeline", "lanes", "chart"],
+        &["mindmap", "kanban", "timeline", "lanes", "chart", "screen"],
         true,
     );
     // the business around it, on product and project boards alike
@@ -80,7 +80,7 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
                 "design",
                 "Design",
                 &["design"],
-                &["mindmap", "lanes", "sticky"],
+                &["mindmap", "lanes", "sticky", "screen"],
                 true,
             ),
         ]
@@ -95,7 +95,7 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
                     "user",
                     "User",
                     &["user"],
-                    &["lanes", "mindmap", "sticky"],
+                    &["lanes", "mindmap", "sticky", "screen"],
                     true,
                 ),
                 exec,
@@ -158,6 +158,8 @@ fn kind_of(g: &Group) -> &'static str {
         "lanes"
     } else if g.cycle {
         "cycle"
+    } else if g.screen.is_some() {
+        "screen"
     } else {
         "section"
     }

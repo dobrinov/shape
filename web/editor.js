@@ -66,6 +66,8 @@
     history: '<path d="M4 12a8 8 0 102.3-5.6"/><path d="M4 4.5v3.5h3.5"/><path d="M12 8v4.5l3 2"/>',
     branch: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3.5-11 6.5"/>',
     blocks: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+    screen: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
+    page: '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M2.5 8h19M5 6h.01M7 6h.01"/>',
     cycle: '<path d="M19.5 12a7.5 7.5 0 01-12.8 5.3M4.5 12a7.5 7.5 0 0112.8-5.3"/><path d="M17.6 3.6v3.3h-3.3M6.4 20.4v-3.3h3.3"/>',
     timeline: '<path d="M4.5 5H16a3.5 3.5 0 010 7H8a3.5 3.5 0 000 7h11.5"/><circle cx="4.5" cy="5" r="2.7" fill="currentColor" stroke="none"/><circle cx="19.5" cy="19" r="2.7" fill="currentColor" stroke="none"/><circle cx="10.5" cy="5" r="2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="19" r="2" fill="currentColor" stroke="none"/>',
     ask: '<path d="M4 5.5A2.5 2.5 0 016.5 3h11A2.5 2.5 0 0120 5.5v8a2.5 2.5 0 01-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 014 14.5z"/><path d="M10 7.8a2 2 0 113 1.7c-.7.4-1 .8-1 1.5"/><circle cx="12" cy="13.2" r=".6" fill="currentColor"/>',
@@ -358,6 +360,8 @@
           ["lanes", "Swimlanes", "Steps across teams", go(addSwimlanes)],
           ["decision", "Decision point", "D · a diamond", go(function () { setTool("decision"); })],
           ["section", "Section", MOD + "G · around the selection", go(groupSelection)],
+          ["screen", "Phone screen", "A wireframe, written as text", go(function () { addScreen("mobile"); })],
+          ["page", "Web page", "A wireframe in a browser", go(function () { addScreen("web"); })],
           ["canvas", "Canvas", "A board inside this one", go(function () {
             var r = canvas.getBoundingClientRect();
             st.menuAt = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
@@ -474,7 +478,7 @@
         })))
       ]), []);
     }
-    var KIND_NAMES = { mindmap: "Mindmaps", timeline: "Timelines", adr: "Decision records", risks: "Risk matrices", kanban: "Kanban boards", gantt: "Gantt charts", table: "Tables", chart: "Charts", entity: "Database tables", sequence: "Sequence diagrams", lanes: "Swimlanes", sticky: "Stickies" };
+    var KIND_NAMES = { mindmap: "Mindmaps", timeline: "Timelines", adr: "Decision records", risks: "Risk matrices", kanban: "Kanban boards", gantt: "Gantt charts", table: "Tables", chart: "Charts", entity: "Database tables", sequence: "Sequence diagrams", lanes: "Swimlanes", sticky: "Stickies", screen: "Wireframe screens" };
     function newPerspective() {
       var name = h("input", { class: "dge-input", placeholder: "e.g. Legal, Support, Investors" });
       var tags = h("input", { class: "dge-input", placeholder: "e.g. legal" });
@@ -1871,6 +1875,9 @@
       if (e) return { type: "edge", id: e.getAttribute("data-id") };
       var g = target.closest(".dg-group");
       if (g) return { type: "group", id: g.getAttribute("data-id") };
+      // the inside of a plotted block (a screen, a chart…) stands for it
+      var pl = target.closest(".dg-chart[data-group]");
+      if (pl) return { type: "group", id: pl.getAttribute("data-group") };
       return null;
     }
 
@@ -2087,6 +2094,33 @@
           ["Delete step", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
         ];
       }
+      if (t.type === "node" && !view && node(t.id) && node(t.id).group && group(node(t.id).group) && group(node(t.id).group).screen) {
+        var sg = group(node(t.id).group);
+        return [
+          ["Edit text", function () { editLabel(t.id); }],
+          ["Add component after…", function () { addComponent(sg.id, st.doc.nodes.filter(function (n) { return n.group === sg.id; }).indexOf(node(t.id)) + 1); }, "e.g. button: Save"],
+          [node(t.id).detail ? "Edit details…" : "Add details…", function () { editDetails(t.id); }, "A card's text, or a note"],
+          ["Colour…", function () { colourMenu(t.id, "update_node", node(t.id).color); }, "Fills a button"],
+          ["Edit screen as text…", function () { editScreen(sg.id); }, "One component per line"],
+          ["Lead to another screen", function () { select([t.id]); setTool("connect"); flash("Drag from “" + (node(t.id).label || t.id) + "” to the screen it leads to"); }],
+          "-",
+          ["Delete component", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
+        ];
+      }
+      if (gr && !view && gr.screen) return [
+        ["Rename", function () { editLabel(t.id); }],
+        ["Edit as text…", function () { editScreen(t.id); }, "One component per line"],
+        ["Add component…", function () { addComponent(t.id, st.doc.nodes.filter(function (n) { return n.group === t.id; }).length); }, "e.g. input: Email"],
+        ["Device…", function () {
+          setTimeout(function () {
+            openMenu(st.menuAt, [["mobile", "Phone"], ["tablet", "Tablet"], ["web", "Web page"]].map(function (d) {
+              return [(gr.screen === d[0] ? "✓ " : "\u2003") + d[1], function () { applyOps([{ op: "update_group", id: t.id, screen: d[0] }]); }];
+            }));
+          }, 0);
+        }],
+        "-",
+        ["Delete", function () { applyOps([{ op: "remove", id: t.id, keep_members: false }]); select([]); }, "The screen and its components"]
+      ];
       if (gr && !view && gr.cycle) return [
         ["Rename", function () { editLabel(t.id); }],
         ["Edit as text…", function () { editCycle(t.id); }, "One step per line"],
@@ -2543,9 +2577,26 @@
         if (d.target && chartOf(d.from) && chartOf(d.target)) dependOn(d.target, d.from);
         else if (d.target) applyOps([{ op: "add_edge", from: d.from, to: d.target }]);
         else if (Math.hypot(p.x - (geom(d.from).x + geom(d.from).w / 2), p.y - (geom(d.from).y + geom(d.from).h / 2)) > 60) {
-          // dropped on empty canvas: create a connected box there
+          // dropped on empty canvas: create a connected box there (from a
+          // screen's component: the next screen, of the same device)
           var before = st.text;
           var src = node(d.from);
+          var scr = src && src.group && group(src.group) && group(src.group).screen;
+          if (scr) {
+            var sid = freshId("screen");
+            // beside the screen it comes from, not on top of it
+            var from = st.r.groups.find(function (x) { return x.id === src.group; });
+            var at = from ? { x: from.x + from.w + 100, y: from.y } : { x: p.x, y: p.y - 40 };
+            var taken = function (q) { return st.r.groups.some(function (x) { return !group(x.id).parent && q.x < x.x + x.w && q.x + 400 > x.x && q.y < x.y + x.h && q.y + 300 > x.y; }); };
+            for (var k = 0; k < 12 && taken(at); k++) at = { x: at.x, y: at.y + (from ? from.h + 60 : 300) };
+            if (applyOps([
+              { op: "merge", dsl: "screen " + sid + ": Next screen [" + scr + "] {\n" + SCREEN_STARTERS[scr === "web" ? "web" : "mobile"] + "\n}" },
+              { op: "move", id: sid, x: Math.round(at.x), y: Math.round(at.y) },
+              { op: "add_edge", from: d.from, to: sid }
+            ]).ok) { select([sid]); editLabel(sid, true); }
+            drawOverlay();
+            return;
+          }
           var id = freshId("node");
           var res = JSON.parse(st.session.apply(JSON.stringify({ ops: [
             { op: "add_node", id: id, label: "New box", x: Math.round(p.x - 60), y: Math.round(p.y - 22), group: src && src.group ? src.group : undefined },
@@ -3153,6 +3204,49 @@
       if (have.length) { select([have[0]]); reveal(have[0]); return flash("This board already has one: add to it (the AI does too)"); }
       if (applyOps([{ op: "merge", dsl: r.source }]).ok) { if (ids[0]) { select([ids[0]]); reveal(ids[0]); } flash("Inserted “" + r.name + "”: its rows are examples, write over them"); }
     }
+    /* Wireframe screens: a phone or a browser window, one component per
+       line; arrows from components to screens make the flow. */
+    var SCREEN_STARTERS = {
+      mobile: "  header: App\n  title: Screen title\n  text: What this screen is for.\n  input: Email\n  button primary: Continue [blue]",
+      web: "  navbar: App | Product | Pricing | Sign in\n  title: Page title\n  text: What this page is for.\n  buttons: Learn more | Get started [blue]\n  footer: © App"
+    };
+    function addScreen(device) {
+      var gid = freshId(device === "web" ? "page" : "screen");
+      var res = applyOps([{ op: "merge", dsl: "screen " + gid + ": " + (device === "web" ? "Page" : "Screen") + " [" + device + "] {\n" + SCREEN_STARTERS[device] + "\n}" }]);
+      if (res.ok) {
+        select([gid]);
+        reveal(gid);
+        editLabel(gid, true);
+      }
+    }
+    var WIDGETS = "header navbar title subtitle text button buttons link input password search textarea select date checkbox radio toggle slider image video map chart avatar card list table tabs tabbar sidebar breadcrumb badges alert progress stepper pagination rating divider spacer footer fab";
+    function addComponent(gid, at) {
+      askAt(st.menuAt, "", "kind: text, e.g. button: Save · input: Email · list: A | B | C", function (line) {
+        if (!line) return;
+        var lines = st.session.screen_text(gid).split("\n").filter(function (l) { return l.trim(); });
+        lines.splice(at, 0, line.trim());
+        screenTextSave(gid, lines.join("\n"));
+      });
+    }
+    function screenTextSave(gid, text) {
+      var r = JSON.parse(st.session.screen_edit_ops(gid, text));
+      if (!r.ok) { flash(r.error + " (components: " + WIDGETS.split(" ").join(", ") + ")", true); return false; }
+      return applyOps(r.ops).ok;
+    }
+    function editScreen(gid) {
+      var ta = h("textarea", { class: "dge-chart-data", spellcheck: "false", rows: "16" });
+      ta.value = st.session.screen_text(gid);
+      var save = function () { if (screenTextSave(gid, ta.value)) closeModal(); };
+      ta.addEventListener("keydown", function (e) { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") save(); });
+      showModal("Screen: " + (group(gid).label || gid), h("div", {}, [
+        h("p", { class: "dge-muted" }, ["One component per line, top to bottom: `kind [id]: text [colour]`, e.g. `button submit: Sign in [blue]`. Items go in the text separated by | (`tabs: Home | Search | Me`). Kinds: " + WIDGETS.split(" ").join(", ") + "."]),
+        ta
+      ]), [
+        h("button", { onclick: closeModal }, ["Cancel"]),
+        h("button", { class: "primary", onclick: save }, ["Save (" + MOD + "↵)"])
+      ]);
+      setTimeout(function () { ta.focus(); }, 0);
+    }
     /* Cycles: steps round a circle, each leading to the next. */
     function addCycle() {
       var gid = freshId("cycle");
@@ -3708,7 +3802,7 @@
       var g = group(t), n = node(t);
       if (n && n.canvas) return "canvas";
       if (n && n.mindmap) return "mindmap";
-      if (g) return g.timeline ? "timeline" : g.cycle ? "cycle" : g.kanban ? "kanban" : g.gantt ? "gantt" : g.risks ? "risks" : g.table ? "table" : g.chart ? "chart" : g.adr ? "decision" : g.sequence ? "sequence" : g.lanes ? "swimlanes" : g.entity ? "table" : "section";
+      if (g) return g.screen ? (g.screen === "web" ? "web page" : "screen") : g.timeline ? "timeline" : g.cycle ? "cycle" : g.kanban ? "kanban" : g.gantt ? "gantt" : g.risks ? "risks" : g.table ? "table" : g.chart ? "chart" : g.adr ? "decision" : g.sequence ? "sequence" : g.lanes ? "swimlanes" : g.entity ? "table" : "section";
       return "box";
     }
     // what can be a slide: the top-level sections and blocks, mindmaps and
