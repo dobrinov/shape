@@ -1,13 +1,17 @@
 <!doctype html>
-<!-- Source for og.png (1200×630): just the logo. Re-render with scripts/render-og.sh -->
+<!-- Source for og.png (1200×630): the logo, the name and the line. Re-render with scripts/render-og.sh -->
 <html>
 <head>
 <meta charset="utf-8">
 <style>
-  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #0d1117; }
-  body { display: flex; align-items: center; justify-content: center; }
-  img { width: 400px; height: 400px; display: block; }
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body { display: flex; align-items: center; gap: 64px; padding: 0 96px; box-sizing: border-box; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+    background: radial-gradient(900px 500px at 85% -10%, rgba(91,92,246,.35), transparent 60%), radial-gradient(700px 400px at -10% 110%, rgba(74,222,128,.18), transparent 60%), #0b0f17; }
+  img { width: 300px; height: 300px; display: block; flex: none; }
+  h1 { margin: 0 0 18px; font-size: 104px; letter-spacing: -0.03em; line-height: 1; }
+  p { margin: 0; font-size: 40px; line-height: 1.25; color: #b6c0ce; max-width: 13em; }
+  p b { background: linear-gradient(90deg, #8ab4ff, #4ade80); -webkit-background-clip: text; background-clip: text; color: transparent; }
 </style>
 </head>
-<body><img src="../web/favicon.svg" alt=""></body>
+<body><img src="../web/favicon.svg" alt=""><div><h1>Shape</h1><p>From a messy idea to <b>a plan everyone gets.</b></p></div></body>
 </html>

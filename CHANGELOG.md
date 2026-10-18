@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.55.0 — 2026-10-18
+
+- **A new icon:** a white square, a yellow circle and a green triangle on an indigo-to-blue tile, for Shape.app, the window, the favicon, the website and the `.shape` / `.diagram` document icon (which now reads SHAPE). Run `shape install-app` again to get it in Finder and the Dock.
+- **A new share image:** links to the site show the icon, the name and *From a messy idea to a plan everyone gets*.
+
 ## 0.54.0 — 2026-10-18
 
 - **Perspectives start high level and drill down:** a perspective opens with its sections and blocks folded into cards. Each card shows the title, what is inside (*2 risks, 1 high*, *3 to do, 1 doing*, *4 events*…) and its first few items. Arrows run between the cards. Click a card to open it in place; *Expand all* in the top bar opens everything, *Fold all* folds it back. Each role keeps open what it looks at first: charts for Business, the timeline for Delivery, Product and Marketing.
