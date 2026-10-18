@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.52.0 — 2026-10-18
+
+- **Wireframes are easier to use:**
+  - The Blocks palette has a *Wireframes* group: Phone, Web page, Tablet and *Screen flow* (three linked screens to start from).
+  - Select a screen or a component and a bar offers the common components (title, text, button, input, list, image, tabs, card) and *All ▾* with the full list. A new one goes after the selected component and you type its text straight away.
+  - ↑ ↓ or ⌥↑ ⌥↓ move a component; *Edit as text* is on the bar too.
+  - Renaming a component keeps its screen's prefix (`login.submit`); before, a new component named by its text could lose it.
+- The landing page has a *Wireframes and flows* section with a sign-up flow across phone and web.
+- The landing page's AI picture now shows the whole exchange: what you asked, the change on the board (added in green, removed in red) and the Keep / Discard bar.
+
+- **Boards as prompts:** ⌘⇧C with nothing selected copies the whole board, every canvas in it, as a Markdown spec to build from: what to do, each board's sections and blocks, the connections and the open comments as questions to ask. It is also on the empty board's right-click and under Share (*Copy as a prompt to build it*), and in the terminal as `diagram prompt FILE --target build`. Screens list their components by kind. The landing page and the README now say Shape is a way to write prompts too.
+
+- **diagram is now Shape.** Everything you read says Shape: the editor, the window title, the app (Shape.app; `diagram install-app` replaces Diagram.app), the file type, the help text, the README and the website. The `diagram` command, `.diagram` files, the Homebrew formula and the repository keep their names, so nothing breaks.
+- **A new landing page:** what Shape is for (from a messy idea to a plan everyone gets), why teams switch, how it works in three steps, one board for every audience, the blocks (now with wireframes, timelines and cycles), the AI, git, install and a short FAQ. It works on phones without scrolling sideways. The example page shows the checkout screens.
+- The minimap stays out of small editors (narrower than 900px), such as boards embedded in a page.
+
 ## 0.51.0 — 2026-10-18
 
 - **Wireframes:** `screen login: Sign in [mobile] { … }` draws a screen as a phone, a tablet or a browser window (`web`), its components one per line, top to bottom: `kind [id]: text [attrs]`.

@@ -67,6 +67,8 @@
     branch: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3.5-11 6.5"/>',
     blocks: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
     screen: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
+    tablet: '<rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+    flow: '<rect x="2.5" y="5" width="6" height="11" rx="1.5"/><rect x="15.5" y="8" width="6" height="11" rx="1.5"/><path d="M8.5 10.5h4l-1.5-1.5M12.5 10.5l-1.5 1.5"/>',
     page: '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M2.5 8h19M5 6h.01M7 6h.01"/>',
     cycle: '<path d="M19.5 12a7.5 7.5 0 01-12.8 5.3M4.5 12a7.5 7.5 0 0112.8-5.3"/><path d="M17.6 3.6v3.3h-3.3M6.4 20.4v-3.3h3.3"/>',
     timeline: '<path d="M4.5 5H16a3.5 3.5 0 010 7H8a3.5 3.5 0 000 7h11.5"/><circle cx="4.5" cy="5" r="2.7" fill="currentColor" stroke="none"/><circle cx="19.5" cy="19" r="2.7" fill="currentColor" stroke="none"/><circle cx="10.5" cy="5" r="2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="19" r="2" fill="currentColor" stroke="none"/>',
@@ -201,7 +203,8 @@
       return { s: s, ox: (MM_W - v.w * s) / 2, oy: (MM_H - v.h * s) / 2, v: v };
     };
     function drawMinimap() {
-      var on = minimapOn() && st.r && st.doc && st.doc.nodes.length > 0 && !st.presenting;
+      // not in a small editor (an embedded board): there it covers the board
+      var on = minimapOn() && st.r && st.doc && st.doc.nodes.length > 0 && !st.presenting && canvas.clientWidth >= 900;
       minimap.hidden = !on;
       zoomBar.querySelector(".dge-minimap-btn").setAttribute("aria-pressed", String(minimapOn()));
       if (!on) return;
@@ -354,14 +357,19 @@
           ["table", "Table", "Rows and columns", go(addTable)],
           ["chart", "Chart", "Bars, lines, pie…", function (e) { closeBlocks(); chartMenu(blocksBtn); }]
         ]],
+        ["Wireframes", [
+          ["screen", "Phone", "A mobile screen", go(function () { addScreen("mobile"); })],
+          ["page", "Web page", "A page in a browser", go(function () { addScreen("web"); })],
+          ["tablet", "Tablet", "A tablet screen", go(function () { addScreen("tablet"); })],
+          ["flow", "Screen flow", "Three screens, linked", go(addFlow)]
+        ]],
         ["Specify", [
           ["sequence", "Sequence diagram", "Who talks to whom", go(addSequence)],
           ["entity", "Database table", "Columns and keys", go(addEntity)],
           ["lanes", "Swimlanes", "Steps across teams", go(addSwimlanes)],
           ["decision", "Decision point", "D · a diamond", go(function () { setTool("decision"); })],
           ["section", "Section", MOD + "G · around the selection", go(groupSelection)],
-          ["screen", "Phone screen", "A wireframe, written as text", go(function () { addScreen("mobile"); })],
-          ["page", "Web page", "A wireframe in a browser", go(function () { addScreen("web"); })],
+
           ["canvas", "Canvas", "A board inside this one", go(function () {
             var r = canvas.getBoundingClientRect();
             st.menuAt = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
@@ -1720,6 +1728,7 @@
     }
 
     function markSelection() {
+      updateScreenBar();
       stage.querySelectorAll(".sel").forEach(function (e) { e.classList.remove("sel"); });
       st.sel.forEach(function (id) {
         stage.querySelectorAll('[data-id="' + cssEsc(id) + '"]').forEach(function (e) { e.classList.add("sel"); });
@@ -2098,7 +2107,9 @@
         var sg = group(node(t.id).group);
         return [
           ["Edit text", function () { editLabel(t.id); }],
-          ["Add component after…", function () { addComponent(sg.id, st.doc.nodes.filter(function (n) { return n.group === sg.id; }).indexOf(node(t.id)) + 1); }, "e.g. button: Save"],
+          ["Add component after…", function () { select([t.id]); openWidgets(sg.id); }, "Fields, buttons, lists, tabs…"],
+          ["Move up", function () { moveComponent(t.id, -1); }, "⌥↑"],
+          ["Move down", function () { moveComponent(t.id, 1); }, "⌥↓"],
           [node(t.id).detail ? "Edit details…" : "Add details…", function () { editDetails(t.id); }, "A card's text, or a note"],
           ["Colour…", function () { colourMenu(t.id, "update_node", node(t.id).color); }, "Fills a button"],
           ["Edit screen as text…", function () { editScreen(sg.id); }, "One component per line"],
@@ -2110,7 +2121,7 @@
       if (gr && !view && gr.screen) return [
         ["Rename", function () { editLabel(t.id); }],
         ["Edit as text…", function () { editScreen(t.id); }, "One component per line"],
-        ["Add component…", function () { addComponent(t.id, st.doc.nodes.filter(function (n) { return n.group === t.id; }).length); }, "e.g. input: Email"],
+        ["Add component…", function () { select([t.id]); openWidgets(t.id); }, "Fields, buttons, lists, tabs…"],
         ["Device…", function () {
           setTimeout(function () {
             openMenu(st.menuAt, [["mobile", "Phone"], ["tablet", "Tablet"], ["web", "Web page"]].map(function (d) {
@@ -2328,6 +2339,14 @@
         }));
       });
     }
+    /* The whole board, every canvas in it, as a prompt to build what it
+       describes: paste it into any LLM or coding agent. */
+    function copyBoardPrompt() {
+      var board = st.answer ? st.answer.main.session : st.session;
+      copyText(board.build_prompt(isoDay(today()))).then(function () {
+        flash("The whole board is copied as a prompt: paste it into Claude, ChatGPT or your coding agent to build it");
+      });
+    }
     /* The selection (or `ids`) as Markdown for a prompt. */
     function copyPrompt(ids) {
       ids = (ids || st.sel).filter(kindOf);
@@ -2342,6 +2361,7 @@
       var at = toDiagram(e.clientX, e.clientY);
       var items = t ? contextItems(t) : view ? [] : [
         ["✦ Rethink the board", function () { rethink(); }, "The AI acts on the open comments and brings the whole board up to date; you see the changes first"],
+        ["Copy the board as a prompt", function () { copyBoardPrompt(); }, "Everything on it, canvases too, as a spec to build from (" + MOD + "⇧C)"],
         ["New canvas here…", function () { newCanvas(at); }, "A board inside this one, opened from a button here"],
         ["Insert recipe…", function () { recipeMenu(); }, "Incidents, OKRs, a burndown, a retro…: ready-made arrangements of blocks"],
         ["Insert image…", function () { pickImages(at); }, "Or paste an image, or drop image files on the board"]
@@ -2806,7 +2826,8 @@
         var ops;
         if (kind === "node") {
           ops = [{ op: "update_node", id: id, label: v }];
-          var nice = slug(v);
+          var scr = screenOf(id);
+          var nice = (scr ? scr.id + "." : "") + slug(v);
           // a box that was just added gets an id from its label
           if (isNew && v && nice !== id && !idTaken(nice)) ops.push({ op: "rename", id: id, to: nice });
           else if (isNew && v && nice !== id && !/^(node|note|topic|map)(-\d+)?$/.test(nice)) ops.push({ op: "rename", id: id, to: freshId(nice) });
@@ -3208,8 +3229,101 @@
        line; arrows from components to screens make the flow. */
     var SCREEN_STARTERS = {
       mobile: "  header: App\n  title: Screen title\n  text: What this screen is for.\n  input: Email\n  button primary: Continue [blue]",
-      web: "  navbar: App | Product | Pricing | Sign in\n  title: Page title\n  text: What this page is for.\n  buttons: Learn more | Get started [blue]\n  footer: © App"
+      web: "  navbar: App | Product | Pricing | Sign in\n  title: Page title\n  text: What this page is for.\n  buttons: Learn more | Get started [blue]\n  footer: © App",
+      tablet: "  header: App\n  title: Screen title\n  text: What this screen is for.\n  list: First | Second | Third\n  button primary: Continue [blue]"
     };
+    /* A flow to start from: sign in, the home screen, a detail, linked. */
+    function addFlow() {
+      var ids = freshIds(["sign-in", "home", "detail"]);
+      var src = "screen " + ids[0] + ": Sign in [mobile] {\n  header: App\n  title: Welcome back\n  input email: Email\n  password: Password\n  button go: Sign in [blue]\n  link forgot: Forgot password?\n}\n" +
+        "screen " + ids[1] + ": Home [mobile] {\n  header: Home\n  search: Search\n  list items: First item | Second item | Third item\n  tabbar: Home | Search | Me\n}\n" +
+        "screen " + ids[2] + ": Detail [mobile] {\n  header: Item\n  image: Photo\n  title: Item name\n  text: What it is, in a line or two.\n  button buy: Add to cart [blue]\n}\n" +
+        ids[0] + ".go -> " + ids[1] + ": signs in\n" + ids[1] + ".items -> " + ids[2] + ": opens";
+      if (applyOps([{ op: "merge", dsl: src }]).ok) { select([ids[0]]); reveal(ids[0]); flash("A flow of three screens: click a screen to add components, drag from a button to another screen to link them"); }
+    }
+    /* Components: what each kind starts with, and the groups the bar offers. */
+    var WIDGET_DEFAULTS = {
+      header: "Title", navbar: "App | Home | Pricing | Sign in", title: "Title", subtitle: "Subtitle", text: "Some text that explains this part.",
+      button: "Button", buttons: "Cancel | Save", link: "Link", input: "Label", password: "Password", search: "Search", textarea: "Message",
+      select: "Choose one", date: "Date", checkbox: "Option", radio: "One | Two | Three", toggle: "Setting", slider: "Amount", image: "Image",
+      video: "Video", map: "Map", chart: "Chart", avatar: "Name | Role", card: "Card title", list: "First | Second | Third",
+      table: "Name | Email | Role", tabs: "One | Two | Three", tabbar: "Home | Search | Me", sidebar: "Home | Inbox | Settings",
+      breadcrumb: "Home | Section | Page", badges: "New | Popular", alert: "Something to know", progress: "Progress", stepper: "One | Two | Three",
+      pagination: "", rating: "", divider: "", spacer: "", footer: "© Company", fab: ""
+    };
+    var WIDGET_GROUPS = [
+      ["Basics", ["title", "subtitle", "text", "button", "buttons", "link", "image", "divider", "spacer"]],
+      ["Inputs", ["input", "password", "search", "textarea", "select", "date", "checkbox", "radio", "toggle", "slider"]],
+      ["Navigation", ["header", "navbar", "tabs", "tabbar", "sidebar", "breadcrumb", "stepper", "pagination"]],
+      ["Content", ["list", "table", "card", "avatar", "badges", "video", "map", "chart", "rating"]],
+      ["Feedback", ["alert", "progress", "fab", "footer"]]
+    ];
+    function screenOf(id) {
+      var g = group(id);
+      if (g && g.screen) return g;
+      var n = node(id), p = n && n.group && group(n.group);
+      return p && p.screen ? p : null;
+    }
+    function componentsOf(gid) { return st.doc.nodes.filter(function (n) { return n.group === gid; }); }
+    /* Add a component: after the selected one, else at the end; its text is typed next. */
+    function addWidget(gid, kind) {
+      var list = componentsOf(gid), cur = node(st.sel[0]);
+      var at = cur && cur.group === gid ? list.indexOf(cur) + 1 : list.length;
+      var base = gid + "." + kind, id = base, k = 2;
+      while (idTaken(id)) id = base + "-" + k++;
+      var op = { op: "add_node", id: id, label: WIDGET_DEFAULTS[kind] || "", group: gid, widget: kind, index: at };
+      if (kind === "card") op.detail = "A line or two about it.";
+      if (kind === "button" && !list.some(function (n) { return n.widget === "button" && n.color; })) op.color = "blue";
+      if (!applyOps([op]).ok) return;
+      closeWidgets();
+      select([id]);
+      if (WIDGET_DEFAULTS[kind]) editLabel(id, true);
+    }
+    function moveComponent(id, d) {
+      var n = node(id), list = n && componentsOf(n.group), i = list ? list.indexOf(n) : -1, j = i + d;
+      if (i < 0 || j < 0 || j >= list.length) return;
+      applyOps([{ op: "update_node", id: id, index: j }]);
+      select([id]);
+    }
+    /* The bar above the tools while a screen (or a component) is selected. */
+    var screenBar = h("div", { class: "dge-screenbar", hidden: true });
+    if (!view) canvas.appendChild(screenBar);
+    ["pointerdown", "dblclick", "contextmenu"].forEach(function (ev) { screenBar.addEventListener(ev, function (e) { e.stopPropagation(); }); });
+    var widgetsMenu = null;
+    function closeWidgets() { if (widgetsMenu) { widgetsMenu.remove(); widgetsMenu = null; } }
+    function openWidgets(gid) {
+      if (widgetsMenu) return closeWidgets();
+      widgetsMenu = h("div", { class: "dge-blocks dge-widgets", role: "menu", "aria-label": "Add a component" });
+      WIDGET_GROUPS.forEach(function (grp) {
+        widgetsMenu.appendChild(h("div", { class: "dge-blocks-head" }, [grp[0]]));
+        widgetsMenu.appendChild(h("div", { class: "dge-widgets-grid" }, grp[1].map(function (k) {
+          return h("button", { role: "menuitem", "data-widget": k, onclick: function () { addWidget(gid, k); } }, [k.charAt(0).toUpperCase() + k.slice(1)]);
+        })));
+      });
+      ["pointerdown", "dblclick", "contextmenu"].forEach(function (ev) { widgetsMenu.addEventListener(ev, function (e) { e.stopPropagation(); }); });
+      canvas.appendChild(widgetsMenu);
+    }
+    function updateScreenBar() {
+      if (!screenBar) return; // before the editor is built
+      var g = !view && st.sel.length === 1 && screenOf(st.sel[0]);
+      screenBar.hidden = !g;
+      if (!g) { closeWidgets(); return; }
+      if (screenBar._for === st.sel[0]) return;
+      screenBar._for = st.sel[0];
+      screenBar.innerHTML = "";
+      var comp = node(st.sel[0]) ? st.sel[0] : null;
+      screenBar.appendChild(h("span", { class: "dge-screenbar-label" }, [comp ? "Add after" : "Add"]));
+      ["title", "text", "button", "input", "list", "image", "tabs", "card"].forEach(function (k) {
+        screenBar.appendChild(h("button", { "data-widget": k, title: "Add a " + k, onclick: function () { addWidget(g.id, k); } }, [k.charAt(0).toUpperCase() + k.slice(1)]));
+      });
+      screenBar.appendChild(h("button", { class: "dge-screenbar-more", "data-act": "widgets", title: "Every component", onclick: function () { openWidgets(g.id); } }, ["All ▾"]));
+      screenBar.appendChild(h("span", { class: "dge-tools-sep" }));
+      if (comp) {
+        screenBar.appendChild(h("button", { title: "Up (⌥↑)", onclick: function () { moveComponent(comp, -1); } }, ["↑"]));
+        screenBar.appendChild(h("button", { title: "Down (⌥↓)", onclick: function () { moveComponent(comp, 1); } }, ["↓"]));
+      }
+      screenBar.appendChild(h("button", { title: "The whole screen as text, one component per line", onclick: function () { editScreen(g.id); } }, ["Edit as text"]));
+    }
     function addScreen(device) {
       var gid = freshId(device === "web" ? "page" : "screen");
       var res = applyOps([{ op: "merge", dsl: "screen " + gid + ": " + (device === "web" ? "Page" : "Screen") + " [" + device + "] {\n" + SCREEN_STARTERS[device] + "\n}" }]);
@@ -3220,14 +3334,6 @@
       }
     }
     var WIDGETS = "header navbar title subtitle text button buttons link input password search textarea select date checkbox radio toggle slider image video map chart avatar card list table tabs tabbar sidebar breadcrumb badges alert progress stepper pagination rating divider spacer footer fab";
-    function addComponent(gid, at) {
-      askAt(st.menuAt, "", "kind: text, e.g. button: Save · input: Email · list: A | B | C", function (line) {
-        if (!line) return;
-        var lines = st.session.screen_text(gid).split("\n").filter(function (l) { return l.trim(); });
-        lines.splice(at, 0, line.trim());
-        screenTextSave(gid, lines.join("\n"));
-      });
-    }
     function screenTextSave(gid, text) {
       var r = JSON.parse(st.session.screen_edit_ops(gid, text));
       if (!r.ok) { flash(r.error + " (components: " + WIDGETS.split(" ").join(", ") + ")", true); return false; }
@@ -4261,7 +4367,7 @@
       if (e.key === " " && !st.space) { st.space = true; canvas.classList.add("space"); e.preventDefault(); return; }
       if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
       if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); return; }
-      if (mod && e.shiftKey && e.key.toLowerCase() === "c" && st.sel.length) { e.preventDefault(); copyPrompt(); return; }
+      if (mod && e.shiftKey && e.key.toLowerCase() === "c") { e.preventDefault(); if (st.sel.length) copyPrompt(); else copyBoardPrompt(); return; }
       if (view) {
         if (e.key === "f") fit();
         return;
@@ -4271,6 +4377,10 @@
         e.preventDefault();
         copyText(st.session.outline(one)).then(function () { flash("Outline copied"); });
         return;
+      }
+      // a screen's component: ⌥↑ ⌥↓ move it
+      if (st.sel.length === 1 && e.altKey && !mod && (e.key === "ArrowUp" || e.key === "ArrowDown") && node(st.sel[0]) && screenOf(st.sel[0])) {
+        e.preventDefault(); moveComponent(st.sel[0], e.key === "ArrowUp" ? -1 : 1); return;
       }
       if (one && !mod) {
         if (e.key === "Tab") { e.preventDefault(); if (e.shiftKey) outdent(one); else addTopic(one); return; }
@@ -4661,6 +4771,7 @@
       if (blocksMenu && !blocksMenu.hidden && !blocksMenu.contains(e.target) && !(blocksBtn && blocksBtn.contains(e.target))) closeBlocks();
       if (boardMenu && !boardMenu.hidden && !boardMenu.contains(e.target) && !e.target.closest("[data-act=board]")) boardMenu.hidden = true;
       if (historyMenu && !historyMenu.hidden && !historyMenu.contains(e.target) && !e.target.closest("[data-act=history]")) historyMenu.hidden = true;
+      if (widgetsMenu && !widgetsMenu.contains(e.target) && !e.target.closest("[data-act=widgets]")) closeWidgets();
     });
 
     function baseName() {
@@ -4679,6 +4790,7 @@
         ["Download .diagram", function () { download(baseName() + ".diagram", st.text); }],
         ["Download JSON", function () { download(baseName() + ".json", st.session.source("json"), "application/json"); }],
         ["Copy as Mermaid", function () { copyText(st.session.source("mermaid")).then(function () { flash("Mermaid copied — paste it into GitHub Markdown"); }); }],
+        ["Copy as a prompt to build it", function () { copyBoardPrompt(); }],
         ["Copy LLM brief (Markdown)", function () { copyText(st.session.brief()).then(function () { flash("Brief copied — paste it into a chat as context"); }); }]
       ];
       if (opts.shareUrl) {

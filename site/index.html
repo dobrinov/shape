@@ -3,34 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>diagram — a FigJam-style board for the agentic world, in plain text</title>
-<meta name="description" content="Draw, discuss and specify on a board that lives in git as plain text: mindmaps, kanban, gantt, sequence and ER diagrams, decision records and more. Review comments become prompts; the AI runs on your own AI subscription. Rust + WebAssembly.">
+<title>Shape — from a messy idea to a plan everyone gets</title>
+<meta name="description" content="Shape is one board for the whole project: mindmaps, plans, timelines, wireframes, decisions and slides. Throw in what you know and the AI you already pay for sorts it; copy the board as a prompt and let an LLM build it. Free, open source, no account: your board is a text file in your repo.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="diagram">
-<meta property="og:title" content="diagram — a FigJam-style board for the agentic world, in plain text">
-<meta property="og:description" content="Mindmaps, kanban, gantt, sequence and ER diagrams on one board that lives in git. Comments become prompts; the AI runs on your own AI subscription.">
+<meta property="og:site_name" content="Shape">
+<meta property="og:title" content="Shape — from a messy idea to a plan everyone gets">
+<meta property="og:description" content="One board for the whole project. Throw in what you know; the AI you already pay for sorts it into plans, screens and decisions. Present it, or copy it as a prompt and let an LLM build it. Free, no account, lives in git.">
 <meta property="og:url" content="{{SITE_URL}}">
 <meta property="og:image" content="{{SITE_URL}}og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="diagram">
+<meta property="og:image:alt" content="Shape">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="{{SITE_URL}}og.png">
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
 <header class="nav">
-  <a class="brand" href="./"><img class="logo" src="favicon.svg" alt="">diagram</a>
+  <a class="brand" href="./"><img class="logo" src="favicon.svg" alt="">Shape</a>
   <nav>
-    <a href="#install">Install</a>
-    <a href="#features">Features</a>
+    <a href="#why">Why Shape</a>
+    <a href="#how">How it works</a>
+    <a href="#wireframes">Wireframes</a>
+    <a href="#prompts">Prompts</a>
+    <a href="#features">Blocks</a>
     <a href="#ai">AI</a>
-    <a href="examples/">Example</a>
-    <a href="app/">Playground</a>
-    <a href="#agents">AI agents</a>
-    <a href="#embed">Embed</a>
+    <a href="#install">Install</a>
+    <a href="#faq">FAQ</a>
     <a href="#changelog">Changelog</a>
     <a class="gh" href="{{REPO_URL}}">GitHub</a>
   </nav>
@@ -38,122 +39,226 @@
 
 <section class="hero">
   <div class="hero-text">
-    <p class="eyebrow">Mindmaps · Kanban · Gantt · ER · Sequence · AI</p>
-    <h1>Draw it. Discuss it.<br><span class="grad">Hand it to your agent.</span></h1>
-    <p class="lede">diagram is a FigJam-style board that lives in your repository as plain text. Map the problem in
-      mindmaps, plan it on kanban and gantt charts, specify it with sequence and ER diagrams — with boards inside boards
-      for the details. Then let AI do the typing: the <b>AI button</b> runs on the Claude, Codex or Gemini subscription you
-      already have, and review comments become a prompt for your coding agent.</p>
-    <ul class="chips">
-      <li>Mindmaps</li><li>Prompt mindmaps</li><li>Kanban</li><li>Gantt + forecast</li><li>Sequence</li><li>ER diagrams</li>
-      <li>Swimlanes</li><li>Risk matrix</li><li>Charts</li><li>Tables</li><li>Timelines</li><li>Cycles</li><li>Decision records</li><li>Boards inside boards</li>
-      <li>Images</li><li>Comments → prompts</li><li>AI: ask, add what you know, rethink</li><li>Git diff &amp; merge</li><li>Themes</li><li>Embed</li>
-    </ul>
+    <p class="eyebrow">Think it · Plan it · Present it · Prompt it</p>
+    <h1>From a messy idea<br><span class="grad">to a plan everyone gets.</span></h1>
+    <p class="lede">Shape is one board for the whole project. Throw in what you know (meeting notes, a Slack thread, a screenshot) and the AI you already pay for sorts it into <b>mindmaps, plans, timelines, screens and decisions</b>. Then show it to every audience, present it as slides, or <b>copy it as a prompt</b> and let an LLM build it.</p>
     <div class="cta">
-      <a class="btn primary" href="app/">Open the playground</a>
-      <a class="btn" href="examples/">See every feature</a>
+      <a class="btn primary" href="app/">Try it now. No sign-up</a>
+      <a class="btn" href="examples/">Explore a finished board</a>
     </div>
     <div class="install-line">
       <code id="brew-cmd">brew install dobrinov/tap/diagram</code>
       <button type="button" id="brew-copy" title="Copy to clipboard">Copy</button>
-      <a href="#install">Binaries &amp; source ↓</a>
+      <a href="#install">Windows, Linux &amp; source ↓</a>
     </div>
-    <div class="terminal">
-      <div class="term-bar"><i></i><i></i><i></i></div>
-<pre><span class="p">$</span> diagram docs/checkout.diagram
-<span class="o">diagram: editing docs/checkout.diagram at http://127.0.0.1:5591/</span>
-<span class="o">diagram: ✦ AI via `claude -p`</span>
-<span class="p">$</span> diagram ask docs/checkout.diagram "add a cache"</pre>
-    </div>
+    <ul class="promises">
+      <li>Free and open source</li>
+      <li>No account, no server</li>
+      <li>Runs on your Claude, ChatGPT or Gemini plan</li>
+      <li>Your board is a text file in your repo</li>
+    </ul>
   </div>
   <div class="hero-demo">
     <div class="demo-frame" data-diagram data-mode="edit" data-theme="dark"><script type="text/plain">{{HERO}}</script></div>
-    <p class="caption">This is the real editor, running in your browser. Double-click <b>Delivery plan</b> to open the board inside it; the trail at the top leads back.</p>
+    <p class="caption">This is the real editor, running in your browser. Double-click <b>Delivery plan</b> to open the board inside it, or right-click anything.</p>
   </div>
 </section>
 
-<section id="install" class="install">
-  <h2>Install</h2>
-  <div class="install-grid">
-    <div>
-      <h3>Homebrew <span>macOS · Linux</span></h3>
-<pre class="code">brew install dobrinov/tap/diagram</pre>
-      <p class="sub">Later: <code>brew upgrade diagram</code>.</p>
-    </div>
-    <div>
-      <h3>Binaries <span>macOS · Linux · Windows</span></h3>
-      <p class="sub">Grab an archive from the <a href="{{REPO_URL}}/releases/latest">latest release</a> (Apple silicon and Intel, Linux x86_64 and arm64, Windows x86_64), unpack it and put <code>diagram</code> on your <code>PATH</code>.</p>
-    </div>
-    <div>
-      <h3>From source</h3>
-<pre class="code">git clone {{REPO_URL}} diagram && cd diagram
-make install</pre>
-      <p class="sub">Needs Rust with the <code>wasm32-unknown-unknown</code> target and <code>wasm-pack</code>.</p>
-    </div>
+<section id="why" class="why">
+  <h2>Why teams switch to Shape</h2>
+  <p class="sub">A project lives in six places: a whiteboard, a roadmap, a ticket board, a wireframe tool, a doc of decisions and a slide deck. They drift apart the day after the kick-off. Shape keeps them on one board, and lets the AI keep it current.</p>
+  <div class="grid">
+    <article>
+      <div class="ico">✦</div>
+      <h3>Talk to your board</h3>
+      <p>Paste what you learned and Shape puts every fact where it belongs. Ask “what blocks the launch?” and get the answer <i>drawn</i>, each piece linked back. After a week of comments, one click on <b>Rethink</b> brings the whole board up to date.</p>
+    </article>
+    <article>
+      <div class="ico">▦</div>
+      <h3>Six tools, one board</h3>
+      <p>Mindmaps, kanban, gantt charts that forecast, timelines, wireframes for phone and web, decision records, risk matrices, charts and slides. They sit side by side, with boards inside boards for the details.</p>
+    </article>
+    <article>
+      <div class="ico">⎇</div>
+      <h3>Yours, for good</h3>
+      <p>A board is a short text file. It diffs and merges like code, it works offline in its own window, and it is still readable in ten years. Collaboration is commits and pull requests, so there is nothing new to host.</p>
+    </article>
   </div>
-  <p class="sub">Then run <code>diagram</code> in a repository: it opens the editor in your browser and saves to the file as you work. AI features use the CLI of a subscription you already have (Claude Code, Codex or Gemini CLI) — no API keys.</p>
+</section>
+
+<section id="how" class="how">
+  <h2>How it works</h2>
+  <ol class="steps">
+    <li>
+      <span class="n">1</span>
+      <h3>Dump it</h3>
+      <p>Write, paste or drop in what you have: notes, a list, interview quotes, a screenshot. No structure needed.</p>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <h3>Shape it</h3>
+      <p>The AI sorts it into the right blocks: findings into a mindmap, dates onto a timeline, work onto the kanban, an outage into a post-mortem. You see each change before you keep it.</p>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <h3>Share it</h3>
+      <p>Open the board through the eyes of leadership, legal or design. Present it as slides. Or copy it as a prompt and hand it to Claude, ChatGPT or your coding agent to build.</p>
+    </li>
+  </ol>
+</section>
+
+<section id="wireframes" class="wireframes">
+  <div class="wire-head">
+    <h2>Wireframes and flows, in minutes</h2>
+    <p class="sub">Sketch the product before anyone opens a design tool. Pick a phone, a tablet or a browser window, click components in, and draw the flow with an arrow from a button to the screen it opens. It sits on the same board as the plan, the data model and the decisions it depends on.</p>
+  </div>
+  <figure class="shot wide"><img src="tour/flow.svg" alt="A sign-up flow: two phone screens leading to a web dashboard" loading="lazy"><figcaption>Sign up, welcome, dashboard: three screens and the flow between them, in about 30 lines.</figcaption></figure>
+  <div class="grid">
+    <article>
+      <div class="ico">▭</div>
+      <h3>40 components</h3>
+      <p>Headers, navbars, sidebars and tab bars; fields, selects, toggles and sliders; buttons, lists, tables, cards, tabs, steppers, maps, charts, alerts and more. Select a screen and click them in, or pick one from the full list.</p>
+    </article>
+    <article>
+      <div class="ico">→</div>
+      <h3>Flows, not just screens</h3>
+      <p>Every button and link is its own element. Drag from one to another screen to draw where it goes; drop it on empty space and the next screen appears beside it. <i>Screen flow</i> starts you with three linked screens.</p>
+    </article>
+    <article>
+      <div class="ico">✎</div>
+      <h3>Write it, or let the AI</h3>
+      <p>A screen is a few lines of text: <code>button submit: Sign in [blue]</code>. Edit it as text, review it in a pull request, or tell the AI “a sign-up flow with Google” and it draws the screens.</p>
+    </article>
+    <article>
+      <div class="ico">⌘</div>
+      <h3>From sketch to build</h3>
+      <p>Copy the screens as a prompt and each comes out as a list of its components, with the flow between them. That is a spec a coding agent can build.</p>
+    </article>
+  </div>
+</section>
+
+<section id="prompts" class="split reverse">
+<pre class="code"><span class="c"># ⌘⇧C: the board, as a spec to build from</span>
+# Build: Checkout relaunch
+
+The board below describes what to build…
+
+## The new checkout, screen by screen
+
+### Pay (wireframe screen, mobile: its components top to bottom)
+- header: Payment
+- stepper: Cart | Pay | Done
+- card: Visa •••• 4242 — Saved card
+- toggle: Save this card
+- button: Pay £42.00 (blue)
+
+### Connections
+- Checkout → Pay: checkout
+- Pay £42.00 → Order placed: pays
+
+## Data &amp; flows
+### Saved cards (database table `cards`)
+| column | type | key | references |
+|---|---|---|---|
+| id | uuid | PK | |
+| customer_id | uuid | | customers |
+
+## Comments
+- On Payments: Should payments own its own database?</pre>
+  <div>
+    <h2>Draw the spec. Let the AI build it.</h2>
+    <p>For a complex build, the best prompt is a picture of it. Lay out the system, the screens, the data model and the decisions on a board, then press <kbd>⌘⇧C</kbd>. Shape writes the whole thing up as a clean Markdown spec, with every part, every arrow and every open question, ready to paste into Claude, ChatGPT, Cursor or your coding agent.</p>
+    <ul class="checks">
+      <li>The <b>whole board</b>, canvases included, or just the part you select</li>
+      <li>Screens come out as their components, data models as tables with keys, flows and dependencies as arrows</li>
+      <li><b>Prompt mindmaps</b>: branch a task into Context, Constraints, Steps and Acceptance, and copy it as a task spec</li>
+      <li>Open comments become the questions the model should ask, not guess</li>
+      <li>From the terminal: <code>diagram prompt plan.diagram --target build</code></li>
+    </ul>
+  </div>
+</section>
+
+<section id="audiences" class="split">
+  <div>
+    <h2>One board, every audience</h2>
+    <p>The same board tells the story differently to different people. Nobody keeps a separate copy for the board meeting.</p>
+    <ul class="checks">
+      <li><b>Perspectives</b>: Senior management sees decisions, risks and the timeline. Legal sees the records. Design sees the screens and the user journey. Each view is one click away, and the AI tags the board for them.</li>
+      <li><b>Presentation mode</b>: pick the sections, add speaker notes, and present. The view glides across the board from slide to slide, with no deck to keep in sync.</li>
+      <li><b>Wireframes</b>: sketch phone and web screens as text and draw the flow with arrows from the buttons.</li>
+      <li><b>Comments with names</b> on any box or arrow, and a full history to go back to.</li>
+    </ul>
+  </div>
+  <figure class="shot"><img src="tour/timeline.svg" alt="A timeline with the important moments starred" loading="lazy"><figcaption>What leadership opens: where we are, and the moments that mattered.</figcaption></figure>
 </section>
 
 <section id="features" class="features">
-  <h2>Every block a project needs, on one board</h2>
-  <p class="sub">Each picture below is a few lines of the diagram language, drawn by diagram itself. Put any of them next to the others — and click into the <a href="examples/">example board</a> to see them all together.</p>
+  <h2>Every block a project needs</h2>
+  <p class="sub">Each picture is a few lines of text, drawn by Shape itself. Put them next to each other, or look at the <a href="examples/">example board</a> that uses them all.</p>
   <div class="tour">
-    <figure><div class="pic"><img src="tour/mindmap.svg" alt="A prompt written as a mindmap" loading="lazy"></div><figcaption><h3>Mindmaps — and prompts as mindmaps</h3><p>Type a map with <kbd>Tab</kbd> and <kbd>Enter</kbd>. Branch it into Context, Constraints, Steps and Acceptance and “Copy as prompt” hands your coding agent a Markdown spec.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/kanban.svg" alt="A kanban board" loading="lazy"></div><figcaption><h3>Kanban</h3><p>Columns of cards with owners and colours. Drag a card to another column or place; the file says <code>kanban</code>, <code>column</code>, and the cards in order.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/gantt.svg" alt="A gantt chart with a forecast" loading="lazy"></div><figcaption><h3>Gantt charts that forecast</h3><p>Durations, dependencies, milestones and progress. As of today, unfinished work pushes everything after it — slips show in red, across charts.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/sequence.svg" alt="A sequence diagram" loading="lazy"></div><figcaption><h3>Sequence diagrams</h3><p>Participants with lifelines, messages in the order you write them, dashed replies, messages to self. Reorder with a right-click.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/er.svg" alt="An ER diagram with crow's feet" loading="lazy"></div><figcaption><h3>ER diagrams</h3><p>Tables with types and keys; foreign keys in crow's-foot notation worked out from the columns, with named relationships. <code>diff</code> reviews a schema change column by column.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/canvases.svg" alt="Links to boards inside the board" loading="lazy"></div><figcaption><h3>Boards inside boards</h3><p>A button, a card or a text link opens a whole board inside this one — nested as deep as you like, all in one file. Deleting the link asks before it takes the board with it.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/lanes.svg" alt="Swimlanes" loading="lazy"></div><figcaption><h3>Swimlanes</h3><p>Who does each step: the flow runs across the lanes and lines up step by step. Drop a box into a lane to move it there.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/risks.svg" alt="A risk matrix" loading="lazy"></div><figcaption><h3>Risk matrix</h3><p>Risks by probability and impact, worst first, with owners. Drag a dot to another cell to re-rate it.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/adr.svg" alt="Decision records" loading="lazy"></div><figcaption><h3>Decision records</h3><p>Context, options, decision and consequences, with a status — proposed, accepted, superseded — and arrows between decisions.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/charts.svg" alt="A line chart and a donut chart" loading="lazy"></div><figcaption><h3>Charts</h3><p>Bars, stacked and horizontal bars, lines, areas, pie, donut and scatter — from a small table you can edit as text.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/mindmap.svg" alt="A prompt written as a mindmap" loading="lazy"></div><figcaption><h3>Mindmaps, and prompts as mindmaps</h3><p>Type a map with <kbd>Tab</kbd> and <kbd>Enter</kbd>. Branch it into Context, Constraints, Steps and Acceptance, and “Copy as prompt” gives your coding agent a spec.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/wireframes.svg" alt="Wireframe screens" loading="lazy"></div><figcaption><h3>Wireframes</h3><p>Phone, tablet and web screens from about 40 components: fields, buttons, lists, tabs, tab bars, maps and more. Arrows from a button make the flow.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/timeline.svg" alt="A timeline with important events starred" loading="lazy"></div><figcaption><h3>Timelines</h3><p>What happened when, with the moments that mattered starred. Write dates the way people say them: “Oct 2026”, “Q4”, “7–14 May”.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/kanban.svg" alt="A kanban board" loading="lazy"></div><figcaption><h3>Kanban</h3><p>Columns of cards with owners and colours. Drag a card to move it; the file just lists the cards in order.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/gantt.svg" alt="A gantt chart with a forecast" loading="lazy"></div><figcaption><h3>Gantt charts that forecast</h3><p>Durations, dependencies, milestones and progress. Unfinished work pushes everything after it, and slips show in red.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/cycle.svg" alt="A cycle of four steps" loading="lazy"></div><figcaption><h3>Cycles</h3><p>Loops that come round again: build–measure–learn, a release train, a review cycle.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/adr.svg" alt="Decision records" loading="lazy"></div><figcaption><h3>Decision records</h3><p>Context, options, decision and consequences, with a status, so “why did we do this?” has an answer.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/risks.svg" alt="A risk matrix" loading="lazy"></div><figcaption><h3>Risk matrix</h3><p>Risks by probability and impact, worst first, with owners. Drag a dot to re-rate it.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/canvases.svg" alt="Links to boards inside the board" loading="lazy"></div><figcaption><h3>Boards inside boards</h3><p>A button opens a whole board inside this one, nested as deep as you like, all in one file.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/sequence.svg" alt="A sequence diagram" loading="lazy"></div><figcaption><h3>Sequence diagrams</h3><p>Who talks to whom, in order, with replies and self-calls.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/er.svg" alt="An ER diagram with crow's feet" loading="lazy"></div><figcaption><h3>Database tables</h3><p>Tables, types and keys, with relationships worked out from the columns. A schema change reviews column by column.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/lanes.svg" alt="Swimlanes" loading="lazy"></div><figcaption><h3>Swimlanes</h3><p>Who does each step: the flow runs across the lanes and lines up step by step.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/charts.svg" alt="A line chart and a donut chart" loading="lazy"></div><figcaption><h3>Charts</h3><p>Bars, lines, areas, pie, donut and scatter, from a small table you edit as text.</p></figcaption></figure>
     <figure><div class="pic"><img src="tour/table.svg" alt="A table" loading="lazy"></div><figcaption><h3>Tables</h3><p>RACI charts, options and trade-offs: rows you can point arrows and comments at.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/images.svg" alt="A pasted screenshot with sticky notes" loading="lazy"></div><figcaption><h3>Images</h3><p>Paste a screenshot or drop a file. It lives in the board as base64 at the end of the file — never in a prompt.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/comments.svg" alt="Review comments on a diagram" loading="lazy"></div><figcaption><h3>Review threads</h3><p>Comment on any box, arrow or spot, reply, resolve. Open threads become a task for your agent with one click.</p></figcaption></figure>
-    <figure><div class="pic"><img src="tour/themes.svg" alt="The blueprint theme" loading="lazy"></div><figcaption><h3>Themes, light and dark</h3><p>Paper, blueprint, midnight, contrast — or your own <code>theme</code> block, shared across boards as a file.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/comments.svg" alt="Review comments on a board" loading="lazy"></div><figcaption><h3>Comments</h3><p>Comment on any box, arrow or spot, reply and resolve. The AI acts on open comments when it rethinks the board.</p></figcaption></figure>
+    <figure><div class="pic"><img src="tour/themes.svg" alt="The blueprint theme" loading="lazy"></div><figcaption><h3>Themes, light and dark</h3><p>Paper, blueprint, midnight, contrast, or your team's own colours, shared across boards.</p></figcaption></figure>
   </div>
 </section>
 
 <section id="ai" class="split">
   <div>
-    <h2>AI on the subscription you already have</h2>
-    <p>No API keys, no new bill. diagram talks to the CLI you are already signed into — Claude Code, Codex or Gemini — and models read a few lines of outline or ops, never coordinates.</p>
+    <h2>AI on the plan you already pay for</h2>
+    <p>No API keys and no new bill. Shape uses the command-line tool of the subscription you are already signed into: Claude Code, Codex or Gemini. Without one, it hands you the prompt to paste into any chat.</p>
     <ul class="checks">
-      <li><b>Add what you know</b> (<kbd>⌘K</kbd>) — write down details or information; the AI puts each where it belongs, tried, retried on errors, and shown as a diff before you keep it</li>
-      <li><b>Ask</b> — a question about the board, answered with a diagram drawn for it on a temporary canvas, every piece linked back; save it, or rethink the board from it</li>
-      <li><b>Rethink</b> — one click acts on the open comments and brings the whole board up to date; in git, what changed on the branch counts as new information too</li>
-      <li><b>Comments → prompts</b> — open review threads become a task for your coding agent</li>
-      <li><b>Grow a mindmap</b> — ✦ on a topic asks for its next branches</li>
-      <li><b>Settle a merge</b> — say “their colours, my labels” and the AI picks the sides</li>
+      <li><b>Add what you know</b> (<kbd>⌘K</kbd>): write down details and the AI puts them in the right place, shown as a change you can keep or discard</li>
+      <li><b>Ask</b>: a question about the board, answered with a small diagram drawn for it, each piece linked back to its source</li>
+      <li><b>Rethink</b>: acts on the open comments, merges duplicates, updates what changed and keeps every perspective filled</li>
+      <li><b>Recipes</b>: an outage becomes a post-mortem, a status update becomes a traffic light, a sprint becomes a burndown</li>
+      <li><b>Draft the slides</b>: tell it who the presentation is for and it picks the order, the titles and the speaker notes</li>
+      <li><b>Comments → prompts</b>: open threads become a task for your coding agent</li>
     </ul>
   </div>
-  <figure class="shot"><img src="tour/ask.svg" alt="What the AI added: a cache and webhook retries, in green; the arrow it replaced, in red" loading="lazy"><figcaption>“Add a read-through cache and retry failed webhooks” — the change, before you keep it.</figcaption></figure>
+  <figure class="shot ai-demo">
+    <div class="ai-ask"><span class="ai-you">You</span>Add a read-through cache and retry failed webhooks</div>
+    <img src="tour/ask.svg" alt="The board after the request: a Redis cache and webhook retries added in green, the direct write to Postgres it replaced in red" loading="lazy">
+    <div class="ai-bar"><span class="ai-spark">✦</span><span class="ai-note">Put Redis in front of Postgres and retry webhooks on failure. 5 added, 1 removed.</span><span class="ai-keep">Keep</span><span class="ai-discard">Discard</span></div>
+    <figcaption>What you asked, and what the AI changed on the board: added in green, removed in red. Nothing changes until you keep it.</figcaption>
+  </figure>
 </section>
 
 <section id="git" class="split reverse">
   <figure class="shot"><img src="merge.png" alt="The merge view: yours, the result and theirs side by side" loading="lazy"><figcaption>Two people changed the same box: pick a side, or say what to keep.</figcaption></figure>
   <div>
     <h2>Git is the database</h2>
-    <p>A board is one text file. Collaboration is commits and pull requests — and diagram makes them pleasant.</p>
+    <p>A board is one text file. Your team already knows how to share it: commit, branch, open a pull request.</p>
     <ul class="checks">
-      <li>Edits rewrite only the lines that changed; your formatting and notes stay</li>
-      <li><code>--base main</code> draws what a branch changed: green, red, amber</li>
-      <li><code>diagram merge --install</code> merges boards element by element — most conflicts never happen</li>
-      <li>Real clashes open side by side in the editor; save marks them resolved</li>
-      <li>Links between boards: <code>link: plans/q3.diagram#launch</code></li>
+      <li>Edits rewrite only the lines that changed; your notes and formatting stay</li>
+      <li>See what a branch changed, in green, red and amber</li>
+      <li>Boards merge element by element, so most conflicts never happen</li>
+      <li>Every version is one click away; restore any of them (outside git too)</li>
+      <li>Link boards to each other: <code>link: plans/q3.diagram#launch</code></li>
     </ul>
   </div>
 </section>
 
 <section class="split">
   <div>
-    <h2>A small language, made to diff</h2>
-    <p>One statement per line. Write it by hand, draw it in the editor, or let an agent edit it with ops — the file stays as you wrote it, and a pull request shows exactly what changed.</p>
+    <h2>Plain text you can read</h2>
+    <p>One statement per line. Write it by hand, draw it in the editor, or let an agent change it with a few small edits. A pull request shows exactly what changed.</p>
     <ul class="checks">
-      <li>Blocks are written as blocks: <code>kanban</code>, <code>gantt</code>, <code>sequence</code>, <code>entity</code>, <code>adr</code>, <code>mindmap</code>…</li>
-      <li>Review threads live in the file: <code>comment on api by ana: …</code></li>
-      <li>Light and dark themes, presets or your own <code>theme</code> block</li>
+      <li>Blocks are written as blocks: <code>kanban</code>, <code>timeline</code>, <code>screen</code>, <code>gantt</code>, <code>adr</code>, <code>mindmap</code>…</li>
+      <li>Comments and the presentation live in the file too</li>
+      <li>Models read short outlines and small edits, never coordinates, so AI calls stay cheap</li>
     </ul>
   </div>
 <pre class="code"><span class="c"># docs/launch.diagram</span>
@@ -166,15 +271,15 @@ kanban sprint: Sprint 12 {
   }
 }
 
-gantt launch: Launch plan [start: 2026-10-12] {
-  Design [5d, done]
-  Build [2w, after: design, done: 40%]
-  Launch day [after: build, milestone]
+screen pay: Pay [mobile] {
+  header: Payment
+  card saved: Visa •••• 4242
+  button pay-now: Pay £42.00 [blue]
 }
 
-entity cards: Saved cards {
-  id:          uuid [pk]
-  customer_id: uuid [fk: customers, rel: owned by]
+timeline launch: Launch {
+  2026-10-28: Open beta [important]
+  2026-11-26: Launch
 }
 
 comment on onepage by mia: Behind a flag?</pre>
@@ -183,8 +288,6 @@ comment on onepage by mia: Behind a flag?</pre>
 <section id="agents" class="split reverse">
 <pre class="code"><span class="c"># in your terminal</span>
 <span class="p">$</span> diagram ask docs/launch.diagram "split Build into API and UI"
-<span class="c"># your Claude Code / Codex / Gemini CLI answers with a few ops;
-# a reply that does not apply goes back with its error</span>
 
 <span class="c"># comments → a task for your coding agent</span>
 <span class="p">$</span> diagram prompt docs/launch.diagram --target code
@@ -192,25 +295,17 @@ comment on onepage by mia: Behind a flag?</pre>
 <span class="c"># let an agent read a few lines, not the whole board</span>
 <span class="p">$</span> diagram query docs/launch.diagram kind:kanban near:onepage</pre>
   <div>
-    <h2>Made for AI agents</h2>
-    <p>Install the bundled skills and your coding agent knows how to read, draw and grow boards with few tokens: indented outlines for mindmaps, a handful of ops for edits.</p>
+    <h2>Made for coding agents too</h2>
+    <p>Install the bundled skills and Claude Code (or any agent) can read, draw and grow boards with few tokens.</p>
 <pre class="code small">diagram skills install          <span class="c"># ./.claude/skills</span>
 diagram skills install --global <span class="c"># ~/.claude/skills</span></pre>
-    <ul class="checks">
-      <li><b>diagram ask</b> — change a board in words, on your AI subscription</li>
-      <li><b>diagram prompt</b> — open comments become a task for an agent</li>
-      <li><b>diagram outline --md</b> — a mindmap as a Markdown prompt</li>
-      <li><b>diagram brief / query</b> — just the part of a board an agent needs</li>
-      <li><b>diagram merge</b> — boards merged element by element in git</li>
-    </ul>
   </div>
 </section>
 
 <section id="embed" class="split">
   <div>
-    <h2>Embed boards anywhere</h2>
-    <p>One script tag gives any HTML page a board — read-only or the full editor. Everything renders in the browser; nothing is uploaded.</p>
-    <p><a class="btn" href="examples/">See the example board →</a></p>
+    <h2>Embed a board anywhere</h2>
+    <p>One script tag puts a board in any page, read-only or with the full editor. It all runs in the browser; nothing is uploaded.</p>
   </div>
 <pre class="code">&lt;script src="diagram.embed.js"&gt;&lt;/script&gt;
 
@@ -221,12 +316,42 @@ diagram skills install --global <span class="c"># ~/.claude/skills</span></pre>
   &lt;/script&gt;
 &lt;/div&gt;
 
-<span class="c">// or from JavaScript</span>
-const svg = await Diagram.render(src, { theme: "dark" });
-const editor = await Diagram.mount(el, { source: src, mode: "edit" });
-
 <span class="c">// or the npm package (Node and browsers)</span>
 import { init, Board } from "diagram";</pre>
+</section>
+
+<section id="install" class="install">
+  <h2>Get Shape</h2>
+  <p class="sub">Or just <a href="app/">try it in your browser</a> first, with nothing to install.</p>
+  <div class="install-grid">
+    <div>
+      <h3>Homebrew <span>macOS · Linux</span></h3>
+<pre class="code">brew install dobrinov/tap/diagram</pre>
+      <p class="sub">Later: <code>brew upgrade diagram</code>.</p>
+    </div>
+    <div>
+      <h3>Download <span>macOS · Linux · Windows</span></h3>
+      <p class="sub">Grab an archive from the <a href="{{REPO_URL}}/releases/latest">latest release</a> (Apple silicon and Intel, Linux x86_64 and arm64, Windows x86_64), unpack it and put <code>diagram</code> on your <code>PATH</code>.</p>
+    </div>
+    <div>
+      <h3>From source</h3>
+<pre class="code">git clone {{REPO_URL}} shape && cd shape
+make install</pre>
+      <p class="sub">Needs Rust with the <code>wasm32-unknown-unknown</code> target and <code>wasm-pack</code>.</p>
+    </div>
+  </div>
+  <p class="sub">Then run <code>diagram</code>: it asks where to save your first board and opens it in its own window. <code>diagram install-app</code> makes <code>.diagram</code> files open with a double-click.</p>
+</section>
+
+<section id="faq" class="faq">
+  <h2>Questions</h2>
+  <details><summary>Is it free?</summary><p>Yes. Shape is open source under the MIT licence, with no paid tier.</p></details>
+  <details><summary>Do I need an API key?</summary><p>No. Shape uses the command-line tool of an AI subscription you already have (Claude Code, Codex or Gemini CLI), signed in as you. If you have none, the ✦ button explains how to set one up, and meanwhile shows the prompt to paste into any chat.</p></details>
+  <details><summary>Where does my data go?</summary><p>Nowhere new. A board is a file on your disk, the editor runs on your machine, and AI requests go through your own AI tool. The site's playground runs entirely in your browser.</p></details>
+  <details><summary>How does my team work on the same board?</summary><p>Through git: commit the file, branch, open a pull request. Shape shows what a branch changed, merges boards element by element, and signs comments with your name. Outside git, it keeps versions you can go back to.</p></details>
+  <details><summary>Can I use it to write prompts for an LLM?</summary><p>Yes, that is one of the best uses. Draw what you want built (the parts, the screens, the data, the rules), then copy the whole board or a selection as a prompt (<kbd>⌘⇧C</kbd>). It is plain Markdown, so it works with any model or coding agent, and the board stays the source you refine between attempts.</p></details>
+  <details><summary>Does it replace Jira, Miro or PowerPoint?</summary><p>For the thinking, planning and explaining part of a project, often yes: it is one board instead of several. It does not try to be a ticket tracker with workflows and permissions.</p></details>
+  <details><summary>Why is the command called <code>diagram</code>?</summary><p>That was the project's first name. The command and the <code>.diagram</code> files stay as they are, so nothing breaks.</p></details>
 </section>
 
 <section id="changelog" class="changelog">
@@ -237,8 +362,14 @@ import { init, Board } from "diagram";</pre>
   </div>
 </section>
 
+<section class="closing">
+  <h2>Your next kick-off, on one board.</h2>
+  <p class="sub">Open the playground, paste the notes from your last meeting and press ✦.</p>
+  <a class="btn primary" href="app/">Try Shape now</a>
+</section>
+
 <footer>
-  <span>diagram · MIT</span>
+  <span>Shape · MIT</span>
   <a href="app/">Playground</a><a href="examples/">Example</a><a href="{{REPO_URL}}/blob/main/crates/core/LANGUAGE.md">Language</a><a href="#changelog">Changelog</a><a href="{{REPO_URL}}">Source</a><a href="https://dobrinov.github.io/products/">More products</a>
 </footer>
 

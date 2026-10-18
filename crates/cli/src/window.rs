@@ -49,14 +49,14 @@ pub fn board_name(file: &Path) -> String {
         .unwrap_or_else(|| file.display().to_string())
 }
 
-/// The window title for the page's title (`plan.diagram — diagram`).
+/// The window title for the page's title (`plan.diagram — Shape`).
 #[cfg_attr(not(feature = "window"), allow(dead_code))]
 pub fn title(page: &str) -> String {
-    let name = page.trim().trim_end_matches("— diagram").trim();
-    if name.is_empty() || name == "diagram" {
-        "diagram".into()
+    let name = page.trim().trim_end_matches("— Shape").trim();
+    if name.is_empty() || name == "Shape" {
+        "Shape".into()
     } else {
-        format!("diagram — {name}")
+        format!("{name} — Shape")
     }
 }
 
@@ -182,7 +182,7 @@ mod native {
             rfd::FileDialog::new()
                 .set_title("New board")
                 .set_file_name("Untitled.diagram")
-                .add_filter("diagram", &["diagram"])
+                .add_filter("Shape board", &["diagram"])
                 .set_directory(dir)
                 .save_file()
                 .map(super::with_extension)
@@ -323,12 +323,12 @@ mod native {
 
         pub fn menu(proxy: EventLoopProxy<Ev>) -> Menu {
             let cmd = |key| Some(Accelerator::new(Modifiers::META, key));
-            let quit = MenuItem::with_id("quit", "Quit diagram", true, cmd(Code::KeyQ));
+            let quit = MenuItem::with_id("quit", "Quit Shape", true, cmd(Code::KeyQ));
             let close = MenuItem::with_id("close", "Close Window", true, cmd(Code::KeyW));
             let menu = Menu::new();
             let sep = P::separator;
             let app = Submenu::with_items(
-                "diagram",
+                "Shape",
                 true,
                 &[
                     &P::about(None, None),
@@ -395,9 +395,9 @@ mod tests {
 
     #[test]
     fn window_titles() {
-        assert_eq!(title("plan.diagram"), "diagram — plan.diagram");
-        assert_eq!(title("plan.diagram — diagram"), "diagram — plan.diagram");
-        assert_eq!(title("diagram"), "diagram");
-        assert_eq!(title(""), "diagram");
+        assert_eq!(title("plan.diagram"), "plan.diagram — Shape");
+        assert_eq!(title("plan.diagram — Shape"), "plan.diagram — Shape");
+        assert_eq!(title("Shape"), "Shape");
+        assert_eq!(title(""), "Shape");
     }
 }

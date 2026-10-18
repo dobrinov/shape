@@ -26,6 +26,12 @@ try {
     await p.goto(`http://127.0.0.1:${port}/`); await p.waitForSelector(".dge-canvas svg"); await sleep(400);
     // a product board asks for a perspective first
     await p.locator(".dge-persp-card", { hasText: "Everyone" }).click(); await sleep(200);
+    // nothing selected: ⌘⇧C copies the whole board as a prompt to build it
+    await p.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: `http://127.0.0.1:${port}` });
+    await p.locator(".dge-canvas").click({ position: { x: 20, y: 300 } });
+    await p.keyboard.press(process.platform === "darwin" ? "Meta+Shift+C" : "Control+Shift+C"); await sleep(300);
+    const copied = await p.evaluate(() => navigator.clipboard.readText());
+    assert.match(copied, /^# Build: Prompts\n[\s\S]*Orders API[\s\S]*why Rust\?/);
     await p.locator('[data-act="board"]').click(); await p.locator('[data-act="prompts"]').click(); await sleep(400);
     const t = await p.locator('textarea[aria-label="Prompt"]').inputValue();
     assert.match(t, /^Today is \d{4}-\d\d-\d\d\./); assert.match(t, /why Rust/);

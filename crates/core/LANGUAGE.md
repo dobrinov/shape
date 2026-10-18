@@ -363,6 +363,11 @@ login.submit -> home: signs in
 - Items of a list, tabs, tab bar, navbar, sidebar, button row, radio, badges, stepper, breadcrumb and a table's columns go in the text, separated by `|`: `tabs: Home | Search | Me`.
 - In the editor: *Blocks → Phone screen / Web page*; right-click a screen to edit it as text, add a component or change the device. Drag from a component (connect, X) to another screen; dropped on empty canvas, it makes the next screen. Ops: `add_group` with `"screen": "mobile"`, `add_node` with `"group": "login", "widget": "button"`.
 
+### Boards as prompts
+
+- In the editor, ⌘⇧C copies the selection as Markdown for a prompt; with nothing selected it copies the whole board, every canvas in it, as a spec to build from (also on the empty board's right-click and under Share). `diagram prompt FILE --target build` prints the same.
+- The spec starts with what to do (build what the board describes; keep its names; ask where open comments leave it unclear), then each board's sections and blocks, the connections and the open comments. Screens list their components, database tables their columns and keys, gantt charts their forecast dates.
+
 ### Presentations
 
 ```diagram

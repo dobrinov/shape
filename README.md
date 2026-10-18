@@ -1,14 +1,16 @@
-<img src="web/favicon.svg" width="64" alt="diagram logo">
+<img src="web/favicon.svg" width="64" alt="Shape logo">
 
-# diagram
+# Shape
 
-A lightweight FigJam for engineers. You can write a diagram in a small, readable language or draw it in a browser editor. Colleagues comment on boxes and arrows, and one click turns those comments into a prompt that Claude Code, Codex or any other LLM can act on. The reply is applied to the diagram, and the comments are resolved.
+**From a messy idea to a plan everyone gets.** Shape is one board for the whole project: think in mindmaps, plan on kanban boards and timelines, sketch the screens, write down the decisions, then present it. The AI you already pay for (Claude, ChatGPT or Gemini) sorts what you throw at it, keeps the board up to date and answers questions with a drawing.
 
-It is written in Rust and compiled to WebAssembly, so a single engine drives the CLI, the browser editor, the embeddable JS library and the Rust crate.
+**It is also a way to write prompts.** For a complex build, the best prompt is a picture of it: lay out the system, the screens, the data model and the decisions, then copy the whole board (or a selection) as a Markdown spec with ⌘⇧C, or `diagram prompt FILE --target build`, and hand it to Claude, ChatGPT or your coding agent to build.
+
+A board is a plain text file in your repository, so it diffs, merges and reviews like code. There is no account, no server and no new bill. The command is `diagram` and boards are `.diagram` files; the engine is Rust compiled to WebAssembly, so the CLI, the editor, the embeddable library and the Rust crate share it.
 
 **[Try it in your browser](https://dobrinov.github.io/diagram/app/)** (no install needed) · [Website](https://dobrinov.github.io/diagram/) · [Examples](https://dobrinov.github.io/diagram/examples/) · [Language reference](crates/core/LANGUAGE.md)
 
-![The diagram editor: a mindmap, a kanban board, a sequence diagram and a decision record on one board](assets/screenshot.png)
+![The Shape editor: a mindmap, a kanban board, a sequence diagram and a decision record on one board](assets/screenshot.png)
 
 ```diagram
 title: Checkout
@@ -135,7 +137,7 @@ A plain `cargo install --path crates/cli` also works. Its `build.rs` runs wasm-p
 diagram install-app      # once; `diagram install-app --remove` undoes it
 ```
 
-After this, `.diagram` files get their own document icon, and double-clicking one opens it in the editor's window (opening Diagram.app itself starts a new board). Closing the window stops it; where it falls back to a browser tab, the server stops by itself a few minutes after you close the tab. On macOS this is a small Diagram.app in `~/Applications` (or `~/Library/Application Support/diagram`). On Linux it is a MIME type, an icon and a `.desktop` entry in `~/.local/share`. On Windows it is a file association for your user. Run it again after moving or reinstalling diagram.
+After this, `.diagram` files get their own document icon, and double-clicking one opens it in the editor's window (opening Shape.app itself starts a new board). Closing the window stops it; where it falls back to a browser tab, the server stops by itself a few minutes after you close the tab. On macOS this is a small Shape.app in `~/Applications` (or `~/Library/Application Support/diagram`). On Linux it is a MIME type, an icon and a `.desktop` entry in `~/.local/share`. On Windows it is a file association for your user. Run it again after moving or reinstalling diagram.
 
 **New versions:** once a day, the editor asks GitHub whether a newer release exists. If one does, the terminal says so (with `brew upgrade diagram` when Homebrew installed it), and a *New* badge in the top bar links to the release notes. Set `DIAGRAM_NO_UPDATE_CHECK=1` to turn this off; it is also off when `CI` is set.
 

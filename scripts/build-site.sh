@@ -47,7 +47,7 @@ subst "$ROOT/site/examples/index.html" "$OUT/examples/index.html"
 EX="$ROOT/examples/example.diagram"
 cp "$EX" "$OUT/examples/"
 "$BIN" svg "$EX" --comments none -o "$OUT/examples/board.svg" 2>/dev/null
-for c in discovery plan data metrics; do
+for c in discovery plan data metrics screens; do
   "$BIN" svg "$EX" --canvas "$c" --comments none -o "$OUT/examples/$c.svg" 2>/dev/null
 done
 
@@ -63,7 +63,7 @@ src, dst, static = sys.argv[1:4]
 html = open(src).read()
 marker = '<script src="pkg/diagram_wasm.js"></script>'
 assert marker in html, "web/index.html lost its wasm <script>"
-html = html.replace(marker, static + "\n" + marker).replace("<title>diagram</title>", "<title>Playground — diagram</title>")
+html = html.replace(marker, static + "\n" + marker).replace("<title>Shape</title>", "<title>Playground — Shape</title>")
 open(dst, "w").write(html)
 PY
 

@@ -1160,6 +1160,16 @@ mod tests {
             s.apply(r#"{"op":"add_node","label":"x","group":"signup","widget":"blink"}"#)["ok"],
             false
         );
+        // renamed, a component keeps the screen's prefix
+        assert_eq!(
+            s.apply(r#"{"op":"rename","id":"signup.go","to":"create"}"#)["ok"],
+            true
+        );
+        assert!(s.doc.node("signup.create").is_some());
+        assert!(s
+            .source("dsl")
+            .unwrap()
+            .contains("  button create: Create account [blue]\n"));
         // edited as text: kept ids keep their arrows; new, gone and moved ones
         let mut s = crate::Session::new();
         s.set_source(LOGIN);

@@ -43,6 +43,30 @@ try {
   await until(/screen sign-in: Sign in \[mobile\] \{\n  header: Acme\n  title: Welcome back\n  input email: Email\n  password: Password\n  button submit: Sign in \[blue\]\n  link forgot: Forgot password\?\n\}/);
   assert.equal(await p.locator('.dg-node[data-id="sign-in.submit"]').count(), 1);
 
+  // the component bar: select a component, add a button after it, type its text
+  await p.locator('.dg-node[data-id="sign-in.password"]').click(); await sleep(200);
+  assert.ok(await p.locator(".dge-screenbar").isVisible());
+  await p.locator('.dge-screenbar [data-widget="button"]').click(); await sleep(300);
+  await p.keyboard.type("Show password"); await p.keyboard.press("Enter");
+  await until(/  password: Password\n  button show-password: Show password\n  button submit: Sign in \[blue\]/);
+  // ⌥↑ moves it up
+  await p.locator('.dg-node[data-id="sign-in.show-password"]').click(); await sleep(200);
+  await p.keyboard.press("Alt+ArrowUp");
+  await until(/  input email: Email\n  button show-password: Show password\n  password: Password/);
+  // every component from the menu
+  await p.locator('.dge-screenbar [data-act="widgets"]').click(); await sleep(200);
+  assert.ok((await p.locator(".dge-widgets [data-widget]").count()) >= 40);
+  await p.locator('.dge-widgets [data-widget="toggle"]').click(); await sleep(300);
+  await p.keyboard.press("Enter");
+  await until(/  button show-password: Show password\n  toggle: Setting\n/);
+  if (process.env.SHOTS) await p.screenshot({ path: join(process.env.SHOTS, "wire-bar.png") });
+  // back to the text the rest of the test expects
+  await p.locator('.dg-group[data-id="sign-in"]').first().click({ button: "right", position: { x: 30, y: 12 } });
+  await p.getByText("Edit as text…").click(); await sleep(200);
+  await p.locator(".dge-modal textarea").fill("header: Acme\ntitle: Welcome back\ninput email: Email\npassword: Password\nbutton submit: Sign in [blue]\nlink forgot: Forgot password?");
+  await p.locator(".dge-modal button.primary").click();
+  await until(/password: Password\n  button submit/);
+
   // a web page, and a flow from the button to it
   await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="page"]').click(); await sleep(300);
   await p.keyboard.type("Home"); await p.keyboard.press("Enter");
@@ -71,6 +95,10 @@ try {
     await p.locator('button[title="Light / dark"]').click(); await sleep(300);
     await p.screenshot({ path: join(process.env.SHOTS, "wire-dark.png") });
   }
+  // a ready-made flow: three screens, linked
+  await p.keyboard.press("Escape");
+  await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="flow"]').click(); await sleep(600);
+  await until(/screen home-2: Home \[mobile\][\s\S]*sign-in-2\.go -> home-2: signs in\nhome-2\.items -> detail: opens/);
   assert.deepEqual(errors, []);
   await browser.close();
   console.log("wireframes: ok");

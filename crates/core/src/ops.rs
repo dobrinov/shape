@@ -1356,6 +1356,15 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             if id == to {
                 return Ok(());
             }
+            // a screen's component keeps the screen's prefix (`login.submit`)
+            let prefix = doc
+                .node(id)
+                .and_then(|n| crate::screen::screen_of(doc, n))
+                .map(|g| format!("{}.", g.id));
+            if let Some(p) = prefix.filter(|p| !to.starts_with(p.as_str())) {
+                let to = format!("{p}{to}");
+                return apply_op(doc, &Op::Rename { id: id.clone(), to }, created);
+            }
             if !crate::dsl::is_ident(to) {
                 return Err(format!(
                     "`{to}` is not a valid id (letters, digits, _, - and .)"

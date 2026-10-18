@@ -780,6 +780,75 @@ pub fn selection(doc: &Document, ids: &[String]) -> String {
     out
 }
 
+/// The whole board (`root`, every canvas in it) as a prompt to build what
+/// it describes: each board's blocks in Markdown, the arrows between them,
+/// the open comments as open questions, and what to do with it. Gantt
+/// forecasts are as of `today` (days since 1970) when given.
+pub fn build(root: &Document, today: Option<i64>) -> String {
+    let title = root.title.as_deref().unwrap_or("this board");
+    let mut s = format!("# Build: {title}\n\n");
+    if let Some(d) = &root.description {
+        s.push_str(&format!("{d}\n\n"));
+    }
+    s.push_str("The board below describes what to build: the parts, how they connect, the decisions taken and the screens and flows people go through. Read all of it first, then build it. Keep the names it uses. Open comments are questions still open: where they or anything else leave it unclear, ask before you guess.\n\n");
+    for (path, doc) in canvases_of(root) {
+        // every top-level item: sections, blocks, mindmaps and loose boxes
+        let mut top: Vec<String> = doc
+            .groups
+            .iter()
+            .filter(|g| g.parent.is_none())
+            .map(|g| g.id.clone())
+            .collect();
+        top.extend(
+            doc.nodes
+                .iter()
+                .filter(|n| n.group.is_none() && n.parent.is_none())
+                .map(|n| n.id.clone()),
+        );
+        if top.is_empty() {
+            continue;
+        }
+        if !path.is_empty() {
+            let name = canvas_at(root, &path)
+                .map(|c| c.display().to_string())
+                .unwrap_or_else(|| path.join("/"));
+            s.push_str(&format!("## {name}\n\n"));
+        }
+        let md = with_today(today, || selection_core(doc, &top, false));
+        // its own title is the heading above; inside a canvas, its sections
+        // go one level down
+        // (a lone block's title is its own: kept, as a section)
+        let body = match md.strip_prefix("# ").and_then(|r| r.split_once('\n')) {
+            Some((head, rest))
+                if doc.title.as_deref().is_none_or(|t| t == head.trim()) || top.len() > 1 =>
+            {
+                rest.to_string()
+            }
+            Some((head, rest)) => format!("## {head}\n{rest}"),
+            None => md.clone(),
+        };
+        for line in body.trim().lines() {
+            if !path.is_empty() && line.starts_with('#') {
+                s.push('#');
+            }
+            s.push_str(line);
+            s.push('\n');
+        }
+        s.push('\n');
+    }
+    s
+}
+
+/// The canvas at `path` (ids from the top board).
+fn canvas_at<'a>(root: &'a Document, path: &[String]) -> Option<&'a crate::model::Canvas> {
+    let (last, outer) = path.split_last()?;
+    let mut doc = root;
+    for id in outer {
+        doc = &doc.canvas(id)?.doc;
+    }
+    doc.canvas(last)
+}
+
 /// How many linked blocks one prompt pulls in, at most.
 const MAX_LINKED: usize = 8;
 
@@ -1149,6 +1218,29 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
             chart_table(doc, g, out, seen);
         } else if g.table {
             data_table(doc, g, out, seen);
+        } else if g.screen.is_some() {
+            // a wireframe: each component with what it is, top to bottom
+            for x in doc
+                .nodes
+                .iter()
+                .filter(|n| n.group.as_deref() == Some(g.id.as_str()))
+            {
+                seen.push(x.id.clone());
+                let kind = x.widget.unwrap_or_default().as_str();
+                let mut line = format!("- {kind}");
+                if !x.label.is_empty() {
+                    line.push_str(&format!(": {}", x.label.replace('\n', " ")));
+                }
+                if let Some(c) = &x.color {
+                    line.push_str(&format!(" ({c})"));
+                }
+                if let Some(d) = &x.detail {
+                    line.push_str(&format!(" — {}", d.replace('\n', " ")));
+                }
+                line.push_str(&format!(" `{}`", x.id));
+                out.push_str(&line);
+                out.push('\n');
+            }
         } else if g.timeline {
             // in time order, important ones marked
             let mut list = crate::timeline::events_of(doc, &g.id);
@@ -1549,6 +1641,31 @@ fn item(doc: &Document, n: &Node) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_whole_board_as_a_prompt_to_build_it() {
+        let d = crate::dsl::parse("title: Shop\ndescription: A small shop\n\ngroup api: API {\n  orders: Orders [detail: Rust]\n}\nweb: Storefront\nweb -> orders: POST\ncomment on orders: Which database?\npay: Pay [canvas: pay]\n\ncanvas pay: Payments {\n  screen card: Card [mobile] {\n    input number: Card number\n    button go: Pay [blue]\n  }\n}\n").unwrap();
+        let p = build(&d, None);
+        assert!(
+            p.starts_with(
+                "# Build: Shop\n\nA small shop\n\nThe board below describes what to build"
+            ),
+            "{p}"
+        );
+        assert!(p.contains("## API\n\n- Orders — Rust"), "{p}");
+        assert!(p.contains("- Storefront → Orders: POST"), "{p}");
+        assert!(p.contains("Which database?"), "{p}");
+        // a canvas under its own heading, its blocks one level down; screens by component
+        assert!(
+            p.contains("## Payments\n\n### Card (wireframe screen, mobile"),
+            "{p}"
+        );
+        assert!(
+            p.contains("- input: Card number `card.number`\n- button: Pay (blue) `card.go`"),
+            "{p}"
+        );
+        assert_eq!(p.matches("# Shop").count(), 0, "no repeated title");
+    }
+
     use super::*;
 
     fn doc() -> Document {

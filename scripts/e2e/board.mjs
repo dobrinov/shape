@@ -55,7 +55,9 @@ try {
   assert.equal(await p.locator(".dge-find").count(), 0);
 
   // Present: one section at a time, toolbars hidden; Esc ends
-  await p.locator('button[title^="Present"]').click(); await sleep(300);
+  // (the bar's button opens presentation mode; ▶ Present plays the sections)
+  await p.locator('[data-act="deck"]').click(); await sleep(300);
+  await p.locator('[data-act="play"]').click(); await sleep(300);
   assert.match(await p.locator(".dge-present-bar span").textContent(), /^1 \/ 3 · /);
   assert.equal(await p.locator(".dge-toolbar").isVisible(), false);
   await p.keyboard.press("ArrowRight"); await sleep(200);

@@ -117,7 +117,7 @@
       lastSaved = f.source;
       fileEl.textContent = f.path;
       fileEl.title = f.path;
-      document.title = f.name + " — diagram";
+      document.title = f.name + " — Shape";
       mount(wasm, f.source, {
         themeFiles: f.themes || {},
         author: f.author || undefined,

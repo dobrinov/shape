@@ -1,7 +1,7 @@
 //! `diagram install-app`: make .diagram files the OS's own, with a document
 //! icon, opening in the editor on a double-click.
 //!
-//! - macOS: ~/Applications/Diagram.app, a small AppleScript app (Finder hands
+//! - macOS: ~/Applications/Shape.app, a small AppleScript app (Finder hands
 //!   files over as Apple Events, not arguments) that declares the .diagram
 //!   type and runs `diagram FILE --idle-exit`.
 //! - Linux: a MIME type, its icon and a .desktop entry under ~/.local/share.
@@ -104,7 +104,11 @@ fn macos(remove: bool) -> Result<(), String> {
         home.join("Applications"),
         home.join("Library/Application Support/diagram"),
     ];
-    for old in places.iter().map(|d| d.join("Diagram.app")) {
+    // Shape.app, and Diagram.app from before the rename
+    for old in places
+        .iter()
+        .flat_map(|d| [d.join("Shape.app"), d.join("Diagram.app")])
+    {
         if old.exists() {
             let _ = Command::new(LSREGISTER).arg("-u").arg(&old).output();
             std::fs::remove_dir_all(&old).map_err(|e| format!("{}: {e}", old.display()))?;
@@ -120,7 +124,7 @@ fn macos(remove: bool) -> Result<(), String> {
         .iter()
         .find(|d| writable(d))
         .ok_or("cannot write to ~/Applications or ~/Library/Application Support")?
-        .join("Diagram.app");
+        .join("Shape.app");
     let bin = binary()?;
     // Finder starts apps with a bare PATH: keep this one, so the AI CLIs are found
     let path = std::env::var("PATH").unwrap_or_default();
@@ -183,7 +187,7 @@ end run
         "CFBundleIdentifier",
         "\"io.github.dobrinov.diagram\"".into(),
     )?;
-    set("CFBundleName", "\"Diagram\"".into())?;
+    set("CFBundleName", "\"Shape\"".into())?;
     // an app with an `open` handler is a "droplet" with its own icon: ours instead
     set("CFBundleIconFile", "\"applet\"".into())?;
     let _ = std::fs::remove_file(res.join("droplet.icns"));
@@ -194,13 +198,13 @@ end run
     set(
         "UTExportedTypeDeclarations",
         format!(
-            r#"[{{"UTTypeIdentifier":"{UTI}","UTTypeDescription":"diagram board","UTTypeConformsTo":["public.plain-text"],"UTTypeIconFile":"document.icns","UTTypeReferenceURL":"https://dobrinov.github.io/diagram/","UTTypeTagSpecification":{{"public.filename-extension":["diagram"]}}}}]"#
+            r#"[{{"UTTypeIdentifier":"{UTI}","UTTypeDescription":"Shape board","UTTypeConformsTo":["public.plain-text"],"UTTypeIconFile":"document.icns","UTTypeReferenceURL":"https://dobrinov.github.io/diagram/","UTTypeTagSpecification":{{"public.filename-extension":["diagram"]}}}}]"#
         ),
     )?;
     set(
         "CFBundleDocumentTypes",
         format!(
-            r#"[{{"CFBundleTypeName":"diagram board","CFBundleTypeRole":"Editor","LSHandlerRank":"Owner","LSItemContentTypes":["{UTI}"],"CFBundleTypeIconFile":"document.icns"}}]"#
+            r#"[{{"CFBundleTypeName":"Shape board","CFBundleTypeRole":"Editor","LSHandlerRank":"Owner","LSItemContentTypes":["{UTI}"],"CFBundleTypeIconFile":"document.icns"}}]"#
         ),
     )?;
     run(Command::new(LSREGISTER).arg("-f").arg(&app))?;
@@ -247,7 +251,7 @@ fn linux(remove: bool) -> Result<(), String> {
         write(
             &files[3],
             format!(
-                "[Desktop Entry]\nType=Application\nName=diagram\nComment=FigJam-style boards as plain text\nExec=\"{}\" %f --idle-exit\nIcon=diagram\nMimeType=application/x-diagram;\nTerminal=false\nCategories=Office;Graphics;\n",
+                "[Desktop Entry]\nType=Application\nName=Shape\nComment=One board for the whole project, with your AI\nExec=\"{}\" %f --idle-exit\nIcon=diagram\nMimeType=application/x-diagram;\nTerminal=false\nCategories=Office;Graphics;\n",
                 bin.display()
             ),
         )?;
@@ -325,7 +329,7 @@ fn windows(remove: bool) -> Result<(), String> {
         "diagram.board",
         "/f",
     ])?;
-    reg(&["add", &key, "/ve", "/d", "diagram board", "/f"])?;
+    reg(&["add", &key, "/ve", "/d", "Shape board", "/f"])?;
     reg(&[
         "add",
         &format!(r"{key}\DefaultIcon"),

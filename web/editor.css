@@ -483,3 +483,15 @@
 .dge-presenting .dge-deck, .dge-presenting .dge-deck-layer { display: none !important; }
 .dge .dge-deck-head button.primary { height: 30px; min-height: 0; padding: 0 12px; border: 0; border-radius: 6px; background: var(--accent); color: var(--accent-fg, #fff); font-weight: 600; }
 .dge .dge-deck input.dge-input { height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+/* wireframes: the bar to add components while a screen is selected */
+.dge-screenbar { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 2px; max-width: calc(100% - 32px); overflow-x: auto; padding: 4px; border: 1px solid var(--line-strong); border-radius: var(--r-3); background: var(--bg); box-shadow: var(--shadow-1); }
+.dge-screenbar[hidden] { display: none; }
+.dge .dge-screenbar button { height: 30px; min-height: 0; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--fg); font-size: 13px; white-space: nowrap; }
+.dge .dge-screenbar button:hover { background: var(--bg3); }
+.dge .dge-screenbar .dge-screenbar-more { color: var(--accent); font-weight: 600; }
+.dge-screenbar-label { padding: 0 6px 0 8px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.dge-widgets { bottom: 112px; }
+.dge-widgets-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; }
+.dge .dge-widgets-grid button { height: 32px; min-height: 0; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--fg); font-size: 13px; text-align: left; }
+.dge .dge-widgets-grid button:hover { background: var(--bg3); }
+.dge-presenting .dge-screenbar { display: none !important; }

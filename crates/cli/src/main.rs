@@ -20,7 +20,7 @@ use diagram_core::prompt::{PromptOptions, Reply, Target};
 use diagram_core::render::CommentMode;
 use diagram_core::{Document, RenderOptions};
 
-pub const HELP: &str = r#"diagram — lightweight diagrams as text, with review comments that become LLM prompts
+pub const HELP: &str = r#"Shape (the `diagram` command) — one board for the whole project, as text, with your AI
 
 USAGE
   diagram [FILE]                     open FILE in the editor, in its own window (created if
@@ -56,7 +56,7 @@ REVIEW
   diagram comment  FILE [--on ID] [--by NAME] TEXT  add a comment
   diagram reply    FILE COMMENT_ID [--by NAME] TEXT
   diagram resolve  FILE COMMENT_ID [--note TEXT]
-  diagram prompt   FILE [--target diagram|code|discuss] [--reply ops|dsl]
+  diagram prompt   FILE [--target build|diagram|code|discuss] [--reply ops|dsl]
                    [--comment c1,c2] [--all] [--instructions TEXT]
                    [--context auto|near|section|all]   how much of the board to show
                    (auto: all of a small board, else the commented sections)
@@ -1087,13 +1087,21 @@ fn run(args: Args) -> Result<ExitCode, String> {
         "prompt" => {
             let file = args.file(0)?;
             let doc = load(file)?;
+            // the whole board (canvases too) as a prompt to build it
+            if args.val("--target") == Some("build") {
+                print!(
+                    "{}",
+                    diagram_core::prompt::build(&doc, today(&args)?.or(Some(today_utc())))
+                );
+                return Ok(ExitCode::SUCCESS);
+            }
             let target = match args.val("--target").unwrap_or("diagram") {
                 "diagram" => Target::Diagram,
                 "code" => Target::Code,
                 "discuss" => Target::Discuss,
                 t => {
                     return Err(format!(
-                        "--target must be diagram, code or discuss (got {t})"
+                        "--target must be build, diagram, code or discuss (got {t})"
                     ))
                 }
             };

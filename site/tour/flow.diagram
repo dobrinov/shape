@@ -1,0 +1,32 @@
+# render: --light
+screen signup: Sign up [mobile] {
+  header: Acme
+  title: Create your account
+  input name: Name
+  input email: Work e-mail
+  password: Password
+  checkbox: I agree to the terms
+  button go: Create account [blue]
+  divider: or
+  button google: Continue with Google
+}
+screen welcome: Welcome [mobile] {
+  header: Welcome
+  stepper: Account | Team | Done
+  avatar: Ana Bell | Product lead
+  card invite: Invite your team [detail: They see the same boards and leave comments.]
+  buttons: Skip | Invite [blue]
+  tabbar: Home | Boards | Inbox | Me
+}
+screen dashboard: Dashboard [web] {
+  navbar: Acme | Boards | People | Sign out
+  sidebar: Overview | Boards | Templates | Settings
+  breadcrumb: Home | Overview
+  title: Good morning, Ana
+  badges: 3 new comments | 1 review
+  table: Board | Owner | Updated
+  chart: Activity this week
+}
+
+signup.go -> welcome: signs up
+welcome.buttons -> dashboard: invites

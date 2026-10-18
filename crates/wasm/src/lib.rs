@@ -228,6 +228,12 @@ impl Diagram {
         diagram_core::prompt::selection_at(&self.inner.doc, &ids, t)
     }
 
+    /// The whole board, every canvas in it, as a prompt to build what it
+    /// describes (gantt forecasts as of `today`, `YYYY-MM-DD`).
+    pub fn build_prompt(&self, today: &str) -> String {
+        diagram_core::prompt::build(&self.inner.whole(), diagram_core::gantt::parse_date(today))
+    }
+
     /// The brief, with gantt forecasts as of `today` (`YYYY-MM-DD`).
     pub fn brief_at(&self, today: &str) -> String {
         diagram_core::prompt::brief_at(&self.inner.doc, diagram_core::gantt::parse_date(today))
