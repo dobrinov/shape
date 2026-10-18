@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.57.0 — 2026-10-18
+
+- **A new logo:** an S folded like a ribbon, blue, teal and green, on a dark tile, with a lowercase *shape* wordmark. It is the app's icon, the window's, the favicon, the document icon and the share image, and the wordmark heads the website and the editor. Run `shape install-app` again to see it in Finder and the Dock.
+- Fixed: *Expand all* showed on the full board, where there is nothing folded.
+
 ## 0.56.0 — 2026-10-18
 
 - **Arrows go round boxes:** an elbow arrow whose usual path would cross a box takes the shortest way round the boxes instead, with as few bends as it can, keeping clear of them. Arrows with nothing in their way keep their shape. On a board like Spend Cards, the arrow to Phase 2 no longer runs through Phase 1. Curved and straight arrows are unchanged.

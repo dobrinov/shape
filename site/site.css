@@ -180,3 +180,5 @@ footer { flex-wrap: wrap; row-gap: 8px; }
 .ai-keep { background: linear-gradient(135deg, #4f6bed, #6d8bff); color: #fff; }
 .ai-discard { border: 1px solid var(--border); color: var(--fg); }
 @media (max-width: 480px) { .ai-bar { border-radius: 14px; } .ai-note { min-width: 100%; } }
+/* the wordmark: lowercase, geometric, like the logo */
+.brand { font-family: "Avenir Next", Futura, "Century Gothic", -apple-system, sans-serif; font-weight: 700; font-size: 21px; letter-spacing: -0.03em; }

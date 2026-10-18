@@ -47,6 +47,7 @@ try {
   const names = await p.locator(".dge-persp option").allTextContents();
   assert.deepEqual(names.slice(0, 5), ["Full board", "Delivery", "Product", "Technical", "Legal"]);
   assert.equal(await shown(p), "api,beta,fraud,note");
+  assert.ok(!(await p.locator('[data-act="folds"]').isVisible()), "nothing to fold on the full board");
   // Delivery starts high level: what is tagged for it, the risks folded into a card; the file does not change
   const before = saved();
   await p.selectOption(".dge-persp", "delivery"); await sleep(400);

@@ -21,7 +21,7 @@
   /* the app's pieces live in the editor's bar (app.js passes them in) */
   .app-bar { height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--line); flex: none; }
   .app-bar .vsep, .app-bar .file { display: none; }
-  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: -.01em; flex: none; color: var(--fg); }
+  .brand { display: flex; align-items: center; gap: 8px; font: 700 17px "Avenir Next", Futura, "Century Gothic", -apple-system, sans-serif; letter-spacing: -.03em; flex: none; color: var(--fg); }
   .brand img { display: block; }
   #app-actions { display: flex; gap: 6px; }
   #app-actions:empty { display: none; }
@@ -40,7 +40,7 @@
 </head>
 <body>
 <header class="app-bar">
-  <div class="brand"><img src="favicon.svg" width="20" height="20" alt="">Shape</div>
+  <div class="brand"><img src="favicon.svg" width="20" height="20" alt="">shape</div>
   <div class="vsep"></div>
   <span id="app-actions" style="display:flex;gap:6px"></span>
   <span class="file" id="file"></span>
