@@ -103,6 +103,8 @@ pub fn plot_any(doc: &Document, g: &Group) -> Plot {
         crate::adr::plot(doc, g)
     } else if g.timeline {
         crate::timeline::plot(doc, g)
+    } else if g.cycle {
+        crate::cycle::plot(doc, g)
     } else {
         plot(doc, g)
     }

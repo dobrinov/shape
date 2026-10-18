@@ -178,7 +178,7 @@ The full reference is in [LANGUAGE.md](crates/core/LANGUAGE.md), and `diagram sp
 | `a -> b: label` | edge. `->` solid, `..>` dashed, `=>` thick, `--` / `..` / `==` no arrow, `<->` both |
 | `a -> b -> c`, `a -> b, c` | chains and fan-out |
 | `group id: Label [color] { … }` | groups, which can be nested |
-| `mindmap` · `lanes` · `kanban` · `sequence` · `gantt` · `risks` · `table` · `chart` · `entity` · `adr` · `timeline` `id: Title { … }` | blocks: mindmaps, swimlanes, kanban boards, sequence diagrams, gantt charts, risk matrices, tables, charts, database tables, decision records, timelines |
+| `mindmap` · `lanes` · `kanban` · `sequence` · `gantt` · `risks` · `table` · `chart` · `entity` · `adr` · `timeline` · `cycle` `id: Title { … }` | blocks: mindmaps, swimlanes, kanban boards, sequence diagrams, gantt charts, risk matrices, tables, charts, database tables, decision records, timelines, cycles |
 | `link: other.diagram#id` | a link to an element on another board |
 | `comment [id] on TARGET by WHO: text` · `reply id: text` | review threads; add `[resolved, resolution: …]` to close one |
 | `title:` `direction:` `layout:` `routing:` `theme:` | settings |

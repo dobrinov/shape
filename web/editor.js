@@ -63,6 +63,7 @@
     magic: '<path d="M10 3.5c.5 3.9 2.6 6 6.5 6.5-3.9.5-6 2.6-6.5 6.5-.5-3.9-2.6-6-6.5-6.5 3.9-.5 6-2.6 6.5-6.5z" fill="currentColor" stroke="none"/><path d="M18 13.5c.25 1.9 1.1 2.75 3 3-1.9.25-2.75 1.1-3 3-.25-1.9-1.1-2.75-3-3 1.9-.25 2.75-1.1 3-3z" fill="currentColor" stroke="none"/>',
     branch: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3.5-11 6.5"/>',
     blocks: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+    cycle: '<path d="M19.5 12a7.5 7.5 0 01-12.8 5.3M4.5 12a7.5 7.5 0 0112.8-5.3"/><path d="M17.6 3.6v3.3h-3.3M6.4 20.4v-3.3h3.3"/>',
     timeline: '<path d="M4.5 5H16a3.5 3.5 0 010 7H8a3.5 3.5 0 000 7h11.5"/><circle cx="4.5" cy="5" r="2.7" fill="currentColor" stroke="none"/><circle cx="19.5" cy="19" r="2.7" fill="currentColor" stroke="none"/><circle cx="10.5" cy="5" r="2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="19" r="2" fill="currentColor" stroke="none"/>',
     ask: '<path d="M4 5.5A2.5 2.5 0 016.5 3h11A2.5 2.5 0 0120 5.5v8a2.5 2.5 0 01-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 014 14.5z"/><path d="M10 7.8a2 2 0 113 1.7c-.7.4-1 .8-1 1.5"/><circle cx="12" cy="13.2" r=".6" fill="currentColor"/>',
     rethink: '<rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M14 7h3.5a2 2 0 012 2v2M10 17H6.5a2 2 0 01-2-2v-2"/><path d="M17.5 9.5l2 2 2-2M6.5 14.5l-2-2-2 2"/>',
@@ -274,6 +275,7 @@
         ["Think", [
           ["mindmap", "Mindmap", "T · branch with Tab", go(function () { setTool("mindmap"); })],
           ["timeline", "Timeline", "What happened when", go(addTimeline)],
+          ["cycle", "Cycle", "Steps that come round again", go(addCycle)],
           ["adr", "Decision record", "Context, options, choice", go(addRecord)],
           ["risks", "Risk matrix", "Likelihood × impact", go(addRisks)]
         ]],
@@ -1829,6 +1831,33 @@
           ["Delete event", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
         ];
       }
+      if (t.type === "node" && !view && node(t.id) && node(t.id).group && group(node(t.id).group) && group(node(t.id).group).cycle) {
+        var cg = group(node(t.id).group);
+        return [
+          ["Rename", function () { editLabel(t.id); }],
+          ["Add step after…", function () {
+            var all = st.doc.nodes.filter(function (n) { return n.group === cg.id; }), at = all.indexOf(node(t.id)) + 1;
+            askAt(st.menuAt, "", "The next step", function (label) {
+              if (!label) return;
+              var base = cg.id + "." + slug(label), id = base, k = 2;
+              while (idTaken(id)) id = base + "-" + k++;
+              if (applyOps([{ op: "add_node", id: id, label: label, group: cg.id, index: at }]).ok) select([id]);
+            });
+          }],
+          [node(t.id).detail ? "Edit details…" : "Add details…", function () { editDetails(t.id); }, "Shown on hover"],
+          ["Colour…", function () { colourMenu(t.id, "update_node", node(t.id).color); }],
+          ["Edit as text…", function () { editCycle(cg.id); }, "The whole cycle"],
+          "-",
+          ["Delete step", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
+        ];
+      }
+      if (gr && !view && gr.cycle) return [
+        ["Rename", function () { editLabel(t.id); }],
+        ["Edit as text…", function () { editCycle(t.id); }, "One step per line"],
+        ["Colour…", function () { colourMenu(t.id, "update_group", gr.color); }],
+        "-",
+        ["Delete", function () { applyOps([{ op: "remove", id: t.id, keep_members: false }]); select([]); }, "The cycle and its steps"]
+      ];
       if (gr && !view && gr.timeline) return [
         ["Rename", function () { editLabel(t.id); }],
         ["Add event…", function () {
@@ -2796,6 +2825,45 @@
       });
       have.slice(Math.max(rows.length - 1, 0)).forEach(function (n) { ops.push({ op: "remove", id: n.id }); });
       return ops;
+    }
+    /* Cycles: steps round a circle, each leading to the next. */
+    function addCycle() {
+      var gid = freshId("cycle");
+      var res = applyOps([{ op: "merge", dsl: "cycle " + gid + ": Cycle {\n  Plan\n  Do\n  Check\n  Act\n}" }]);
+      if (res.ok) {
+        select([gid]);
+        reveal(gid);
+        editLabel(gid, true);
+      }
+    }
+    function editCycle(gid) {
+      var ta = h("textarea", { class: "dge-chart-data", spellcheck: "false", rows: "8" });
+      var have = st.doc.nodes.filter(function (n) { return n.group === gid; });
+      ta.value = have.map(function (n) { return n.label || n.id; }).join("\n");
+      var save = function () {
+        var lines = ta.value.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+        var ops = [], taken = [], used = [];
+        lines.forEach(function (label, i) {
+          var k = have.findIndex(function (n, j) { return used.indexOf(j) < 0 && (n.label || n.id) === label; });
+          if (k < 0) k = have.findIndex(function (n, j) { return used.indexOf(j) < 0 && lines.indexOf(n.label || n.id) < 0; });
+          if (k >= 0) {
+            used.push(k);
+            ops.push({ op: "update_node", id: relabel(have[k], gid, label, ops, taken), label: label, index: i });
+          } else {
+            var base = gid + "." + slug(label), id = base, n = 2;
+            while (idTaken(id) || taken.indexOf(id) >= 0) id = base + "-" + n++;
+            taken.push(id);
+            ops.push({ op: "add_node", id: id, label: label, group: gid, index: i });
+          }
+        });
+        have.forEach(function (n, j) { if (used.indexOf(j) < 0) ops.push({ op: "remove", id: n.id }); });
+        if (applyOps(ops).ok) closeModal();
+      };
+      showModal("Cycle: " + (group(gid).label || gid), h("div", {}, [h("p", { class: "dge-muted" }, ["One step per line, in order; the last leads back to the first."]), ta]), [
+        h("button", { onclick: closeModal }, ["Cancel"]),
+        h("button", { class: "primary", onclick: save }, ["Save"])
+      ]);
+      setTimeout(function () { ta.focus(); }, 0);
     }
     /* Timelines: a line per event, `DATE: what happened`, `[important]` to star it. */
     function addTimeline() {

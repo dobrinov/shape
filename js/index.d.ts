@@ -213,6 +213,8 @@ export interface Group {
   table?: boolean;
   /** A timeline (its nodes are events, each with a `date`). */
   timeline?: boolean;
+  /** A cycle (its nodes are steps on a circle, each leading to the next). */
+  cycle?: boolean;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -521,6 +523,8 @@ export interface AddGroupOp {
   table?: boolean;
   /** A timeline (its nodes are events, each with a `date`). */
   timeline?: boolean;
+  /** A cycle (its nodes are steps on a circle, each leading to the next). */
+  cycle?: boolean;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -565,6 +569,8 @@ export interface UpdateGroupOp {
   table?: boolean;
   /** A timeline (its nodes are events, each with a `date`). */
   timeline?: boolean;
+  /** A cycle (its nodes are steps on a circle, each leading to the next). */
+  cycle?: boolean;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -753,6 +759,8 @@ export interface GroupBox extends Rect {
   table?: boolean;
   /** A timeline. */
   timeline?: boolean;
+  /** A cycle. */
+  cycle?: boolean;
   /** A database table. */
   entity?: boolean;
 }

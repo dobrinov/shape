@@ -466,6 +466,9 @@ pub struct Group {
     /// A timeline: its nodes are events, each with a `date`.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub timeline: bool,
+    /// A cycle: its nodes are steps that come round again, drawn on a circle.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub cycle: bool,
     /// A decision record, with its status (`proposed`, `accepted`, …): its
     /// nodes are its fields (context, options, decision, consequences).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -522,7 +525,12 @@ impl Group {
     /// Drawn from a plot with its nodes at fixed places: a chart, a table, a
     /// database table or a decision record.
     pub fn plotted(&self) -> bool {
-        self.chart.is_some() || self.table || self.entity || self.adr.is_some() || self.timeline
+        self.chart.is_some()
+            || self.table
+            || self.entity
+            || self.adr.is_some()
+            || self.timeline
+            || self.cycle
     }
 
     pub fn display(&self) -> &str {

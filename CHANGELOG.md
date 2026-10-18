@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.42.0 — 2026-10-18
+
+- **Cycle diagrams:** `cycle loop: Build loop { Plan · Build · Measure · Learn }`, one step per line. The steps go round a circle with an arrow from each to the next and from the last back to the first; the circle grows with the steps so they never overlap. Steps take colours, details, links and comments. In the editor: *Blocks → Cycle*; right-click to add a step after one or edit the cycle as text. Perspectives can show cycles (`show: cycle`).
+
 ## 0.41.0 — 2026-10-18
 
 - **Perspectives:** one board, seen by different audiences. A perspective shows the elements tagged for it and the blocks it cares about (with the sections, arrows and comments around them), and can hide details. It changes only what you see.

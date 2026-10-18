@@ -9,7 +9,7 @@ use crate::model::{BoardKind, Document, Group, Node, Perspective};
 /// The block kinds `show` can name.
 pub const KINDS: &[&str] = &[
     "mindmap", "timeline", "adr", "risks", "kanban", "gantt", "table", "chart", "entity",
-    "sequence", "lanes", "sticky",
+    "sequence", "lanes", "sticky", "cycle",
 ];
 
 fn p(id: &str, label: &str, tags: &[&str], show: &[&str], details: bool) -> Perspective {
@@ -156,6 +156,8 @@ fn kind_of(g: &Group) -> &'static str {
         "sequence"
     } else if g.lanes {
         "lanes"
+    } else if g.cycle {
+        "cycle"
     } else {
         "section"
     }

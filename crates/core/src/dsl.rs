@@ -396,7 +396,7 @@ impl Parser {
         };
         let word = match word {
             "group" | "gantt" | "risks" | "chart" | "table" | "entity" | "adr" | "mindmap"
-            | "timeline"
+            | "timeline" | "cycle"
                 if !opens =>
             {
                 ""
@@ -492,7 +492,11 @@ impl Parser {
             }
             "timeline" if c.rest()[8..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(8);
-                return self.timeline_decl(c);
+                return self.timeline_decl(c, false);
+            }
+            "cycle" if c.rest()[5..].starts_with(|ch: char| ch.is_whitespace()) => {
+                c.advance(5);
+                return self.timeline_decl(c, true);
             }
             "entity" if c.rest()[6..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(6);
@@ -1090,7 +1094,8 @@ impl Parser {
 
     /// `timeline id: Title [color] {` … one event per line (`DATE: what
     /// happened [important]`) … `}`.
-    fn timeline_decl(&mut self, mut c: Cursor) -> Result<(), String> {
+    /// `cycle id: Title {` … one step per line … `}` too (`cycle`).
+    fn timeline_decl(&mut self, mut c: Cursor, cycle: bool) -> Result<(), String> {
         c.skip_ws();
         let (id, qlabel) = c.reference()?;
         let (label, attrs) = label_and_attrs_until_brace(&mut c)?;
@@ -1118,7 +1123,11 @@ impl Parser {
         }
         let g = self.doc.group_mut(&id).unwrap();
         g.parent = parent;
-        g.timeline = true;
+        if cycle {
+            g.cycle = true;
+        } else {
+            g.timeline = true;
+        }
         if let Some(l) = label.or(qlabel) {
             g.label = l;
         }
@@ -1129,13 +1138,47 @@ impl Parser {
                 ("x", Some(v)) => g.x = Some(num("x", v)?),
                 ("y", Some(v)) => g.y = Some(num("y", v)?),
                 ("w" | "width", Some(v)) => g.w = Some(num("w", v)?),
-                (k, _) => return Err(format!("unknown timeline attribute `{k}` (color, x, y, w)")),
+                (k, _) => {
+                    let what = if cycle { "cycle" } else { "timeline" };
+                    return Err(format!("unknown {what} attribute `{k}` (color, x, y, w)"));
+                }
             }
         }
         self.touched.push(Elem::Group(id.clone()));
         if !closes_inline {
             self.gantt = Some((id, self.line));
         }
+        Ok(())
+    }
+
+    /// A step of a cycle: `Measure [blue]`.
+    fn step_line(&mut self, cycle: &str, t: &str) -> Result<(), String> {
+        let t = crate::mindmap::strip_bullet(t);
+        let (text, attrs) = split_attrs(t);
+        let label = unescape_label(text.trim());
+        let mut attrs = parse_attrs(attrs.unwrap_or(""))?;
+        let mut explicit = None;
+        attrs.retain(|(k, v)| match (k.as_str(), v) {
+            ("id", Some(v)) => {
+                explicit = Some(v.clone());
+                false
+            }
+            _ => true,
+        });
+        let wanted = explicit.clone().unwrap_or_else(|| row_id(cycle, &label));
+        let id = if !self.doc.id_taken(&wanted) {
+            wanted
+        } else if explicit.is_some() {
+            return Err(format!("id `{wanted}` is already used"));
+        } else {
+            self.doc.fresh_id(&wanted)
+        };
+        let mut n = Node::new(&id);
+        n.label = label;
+        n.group = Some(cycle.to_string());
+        apply_node_attrs(&mut n, &attrs)?;
+        self.touched.push(Elem::Node(n.id.clone()));
+        self.doc.nodes.push(n);
         Ok(())
     }
 
@@ -1405,6 +1448,9 @@ impl Parser {
         }
         if self.doc.group(&block).is_some_and(|g| g.timeline) {
             return self.event_line(&block, t);
+        }
+        if self.doc.group(&block).is_some_and(|g| g.cycle) {
+            return self.step_line(&block, t);
         }
         if self.doc.group(&block).is_some_and(|g| g.entity) {
             return self.column_line(&block, t);
@@ -2574,6 +2620,50 @@ pub(crate) fn perspective_line(p: &Perspective) -> String {
     head + &attrs_text(&a)
 }
 
+/// `cycle id: Title {` … `Step [attrs]` per step … `}`.
+pub(crate) fn cycle_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
+    let mut head = id_text(&g.id);
+    if !g.label.is_empty() && g.label != g.id {
+        head.push_str(": ");
+        head.push_str(&label_text(&g.label));
+    }
+    let mut a = Vec::new();
+    if let Some(c) = &g.color {
+        a.push(if c.starts_with('#') {
+            format!("color: {c}")
+        } else {
+            c.clone()
+        });
+    }
+    if let Some(w) = g.w {
+        a.push(format!("w: {}", fmt_num(w)));
+    }
+    a.extend(group_pos(g));
+    head.push_str(&attrs_text(&a));
+    let steps: Vec<&Node> = doc
+        .nodes
+        .iter()
+        .filter(|n| n.group.as_deref() == Some(g.id.as_str()))
+        .collect();
+    if steps.is_empty() {
+        out.push_str(&format!("{pad}cycle {head} {{}}\n"));
+        return;
+    }
+    out.push_str(&format!("{pad}cycle {head} {{\n"));
+    for n in steps {
+        let mut a = node_attrs(n);
+        if row_id(&g.id, n.display()) != n.id {
+            a.insert(0, format!("id: {}", attr_value(&n.id)));
+        }
+        out.push_str(&format!(
+            "{pad}  {}{}\n",
+            label_text(n.display()),
+            attrs_text(&a)
+        ));
+    }
+    out.push_str(&format!("{pad}}}\n"));
+}
+
 /// `timeline id: Title {` … `DATE: label [attrs]` per event … `}`.
 pub(crate) fn timeline_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
     let mut head = id_text(&g.id);
@@ -3285,6 +3375,10 @@ pub(crate) fn group_block(
     }
     if g.timeline {
         timeline_block(doc, g, &pad, out);
+        return;
+    }
+    if g.cycle {
+        cycle_block(doc, g, &pad, out);
         return;
     }
     if g.entity {

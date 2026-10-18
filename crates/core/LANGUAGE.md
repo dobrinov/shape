@@ -311,6 +311,20 @@ table options: Hosting options {
 - In the editor: the *Table* tool; right-click a table → *Edit as text…*, *Add row*, *Add column*; right-click a row → *Edit row…* (its cells, separated by `|`), *Add row below*, *Colour…*, *Delete row*. Renaming a row's label renames its id; renaming a table renames its rows.
 - Prompts show it as a Markdown table. In JSON a table is a group with `table` and `columns`; its rows are nodes whose `label` is the first cell and `cells` the rest. Ops can place a row with `index`.
 
+### Cycles
+
+```diagram
+cycle loop: Build loop {
+  Plan
+  Build [blue]
+  Measure
+  Learn [detail: talk to five users]
+}
+```
+
+- One step per line, in order: the steps sit round a circle (the first at the top, clockwise), each with an arrow to the next and the last back to the first. A step's id comes from its label within the cycle (`loop.plan`); `[attrs]`: a colour, `detail`, `link`, `id`.
+- In the editor: *Blocks → Cycle*; right-click a cycle → *Edit as text…*; right-click a step → *Add step after*, details, colour.
+
 ### Perspectives
 
 ```diagram

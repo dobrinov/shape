@@ -20,6 +20,7 @@
 #![recursion_limit = "256"]
 pub mod adr;
 pub mod charts;
+pub mod cycle;
 pub mod diff;
 pub mod dsl;
 pub mod entities;
@@ -244,6 +245,7 @@ pub fn json_schema() -> Value {
                 "axis": {"type": "string", "description": "chart: what the rows are"},
                 "table": {"type": "boolean", "description": "table: the nodes inside are rows"},
                 "timeline": {"type": "boolean", "description": "timeline: the nodes inside are events, each with a date"},
+                "cycle": {"type": "boolean", "description": "cycle: the nodes inside are steps on a circle, each leading to the next and the last back to the first"},
                 "entity": {"type": "boolean", "description": "database table: the nodes inside are columns"},
                 "columns": {"type": "array", "items": {"type": "string"}, "description": "table: the columns' names"},
                 "w": {"type": "number"}, "h": {"type": "number"},

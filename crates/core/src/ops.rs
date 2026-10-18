@@ -361,6 +361,9 @@ pub enum Op {
         /// A timeline (its nodes are events, each with a `date`).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         timeline: Option<bool>,
+        /// A cycle (its nodes are steps, each leading to the next).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cycle: Option<bool>,
         /// A database table (its nodes are columns).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         entity: Option<bool>,
@@ -421,6 +424,9 @@ pub enum Op {
         /// A timeline (its nodes are events, each with a `date`).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         timeline: Option<bool>,
+        /// A cycle (its nodes are steps, each leading to the next).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cycle: Option<bool>,
         /// A database table (its nodes are columns).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         entity: Option<bool>,
@@ -1656,6 +1662,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             axis,
             table,
             timeline,
+            cycle,
             columns,
             entity,
             adr,
@@ -1688,6 +1695,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             chart_fields(&mut g, chart, stacked, horizontal, unit, series, axis)?;
             g.table = table.unwrap_or(false) || columns.is_some();
             g.timeline = timeline.unwrap_or(false);
+            g.cycle = cycle.unwrap_or(false);
             g.entity = entity.unwrap_or(false);
             g.adr = adr_status(adr)?;
             g.columns = columns.clone().unwrap_or_default();
@@ -1726,6 +1734,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             axis,
             table,
             timeline,
+            cycle,
             columns,
             entity,
             adr,
@@ -1773,6 +1782,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             if let Some(t) = timeline {
                 g.timeline = *t;
+            }
+            if let Some(c) = cycle {
+                g.cycle = *c;
             }
             if let Some(c) = columns {
                 g.columns = c.clone();
