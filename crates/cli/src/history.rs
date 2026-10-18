@@ -1,6 +1,6 @@
 //! A board's history. In git it is the commits that touched the file; a
 //! board git does not track gets snapshots instead, kept beside it in
-//! `.diagram-history/<file name>/` (one at most every few minutes of
+//! `.shape-history/<file name>/` (one at most every few minutes of
 //! saving, signed by whoever saved), so it can go back too.
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -59,11 +59,13 @@ pub fn in_git(file: &Path) -> bool {
 
 fn snapshots_dir(file: &Path) -> Option<PathBuf> {
     let abs = std::fs::canonicalize(file).ok()?;
-    Some(
-        abs.parent()?
-            .join(".diagram-history")
-            .join(abs.file_name()?),
-    )
+    let parent = abs.parent()?;
+    // `.diagram-history` from before the rename to Shape stays in use
+    let old = parent.join(".diagram-history").join(abs.file_name()?);
+    if old.is_dir() {
+        return Some(old);
+    }
+    Some(parent.join(".shape-history").join(abs.file_name()?))
 }
 
 fn now() -> u64 {
@@ -135,7 +137,9 @@ pub fn versions(file: &Path) -> Vec<Version> {
         .unwrap_or_default()
         .into_iter()
         .filter_map(|name| {
-            let stem = name.strip_suffix(".diagram")?;
+            let stem = name
+                .strip_suffix(".shape")
+                .or_else(|| name.strip_suffix(".diagram"))?;
             let (time, who) = stem.split_once("__").unwrap_or((stem, ""));
             Some(Version {
                 time: time.parse().ok()?,
@@ -185,7 +189,7 @@ pub fn snapshot(file: &Path, text: &str, author: &str) -> bool {
     if std::fs::create_dir_all(&dir).is_err() {
         return false;
     }
-    let name = format!("{t}__{}.diagram", sign(author));
+    let name = format!("{t}__{}.shape", sign(author));
     if std::fs::write(dir.join(&name), text).is_err() {
         return false;
     }
@@ -204,7 +208,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("diagram-history-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let file = dir.join("b.diagram");
+        let file = dir.join("b.shape");
         std::fs::write(&file, "a: A\n").unwrap();
         assert!(versions(&file).is_empty());
         assert!(snapshot(&file, "a: A\n", "Ana Bell"));
@@ -215,7 +219,7 @@ mod tests {
         let v = versions(&file);
         assert_eq!((v.len(), v[0].author.as_str()), (1, "Ana Bell"));
         assert_eq!(version(&file, &v[0].id).unwrap(), "a: A\n");
-        assert!(version(&file, "../b.diagram").is_err());
+        assert!(version(&file, "../b.shape").is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

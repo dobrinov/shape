@@ -1,23 +1,23 @@
 [package]
-name = "diagram"
+name = "shape"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Lightweight FigJam-style diagrams as text: editor, CLI, SVG/PNG export and LLM review prompts"
+description = "Shape: one board for the whole project, as text, with your AI (editor, CLI, exports, prompts)"
 build = "build.rs"
 
 [[bin]]
-name = "diagram"
+name = "shape"
 path = "src/main.rs"
 
 [dependencies]
-diagram-core = { path = "../core" }
+shape-core = { path = "../core" }
 resvg = { version = "0.48.1", default-features = false, features = ["text", "system-fonts", "memmap-fonts", "raster-images"] }
 serde_json.workspace = true
 tiny_http = "0.12"
 
-# The native window (`diagram FILE` opens one; --browser for a tab) and the
+# The native window (`shape FILE` opens one; --browser for a tab) and the
 # new-board save dialog. Without the `window` feature
 # (`cargo build --no-default-features`) boards open in the browser as before.
 tao = { version = "=0.37.1", default-features = false, features = ["rwh_06", "x11"], optional = true }

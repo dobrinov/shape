@@ -129,7 +129,7 @@ test("prompts, brief and selection", () => {
   assert.match(b.prompt({ includeResolved: true }), /## Comments to address \(2\)[^]*\*\*c2\*\* on node `db` \(resolved\)/);
   assert.match(b.prompt({ instructions: "Be brief." }), /Be brief\./);
   assert.throws(() => b.prompt({ target: "nope" }), /invalid options/);
-  assert.match(b.brief(), /## Source\n\n```diagram\n[^]*comment c1 on api by ana: rename this\?/);
+  assert.match(b.brief(), /## Source\n\n```shape\n[^]*comment c1 on api by ana: rename this\?/);
   assert.match(b.selection(["api"]), /rename this\?/);
   b.free();
 });
@@ -177,8 +177,8 @@ test("free, dispose and the static helpers", () => {
     c[Symbol.dispose]();
     assert.throws(() => c.document(), /freed/);
   }
-  assert.match(spec(), /# The diagram language/);
-  assert.equal(jsonSchema().title, "diagram document");
+  assert.match(spec(), /# The Shape language/);
+  assert.equal(jsonSchema().title, "Shape board");
   assert.equal(typeof diagram.initSync, "function");
 });
 

@@ -1,4 +1,4 @@
-# diagram build helpers
+# Shape build helpers
 CARGO_BIN := $(HOME)/.cargo/bin
 # Prefer the rustup toolchain (has the wasm32 target) over e.g. Homebrew's rustc.
 RUSTUP_BIN := $(shell rustup which rustc 2>/dev/null | xargs dirname 2>/dev/null)
@@ -16,19 +16,19 @@ js:
 	$(WASM_ENV) CARGO_TARGET_DIR="$(CURDIR)/target/wasm-web" wasm-pack build crates/wasm --release --target web --no-typescript --no-pack --out-dir ../../js/pkg
 
 build: wasm
-	DIAGRAM_SKIP_WASM=1 cargo build
+	SHAPE_SKIP_WASM=1 cargo build
 
 release: wasm
-	DIAGRAM_SKIP_WASM=1 cargo build --release
+	SHAPE_SKIP_WASM=1 cargo build --release
 
 install: wasm
-	DIAGRAM_SKIP_WASM=1 cargo install --path crates/cli --force
+	SHAPE_SKIP_WASM=1 cargo install --path crates/cli --force
 
 test:
 	cargo test --workspace
 	node --test web/test/*.test.mjs
 	@# the js/ package tests need js/pkg (`make js`); skipped when it is not built
-	@if [ -f js/pkg/diagram_wasm_bg.wasm ]; then node --test js/test/*.test.mjs; else echo "skipping js/ tests: run 'make js' first"; fi
+	@if [ -f js/pkg/shape_wasm_bg.wasm ]; then node --test js/test/*.test.mjs; else echo "skipping js/ tests: run 'make js' first"; fi
 
 # Browser tests of the editor (Playwright + the installed Chrome; serves web/ from disk)
 e2e: build
@@ -36,7 +36,7 @@ e2e: build
 
 # Browser library: one JS file with the WASM inlined
 embed: build
-	./target/debug/diagram embed -o diagram.embed.js
+	./target/debug/shape embed -o shape.embed.js
 
 # Static GitHub Pages site in ./docs (landing page, playground, examples)
 site: release
@@ -44,7 +44,7 @@ site: release
 
 # Serve the frontend from disk while hacking on web/ (no rebuild needed)
 dev: build
-	DIAGRAM_WEB_DIR=web ./target/debug/diagram examples/example.diagram
+	SHAPE_WEB_DIR=web ./target/debug/shape examples/example.shape
 
 clean:
 	cargo clean

@@ -1,4 +1,4 @@
-//! `diagram png`: rasterise the SVG with resvg. The SVG uses literal colours,
+//! `shape png`: rasterise the SVG with resvg. The SVG uses literal colours,
 //! so nothing needs translating; only the font stack is resolved here.
 use std::sync::Arc;
 
@@ -54,7 +54,7 @@ fn pixmap(svg: &str, scale: f32) -> Result<tiny_skia::Pixmap, String> {
     let svg = svg.replace(
         &format!(
             "font-family=\"{}\"",
-            diagram_core::text::esc(diagram_core::text::FONT)
+            shape_core::text::esc(shape_core::text::FONT)
         ),
         "font-family=\"sans-serif\"",
     );
@@ -84,8 +84,8 @@ fn pixmap(svg: &str, scale: f32) -> Result<tiny_skia::Pixmap, String> {
 mod tests {
     #[test]
     fn renders_a_png() {
-        let doc = diagram_core::parse("a -> b: hello\nc [sticky]").unwrap();
-        let svg = diagram_core::render_svg(&doc, &Default::default());
+        let doc = shape_core::parse("a -> b: hello\nc [sticky]").unwrap();
+        let svg = shape_core::render_svg(&doc, &Default::default());
         let png = super::render(&svg, 1.0).unwrap();
         assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n");
     }

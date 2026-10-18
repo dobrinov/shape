@@ -1,9 +1,10 @@
-//! `diagram install-app`: make .diagram files the OS's own, with a document
+//! `shape install-app`: make .shape (and .diagram) files the OS's own, with a document
 //! icon, opening in the editor on a double-click.
 //!
 //! - macOS: ~/Applications/Shape.app, a small AppleScript app (Finder hands
-//!   files over as Apple Events, not arguments) that declares the .diagram
-//!   type and runs `diagram FILE --idle-exit`.
+//!   files over as Apple Events, not arguments) that declares the board
+//!   type (.shape, and .diagram from before the rename) and runs
+//!   `shape FILE --idle-exit`.
 //! - Linux: a MIME type, its icon and a .desktop entry under ~/.local/share.
 //! - Windows: a file association under HKEY_CURRENT_USER.
 //!
@@ -27,7 +28,7 @@ pub fn install(remove: bool) -> Result<(), String> {
     }
 }
 
-/// The diagram to start: the one on PATH (a stable path across Homebrew
+/// The `shape` to start: the one on PATH (a stable path across Homebrew
 /// upgrades), else this binary.
 fn binary() -> Result<PathBuf, String> {
     let exe = std::env::current_exe().map_err(|e| format!("cannot find this binary: {e}"))?;
@@ -81,7 +82,7 @@ fn write(path: &Path, bytes: impl AsRef<[u8]>) -> Result<(), String> {
 // ------------------------------------------------------------------ macOS
 
 const LSREGISTER: &str = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
-const UTI: &str = "io.github.dobrinov.diagram.board";
+const UTI: &str = "io.github.dobrinov.shape.board";
 
 /// An AppleScript string literal.
 fn applescript_string(s: &str) -> String {
@@ -90,7 +91,7 @@ fn applescript_string(s: &str) -> String {
 
 /// Whether files can be made in `dir` (made if missing).
 fn writable(dir: &Path) -> bool {
-    let probe = dir.join(".diagram-probe");
+    let probe = dir.join(".shape-probe");
     let ok = std::fs::create_dir_all(dir).is_ok() && std::fs::write(&probe, "").is_ok();
     let _ = std::fs::remove_file(probe);
     ok
@@ -102,11 +103,13 @@ fn macos(remove: bool) -> Result<(), String> {
     let home = home()?;
     let places = [
         home.join("Applications"),
-        home.join("Library/Application Support/diagram"),
+        home.join("Library/Application Support/shape"),
     ];
     // Shape.app, and Diagram.app from before the rename
+    let before = home.join("Library/Application Support/diagram");
     for old in places
         .iter()
+        .chain([&before])
         .flat_map(|d| [d.join("Shape.app"), d.join("Diagram.app")])
     {
         if old.exists() {
@@ -142,7 +145,7 @@ end run
         path = applescript_string(&path),
         bin = applescript_string(&bin.to_string_lossy()),
     );
-    let tmp = std::env::temp_dir().join(format!("diagram-app-{}", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!("shape-app-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);
     write(&tmp.join("open.applescript"), script)?;
     run(Command::new("osacompile")
@@ -172,7 +175,7 @@ end run
     let _ = std::fs::remove_file(res.join("Assets.car")); // would win over applet.icns
     let _ = std::fs::remove_dir_all(&tmp);
 
-    // the .diagram type: declared here, opened here, with its icon
+    // the board type: declared here, opened here, with its icon
     let plist = app.join("Contents").join("Info.plist");
     let set = |key: &str, json: String| {
         let _ = Command::new("plutil")
@@ -183,10 +186,7 @@ end run
             .args(["-insert", key, "-json", &json])
             .arg(&plist))
     };
-    set(
-        "CFBundleIdentifier",
-        "\"io.github.dobrinov.diagram\"".into(),
-    )?;
+    set("CFBundleIdentifier", "\"io.github.dobrinov.shape\"".into())?;
     set("CFBundleName", "\"Shape\"".into())?;
     // an app with an `open` handler is a "droplet" with its own icon: ours instead
     set("CFBundleIconFile", "\"applet\"".into())?;
@@ -198,7 +198,7 @@ end run
     set(
         "UTExportedTypeDeclarations",
         format!(
-            r#"[{{"UTTypeIdentifier":"{UTI}","UTTypeDescription":"Shape board","UTTypeConformsTo":["public.plain-text"],"UTTypeIconFile":"document.icns","UTTypeReferenceURL":"https://dobrinov.github.io/diagram/","UTTypeTagSpecification":{{"public.filename-extension":["diagram"]}}}}]"#
+            r#"[{{"UTTypeIdentifier":"{UTI}","UTTypeDescription":"Shape board","UTTypeConformsTo":["public.plain-text"],"UTTypeIconFile":"document.icns","UTTypeReferenceURL":"https://dobrinov.github.io/shape/","UTTypeTagSpecification":{{"public.filename-extension":["shape","diagram"]}}}}]"#
         ),
     )?;
     set(
@@ -211,7 +211,9 @@ end run
     // Finder caches icons: a touch makes it look again
     let _ = Command::new("touch").arg(&app).output();
     eprintln!("installed {}", app.display());
-    eprintln!(".diagram files now have their own icon and open in the editor on a double-click.");
+    eprintln!(
+        ".shape and .diagram files now have their own icon and open in Shape on a double-click."
+    );
     eprintln!("If Finder still shows the old icon, run: killall Finder");
     Ok(())
 }
@@ -224,12 +226,19 @@ fn linux(remove: bool) -> Result<(), String> {
         .map(PathBuf::from)
         .unwrap_or(home()?.join(".local").join("share"));
     let files = [
+        share.join("mime/packages/shape.xml"),
+        share.join("icons/hicolor/scalable/mimetypes/application-x-shape.svg"),
+        share.join("icons/hicolor/scalable/apps/shape.svg"),
+        share.join("applications/shape.desktop"),
+    ];
+    // and the files from before the rename to Shape
+    let old = [
         share.join("mime/packages/diagram.xml"),
         share.join("icons/hicolor/scalable/mimetypes/application-x-diagram.svg"),
         share.join("icons/hicolor/scalable/apps/diagram.svg"),
         share.join("applications/diagram.desktop"),
     ];
-    for f in &files {
+    for f in files.iter().chain(&old) {
         let _ = std::fs::remove_file(f);
     }
     if !remove {
@@ -238,9 +247,10 @@ fn linux(remove: bool) -> Result<(), String> {
             &files[0],
             r#"<?xml version="1.0" encoding="UTF-8"?>
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
-  <mime-type type="application/x-diagram">
-    <comment>diagram board</comment>
+  <mime-type type="application/x-shape">
+    <comment>Shape board</comment>
     <sub-class-of type="text/plain"/>
+    <glob pattern="*.shape"/>
     <glob pattern="*.diagram"/>
   </mime-type>
 </mime-info>
@@ -251,7 +261,7 @@ fn linux(remove: bool) -> Result<(), String> {
         write(
             &files[3],
             format!(
-                "[Desktop Entry]\nType=Application\nName=Shape\nComment=One board for the whole project, with your AI\nExec=\"{}\" %f --idle-exit\nIcon=diagram\nMimeType=application/x-diagram;\nTerminal=false\nCategories=Office;Graphics;\n",
+                "[Desktop Entry]\nType=Application\nName=Shape\nComment=One board for the whole project, with your AI\nExec=\"{}\" %f --idle-exit\nIcon=shape\nMimeType=application/x-shape;\nTerminal=false\nCategories=Office;Graphics;\n",
                 bin.display()
             ),
         )?;
@@ -269,11 +279,11 @@ fn linux(remove: bool) -> Result<(), String> {
         .output();
     if !remove {
         let _ = Command::new("xdg-mime")
-            .args(["default", "diagram.desktop", "application/x-diagram"])
+            .args(["default", "shape.desktop", "application/x-shape"])
             .output();
     }
     eprintln!(
-        "{} the .diagram file type under {}",
+        "{} the .shape file type (and .diagram) under {}",
         if remove { "removed" } else { "installed" },
         share.display()
     );
@@ -307,28 +317,34 @@ fn ico(svg: &str) -> Result<Vec<u8>, String> {
 fn windows(remove: bool) -> Result<(), String> {
     let classes = r"HKCU\Software\Classes";
     let reg = |args: &[&str]| run(Command::new("reg").args(args));
+    // the association from before the rename to Shape goes either way
+    let _ = reg(&["delete", &format!(r"{classes}\diagram.board"), "/f"]);
     if remove {
-        let _ = reg(&["delete", &format!(r"{classes}\.diagram"), "/f"]);
-        let _ = reg(&["delete", &format!(r"{classes}\diagram.board"), "/f"]);
-        eprintln!("removed the .diagram file association");
+        for ext in [".shape", ".diagram"] {
+            let _ = reg(&["delete", &format!(r"{classes}\{ext}"), "/f"]);
+        }
+        let _ = reg(&["delete", &format!(r"{classes}\shape.board"), "/f"]);
+        eprintln!("removed the .shape and .diagram file associations");
         return Ok(());
     }
     let bin = binary()?;
     let dir = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or(home()?)
-        .join("diagram");
+        .join("shape");
     let icon = dir.join("document.ico");
     write(&icon, ico(DOC_SVG)?)?;
-    let key = format!(r"{classes}\diagram.board");
-    reg(&[
-        "add",
-        &format!(r"{classes}\.diagram"),
-        "/ve",
-        "/d",
-        "diagram.board",
-        "/f",
-    ])?;
+    let key = format!(r"{classes}\shape.board");
+    for ext in [".shape", ".diagram"] {
+        reg(&[
+            "add",
+            &format!(r"{classes}\{ext}"),
+            "/ve",
+            "/d",
+            "shape.board",
+            "/f",
+        ])?;
+    }
     reg(&["add", &key, "/ve", "/d", "Shape board", "/f"])?;
     reg(&[
         "add",
@@ -347,7 +363,7 @@ fn windows(remove: bool) -> Result<(), String> {
         &open,
         "/f",
     ])?;
-    eprintln!(".diagram files now have their own icon and open in the editor (sign out and in if Explorer keeps the old icon)");
+    eprintln!(".shape and .diagram files now have their own icon and open in Shape (sign out and in if Explorer keeps the old icon)");
     Ok(())
 }
 

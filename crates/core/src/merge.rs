@@ -467,7 +467,7 @@ pub fn prompt(m: &Merged, instruction: &str) -> String {
     for c in &m.conflicts {
         s.push_str(&format!("- {} — key `{}`\n", describe(c), c.key()));
     }
-    s.push_str("\n## The merged board (yours where they clash)\n\n```diagram\n");
+    s.push_str("\n## The merged board (yours where they clash)\n\n```shape\n");
     s.push_str(&crate::dsl::print_lean(&m.doc));
     s.push_str("```\n\n## What the person wants\n\n");
     s.push_str(instruction.trim());
@@ -546,7 +546,7 @@ pub fn split_markers(text: &str) -> Option<(Option<String>, String, String)> {
     Some((has_base.then_some(b), o, t))
 }
 
-/// The merge comment `diagram merge` puts on top of a file it could not
+/// The merge comment `shape merge` puts on top of a file it could not
 /// merge cleanly, taken off.
 pub fn strip_note(text: &str) -> &str {
     match text.strip_prefix("# merge: ") {

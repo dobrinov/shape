@@ -1,4 +1,4 @@
-//! The diagram document. This is also the JSON format: every other format
+//! The board document. This is also the JSON format: every other format
 //! (the DSL, Mermaid, the Markdown brief) converts to or from it.
 use serde::{Deserialize, Serialize};
 
@@ -1154,8 +1154,13 @@ impl Document {
     }
 }
 
-/// A link to another board, relative to this one: `delivery.diagram` or
-/// `../plans/q3.diagram#m1` → (`../plans/q3.diagram`, `Some("m1")`).
+/// A board's file name: `.shape`, or `.diagram` from before the rename.
+pub fn is_board_file(name: &str) -> bool {
+    name.ends_with(".shape") || name.ends_with(".diagram")
+}
+
+/// A link to another board, relative to this one: `delivery.shape` or
+/// `../plans/q3.shape#m1` → (`../plans/q3.shape`, `Some("m1")`).
 pub fn board_link(link: &str) -> Option<(&str, Option<&str>)> {
     if link.starts_with('#') || link.contains("://") || link.starts_with("mailto:") {
         return None;
@@ -1164,7 +1169,7 @@ pub fn board_link(link: &str) -> Option<(&str, Option<&str>)> {
         Some((p, i)) => (p, Some(i).filter(|i| !i.is_empty())),
         None => (link, None),
     };
-    path.ends_with(".diagram").then_some((path, id))
+    is_board_file(path).then_some((path, id))
 }
 
 pub fn valid_color(c: &str) -> bool {
@@ -1233,19 +1238,19 @@ mod tests {
     #[test]
     fn board_links() {
         assert_eq!(
-            board_link("../plans/q3.diagram#m1"),
-            Some(("../plans/q3.diagram", Some("m1")))
+            board_link("../plans/q3.shape#m1"),
+            Some(("../plans/q3.shape", Some("m1")))
         );
         assert_eq!(
             board_link("delivery.diagram"),
             Some(("delivery.diagram", None))
         );
         assert_eq!(board_link("#m1"), None);
-        assert_eq!(board_link("https://x.dev/a.diagram"), None);
+        assert_eq!(board_link("https://x.dev/a.shape"), None);
         assert_eq!(board_link("notes.md"), None);
-        let d = crate::dsl::parse("a: Plan [link: delivery.diagram#m1]\n").unwrap();
+        let d = crate::dsl::parse("a: Plan [link: delivery.shape#m1]\n").unwrap();
         let svg = crate::render::render(&d, &Default::default()).svg;
-        assert!(svg.contains("Go to m1 on delivery.diagram"));
+        assert!(svg.contains("Go to m1 on delivery.shape"));
         assert!(!svg.contains("<a href"));
     }
 }

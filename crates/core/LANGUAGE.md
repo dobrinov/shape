@@ -1,19 +1,19 @@
-# The diagram language
+# The Shape language
 
-A diagram can be written three ways. All three hold the same information, and
-`diagram convert` translates between them without losing any of it.
+A board can be written three ways. All three hold the same information, and
+`shape convert` translates between them without losing any of it.
 
 | Format | Best for | Extension |
 |---|---|---|
-| **DSL**: one statement per line | people: writing by hand, reviewing in a PR | `.diagram` |
-| **JSON**: the document model | programs and LLMs that emit structured output | `.diagram.json` |
+| **DSL**: one statement per line | people: writing by hand, reviewing in a PR | `.shape` |
+| **JSON**: the document model | programs and LLMs that emit structured output | `.shape.json` |
 | **Ops**: a JSON list of edits | LLMs and tools *changing* an existing diagram | (any) |
 
 Mermaid flowcharts (`flowchart LR …`) can be imported and exported as well.
 
 ## DSL
 
-```diagram
+```shape
 title: Checkout
 direction: right            # right (default) | down | left | up
 
@@ -38,7 +38,7 @@ comment c9 at 400,20: Overall flow looks right [resolved, resolution: ok]
 
 There is one statement per line. A line that starts with `#` or `//` is a note for people reading the file; use `comment` for review notes.
 
-Edits keep the file as it is written. Ops, the editor and `diagram apply` rewrite only the statements whose elements changed (a chain like `a -> b -> c` is split only when one of its arrows changes; a changed mindmap or gantt chart is rewritten as a block), put new statements next to their kind (inside their section, after the last box, arrow or comment), and leave every other line, blank line and `#` note alone. Only `diagram fmt` rewrites the whole file in its canonical form.
+Edits keep the file as it is written. Ops, the editor and `shape apply` rewrite only the statements whose elements changed (a chain like `a -> b -> c` is split only when one of its arrows changes; a changed mindmap or gantt chart is rewritten as a block), put new statements next to their kind (inside their section, after the last box, arrow or comment), and leave every other line, blank line and `#` note alone. Only `shape fmt` rewrites the whole file in its canonical form.
 
 | Statement | Meaning |
 |---|---|
@@ -83,7 +83,7 @@ Attributes go in square brackets at the end of the line as `key: value` pairs se
 
 | On | Keys |
 |---|---|
-| nodes | `shape`, `color`, `detail` (smaller second line), `link` (a web page; `#id` to go to another element on the board, `#/id` to one on the top board and `#/plan/id` to one inside canvas `plan` from anywhere; `delivery.diagram` or `../plans/q3.diagram#m1` for another board, relative to this file: the editor opens it in place and `diagram check` reports links that lead nowhere), `tags` (space separated), `x`, `y` (pinned position; on a mindmap topic, relative to its centre), `w`, `h`; mindmap topics also `collapsed`, `id`, and a centre `layout` |
+| nodes | `shape`, `color`, `detail` (smaller second line), `link` (a web page; `#id` to go to another element on the board, `#/id` to one on the top board and `#/plan/id` to one inside canvas `plan` from anywhere; `delivery.shape` or `../plans/q3.shape#m1` for another board, relative to this file: the editor opens it in place and `shape check` reports links that lead nowhere), `tags` (space separated), `x`, `y` (pinned position; on a mindmap topic, relative to its centre), `w`, `h`; mindmap topics also `collapsed`, `id`, and a centre `layout` |
 | edges | `label`, `arrow` (`end`, `start`, `both`, `none`), `line` (`solid`, `dashed`, `dotted`, `thick`), `color`, `id` |
 | groups | `color`, `label`, `x`, `y` (placed by hand: the section keeps its place and its boxes are laid out in it) |
 | comments | `resolved` / `open`, `resolution`, `author`, `x`, `y` |
@@ -92,11 +92,11 @@ Attributes go in square brackets at the end of the line as `key: value` pairs se
 - **Colours:** `gray`, `blue`, `green`, `yellow`, `orange`, `red`, `purple`, `pink`, `teal`, or `#rrggbb`
 - **Settings:** `layout: layered | grid`, `routing: orthogonal | curved | straight`, `theme: light | dark | paper | blueprint | midnight | contrast | <a theme's id> | ./file.theme`
 
-Nodes without `x`/`y` are placed automatically. Dragging a node in the editor pins it there. `diagram apply FILE` with `{"op":"unpin"}` releases every pinned node.
+Nodes without `x`/`y` are placed automatically. Dragging a node in the editor pins it there. `shape apply FILE` with `{"op":"unpin"}` releases every pinned node.
 
 ### Canvases inside a board
 
-```diagram
+```shape
 title: Checkout
 pay: Payments [pill, canvas: payments]
 api: Orders API
@@ -121,7 +121,7 @@ canvas payments: Payments flow {
 
 ### Images
 
-```diagram
+```shape
 shot: Login screen [image: img1, w: 328, h: 228]
 
 asset img1: data:image/png;base64,iVBORw0KGgo…
@@ -129,13 +129,13 @@ asset img1: data:image/png;base64,iVBORw0KGgo…
 
 - `image: img1` makes a box show an image; the label, if any, is its caption. `w`/`h` size it (the picture keeps its proportions inside).
 - The image itself is an `asset` line at the end of the file: its id and a `data:image/png;base64,…` URI (png, jpeg, gif, webp or svg+xml). One asset can be shown by several boxes; removing the last box that shows it removes it too.
-- Prompts, `brief` and `query` leave the base64 out and say which images there are, so a model reads `[image: img1]`, not the data. A whole-diagram reply keeps the board's images.
+- Prompts, `brief` and `query` leave the base64 out and say which images there are, so a model reads `[image: img1]`, not the data. A whole-shape reply keeps the board's images.
 - In the editor: paste an image (a screenshot, a copied picture), drop image files on the board, or right-click the empty board → *Insert image…*. Images over 1600px are scaled down, and large photos are stored as JPEG, to keep the file small.
 - Ops: `{"op":"add_asset","id":"img1","data":"data:image/png;base64,…"}`, then `add_node` / `update_node` with `"image":"img1"`; `remove` an asset id to drop it from every box.
 
 ### Themes
 
-```diagram
+```shape
 theme: brand
 
 theme brand {
@@ -163,7 +163,7 @@ theme brand {
 
 ### Swimlanes
 
-```diagram
+```shape
 lanes order: Order to cash {
   lane customer: Customer {
     place: Place order [pill]
@@ -189,7 +189,7 @@ confirm -> invoice -> pay
 
 ### Sequence diagrams
 
-```diagram
+```shape
 sequence login: Sign in {
   user: User [person]
   web: Web app
@@ -209,7 +209,7 @@ sequence login: Sign in {
 
 ### Kanban boards
 
-```diagram
+```shape
 kanban sprint: Sprint 12 {
   column todo: To do {
     search: Search results [owner: ana]
@@ -232,7 +232,7 @@ api -> search: unblocks
 
 ### Decision records
 
-```diagram
+```shape
 adr db: Use Postgres for orders [accepted] {
   context: Orders and payments change together; reporting needs ad-hoc queries.
   options: Postgres (RDS), DynamoDB, MongoDB Atlas
@@ -252,7 +252,7 @@ db -> mongo: supersedes
 
 ### Gantt charts
 
-```diagram
+```shape
 gantt launch: Launch plan [start: 2026-10-12] {
   Design [5d]
   Build [2w, after: design]
@@ -267,7 +267,7 @@ gantt launch: Launch plan [start: 2026-10-12] {
 - `5d` / `2w` / `1m` (30 days) / `1q` (91 days), or `days: 5`, is the duration (1 day if left out). `2026-11-03` (or `start: …`) fixes the start. `after: a b` starts it when those tasks end. Otherwise a task starts when the one above it ends; the first starts on the chart's `start`.
 - `after:` names a task of the same chart first (its id, or its label as an id: `after: design` is this chart's Design even if another chart's took the id `design`), then any task on the board, so a task can wait for one in another chart (drawn dashed; both charts need dates). `chart/task` names a task of another chart when this one has a task of the same name.
 - `milestone` makes a task a point in time (a diamond on the day it falls), `done: 60%` (or `done` for all of it) shades the part that is done, and `owner: ana` shows who does it next to the task's name.
-- **Forecast:** as of today (in the editor; `--today` or `--as-of DATE` for exports, `brief`, `outline --md`), an unfinished task that has started is forecast to take until today plus the part not done yet (by its `done`), and everything that waits for it moves with it, in other charts too. A slip is drawn as a red dashed extension with `+5d` (a hollow diamond where a milestone will land). Prompts add `forecast end 2026-10-26 (+5d, behind)`; `diagram schedule FILE [CHART] [--as-of DATE] [--json]` lists every task's plan, forecast and status (done, late, behind, in progress, pushed back, upcoming); `diff` lists the milestones and chart ends a plan change moves.
+- **Forecast:** as of today (in the editor; `--today` or `--as-of DATE` for exports, `brief`, `outline --md`), an unfinished task that has started is forecast to take until today plus the part not done yet (by its `done`), and everything that waits for it moves with it, in other charts too. A slip is drawn as a red dashed extension with `+5d` (a hollow diamond where a milestone will land). Prompts add `forecast end 2026-10-26 (+5d, behind)`; `shape schedule FILE [CHART] [--as-of DATE] [--json]` lists every task's plan, forecast and status (done, late, behind, in progress, pushed back, upcoming); `diff` lists the milestones and chart ends a plan change moves.
 - Days are calendar days. A colour colours the bar. In JSON, the chart is a group with `"gantt": true` and `start`; tasks are its nodes with `start`, `days`, `after`, `milestone`, `done` and `owner`.
 - Bars are tasks like any node: comment on them, link them to anything on the board.
 - `x`/`y` on the chart (`[start: …, x: 400, y: 120]`) pin it, as dragging it in the editor does.
@@ -276,7 +276,7 @@ gantt launch: Launch plan [start: 2026-10-12] {
 
 ### Database tables
 
-```diagram
+```shape
 entity teams: Teams {
   id:   uuid [pk]
   name: text [unique]
@@ -293,12 +293,12 @@ entity users: Users {
 - Each line is a column: `name: type`, then `[pk]`, `[unique]`, `[null]` (it may be NULL; columns are NOT NULL otherwise), `[fk: teams.id]` (or `fk: teams` for its primary key), `[rel: member of]` (the relationship's name, written on its line), `[default: now()]`, and the usual `detail`, `color`, `link`. The type can be left out (`email [unique]`) for a conceptual ER model. A column's id is its table's and its name (`users.email`), so comments, links and arrows can point at a column.
 - **ER notation:** a foreign key is drawn with crow's feet worked out from the column. At the referenced table: one (`||`), or zero or one (`o|`) when the column may be NULL. At the referencing table: many (`o<`), or zero or one when the column is unique or the primary key (one-to-one).
 - A foreign key is drawn as a line from the column to the column it references, and pulls related tables together in the layout. Columns show a `PK` / `FK` / `UQ` badge, their type, and `?` when nullable; hovering one shows everything about it.
-- Reviewing a schema change: `diagram diff old.diagram new.diagram` lists columns added, dropped and changed (type, keys, references, default), and `diagram svg new.diagram --base old.diagram` (or `--base HEAD`) shows them in green, red and amber.
+- Reviewing a schema change: `shape diff old.shape new.shape` lists columns added, dropped and changed (type, keys, references, default), and `shape svg new.shape --base old.shape` (or `--base HEAD`) shows them in green, red and amber.
 - In the editor: the *Database table* tool; right-click a table → *Edit columns…* (the columns as text), *Add column*; right-click a column → *Edit column…*, *Colour…*, *Delete column*. Prompts show a table as a Markdown table of its columns. In JSON a table is a group with `entity`; its columns are nodes with `column: {type, pk, unique, null, fk, default}`.
 
 ### Tables
 
-```diagram
+```shape
 table options: Hosting options {
   option | cost  | latency | notes
   Local  | $0    | 40 ms   | Needs an 8B model on every laptop
@@ -313,7 +313,7 @@ table options: Hosting options {
 
 ### Cycles
 
-```diagram
+```shape
 cycle loop: Build loop {
   Plan
   Build [blue]
@@ -327,7 +327,7 @@ cycle loop: Build loop {
 
 ### Perspectives
 
-```diagram
+```shape
 type: project
 perspective legal: Legal [tags: legal, show: adr]
 
@@ -340,7 +340,7 @@ fraud: Fraud reporting API [tags: tech exec]
 
 ### Wireframe screens
 
-```diagram
+```shape
 screen login: Sign in [mobile] {
   header: Acme
   title: Welcome back
@@ -365,12 +365,12 @@ login.submit -> home: signs in
 
 ### Boards as prompts
 
-- In the editor, ⌘⇧C copies the selection as Markdown for a prompt; with nothing selected it copies the whole board, every canvas in it, as a spec to build from (also on the empty board's right-click and under Share). `diagram prompt FILE --target build` prints the same.
+- In the editor, ⌘⇧C copies the selection as Markdown for a prompt; with nothing selected it copies the whole board, every canvas in it, as a spec to build from (also on the empty board's right-click and under Share). `shape prompt FILE --target build` prints the same.
 - The spec starts with what to do (build what the board describes; keep its names; ask where open comments leave it unclear), then each board's sections and blocks, the connections and the open comments. Screens list their components, database tables their columns and keys, gantt charts their forecast dates.
 
 ### Presentations
 
-```diagram
+```shape
 presentation: Launch review [transition: glide, instructions: "For the exec sync, ten minutes"] {
   * [title: Where we are]
   risks [notes: "Two of them, both owned", transition: zoom]
@@ -384,7 +384,7 @@ presentation: Launch review [transition: glide, instructions: "For the exec sync
 
 ### Timelines
 
-```diagram
+```shape
 timeline history: How we got here {
   Dec 2024: Airwallex: no markup on issuing
   18 Jun 2025: Push provisioning priced at £15k per region
@@ -403,7 +403,7 @@ timeline history: How we got here {
 
 ### Charts
 
-```diagram
+```shape
 chart revenue: Revenue by quarter [bar, stacked, unit: k€] {
   quarter | EU  | US
   Q1      | 120 | 80
@@ -424,7 +424,7 @@ chart share: Market share [pie, unit: %] {
 
 ### Risk matrices
 
-```diagram
+```shape
 risks delivery: Delivery risks [scale: 5] {
   Bank contract slips [p: 4, i: 4, owner: ana, detail: "Legal says 4 weeks; it blocks the pilot"]
   Local model too weak for ops [p: 3, i: 3]
@@ -441,7 +441,7 @@ risks delivery: Delivery risks [scale: 5] {
 
 ### Mindmaps
 
-```diagram
+```shape
 mindmap offsite: Team offsite [layout: both, x: 0, y: 0] {
   Venue
     Who books it?
@@ -462,16 +462,16 @@ offsite-note ..> who-books-it
 - Each level of a side lines up in one column, and each branch's sub-topics fan out evenly around it. A topic with `x`/`y` was placed by hand: the position is relative to the centre's top-left, its own branches follow it, and its siblings close up. `{"op":"unpin","id":ID}` puts it back in the automatic layout (the editor's *Reset arrangement* does that for the whole map).
 - `[collapsed]` folds the branches under a topic. A colour on a topic colours its whole branch; main branches get distinct colours automatically.
 - In JSON a topic is a node with `parent` (the topic it branches from); the centre has `mindmap` (its layout). Siblings keep document order.
-- `diagram outline FILE` prints a map as an outline and `--md` as Markdown (the centre is the title, topics are bullets; main branches are `##` sections when each has something under it): that is how a mindmap becomes a prompt. A topic with `link: #id` reads "label (see “target”)", and the block it points at (a flow, a plan, a section, another map) follows as a section of its own, so one prompt map can gather context from the whole board. `diagram expand FILE ID` grows a topic with your AI harness.
+- `shape outline FILE` prints a map as an outline and `--md` as Markdown (the centre is the title, topics are bullets; main branches are `##` sections when each has something under it): that is how a mindmap becomes a prompt. A topic with `link: #id` reads "label (see “target”)", and the block it points at (a flow, a plan, a section, another map) follows as a section of its own, so one prompt map can gather context from the whole board. `shape expand FILE ID` grows a topic with your AI harness.
 
 ## Merging
 
-Boards merge element by element, not line by line. `diagram merge --install` (once per clone; commit the `.gitattributes` it writes) makes git use `diagram merge` for `.diagram` files:
+Boards merge element by element, not line by line. `shape merge --install` (once per clone; commit the `.gitattributes` it writes) makes git use `shape merge` for `.shape` files:
 
 - An element changed on one side takes that change; two people changing different things about the same box (one its colour, the other its detail) get both. Added on one side, it is added; removed on one side and left alone on the other, it goes. Canvases inside a board merge the same way.
 - Only the same field changed two ways, or an element changed on one side and removed on the other, is a conflict. The file then keeps yours, says so in a `# merge: …` line at the top, and git leaves it unmerged.
-- Opening the board in the editor (`diagram FILE`) shows the merge to settle: yours, the result and theirs side by side, what clashed outlined. Pick yours or theirs per conflict, or describe what to keep in words ("their colours, but my labels") and the AI picks, and edits where a pick alone will not do. *Save and mark resolved* writes the file and `git add`s it. A file git merged line by line (with `<<<<<<<` markers) opens the same way.
-- `diagram merge BASE OURS THEIRS [-o OUT]` merges three files and lists the conflicts.
+- Opening the board in the editor (`shape FILE`) shows the merge to settle: yours, the result and theirs side by side, what clashed outlined. Pick yours or theirs per conflict, or describe what to keep in words ("their colours, but my labels") and the AI picks, and edits where a pick alone will not do. *Save and mark resolved* writes the file and `git add`s it. A file git merged line by line (with `<<<<<<<` markers) opens the same way.
+- `shape merge BASE OURS THEIRS [-o OUT]` merges three files and lists the conflicts.
 
 ## JSON
 
@@ -498,7 +498,7 @@ The JSON form is the document model itself. Only `nodes` is required. Every othe
 }
 ```
 
-`diagram spec --json-schema` prints the JSON Schema.
+`shape spec --json-schema` prints the JSON Schema.
 
 ## Ops
 
@@ -514,10 +514,10 @@ An ops batch changes a diagram without rewriting it, and it is the safest format
 
 OPS_REFERENCE
 
-`diagram apply FILE reply.md` accepts a chat reply as it is: it uses the first ```json block in the text. One op can go inline: `diagram apply FILE '{"op":"remove","id":"cache"}'`. A mistyped id gets a suggestion (`no node `apii` (did you mean `api`?)`).
+`shape apply FILE reply.md` accepts a chat reply as it is: it uses the first ```json block in the text. One op can go inline: `shape apply FILE '{"op":"remove","id":"cache"}'`. A mistyped id gets a suggestion (`no node `apii` (did you mean `api`?)`).
 
 ### Writing and reading parts of a board
 
-- **`merge` / `diagram add FILE`** take statements in the diagram language and add them as if they were written at the end of the file: new elements are created, and an element written again by its id gets the attributes given (`api [red]`, `build [3w, done: 50%]`). A group written again keeps its place, so `lane platform {` … `}` adds to that lane. This is the cheapest way for a model to add a lot at once. (Topics and tasks written in a repeated `mindmap` / `gantt` block are added as new ones; change existing ones by id.)
-- **`diagram query FILE SELECTOR…`** prints just part of the board, as diagram language with the sections it sits in: `ID`, `group:ID` (also `chart:`, `lanes:`), `map:ID` (a topic and its branches), `near:ID` (a box, its arrows and their other ends), `label~TEXT`, `kind:box|topic|task|milestone|sticky|decision|group|edge|comment`, `owner:NAME`, `tag:NAME`, `color:NAME`, `comments:open`. Several selectors give everything any of them picks; `--ids` prints only ids.
+- **`merge` / `shape add FILE`** take statements in the Shape language and add them as if they were written at the end of the file: new elements are created, and an element written again by its id gets the attributes given (`api [red]`, `build [3w, done: 50%]`). A group written again keeps its place, so `lane platform {` … `}` adds to that lane. This is the cheapest way for a model to add a lot at once. (Topics and tasks written in a repeated `mindmap` / `gantt` block are added as new ones; change existing ones by id.)
+- **`shape query FILE SELECTOR…`** prints just part of the board, as Shape language with the sections it sits in: `ID`, `group:ID` (also `chart:`, `lanes:`), `map:ID` (a topic and its branches), `near:ID` (a box, its arrows and their other ends), `label~TEXT`, `kind:box|topic|task|milestone|sticky|decision|group|edge|comment`, `owner:NAME`, `tag:NAME`, `color:NAME`, `comments:open`. Several selectors give everything any of them picks; `--ids` prints only ids.
 - **`--focus ID,ID`** on `svg` / `png` / `html` crops the picture to those elements.

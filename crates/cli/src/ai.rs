@@ -2,7 +2,7 @@
 //! answer to stdout. Usually the CLI of an AI subscription the person
 //! already has, signed in: `--ai claude` (Claude Code), `codex` (Codex CLI,
 //! ChatGPT plan), `gemini` (Gemini CLI); `claude:sonnet` picks a model.
-//! Any other text is a command line. Chosen with `--ai` or `DIAGRAM_AI`;
+//! Any other text is a command line. Chosen with `--ai` or `SHAPE_AI`;
 //! when neither is set, the first of those CLIs that is installed.
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -85,7 +85,7 @@ pub fn hint(cmd: &str, error: &str) -> String {
     let e = error.to_lowercase();
     let prog = cmd.split_whitespace().next().unwrap_or(cmd);
     if e.contains("not found") || e.contains("no such file") || e.contains("cannot run") {
-        format!("`{prog}` was not found. Install it, or pass its full path: `diagram FILE --ai \"/full/path/to/{prog} …\"` (`command -v {prog}` in a terminal prints it).")
+        format!("`{prog}` was not found. Install it, or pass its full path: `shape FILE --ai \"/full/path/to/{prog} …\"` (`command -v {prog}` in a terminal prints it).")
     } else if [
         "login",
         "log in",
@@ -134,7 +134,8 @@ pub fn command(explicit: Option<&str>) -> Option<String> {
     if let Some(c) = explicit.filter(|c| !c.trim().is_empty()) {
         return Some(resolve(c));
     }
-    if let Ok(c) = std::env::var("DIAGRAM_AI") {
+    // DIAGRAM_AI: the name before the rename to Shape
+    if let Ok(c) = std::env::var("SHAPE_AI").or_else(|_| std::env::var("DIAGRAM_AI")) {
         return Some(resolve(&c)).filter(|c| !c.trim().is_empty());
     }
     // the first subscription CLI that is installed

@@ -1,4 +1,4 @@
-//! Agent skills shipped inside the binary (`diagram skills install`).
+//! Agent skills shipped inside the binary (`shape skills install`).
 use std::path::PathBuf;
 
 macro_rules! skill {
@@ -16,11 +16,11 @@ macro_rules! skill {
 }
 
 pub const SKILLS: &[(&str, &str)] = &[
-    skill!("diagram-draw"),
-    skill!("diagram-review"),
-    skill!("diagram-edit"),
-    skill!("diagram-mindmap"),
-    skill!("diagram-embed"),
+    skill!("shape-draw"),
+    skill!("shape-review"),
+    skill!("shape-edit"),
+    skill!("shape-mindmap"),
+    skill!("shape-embed"),
 ];
 
 pub fn run(args: &[String], global: bool, dir: Option<PathBuf>) -> Result<(), String> {
@@ -34,11 +34,11 @@ pub fn run(args: &[String], global: bool, dir: Option<PathBuf>) -> Result<(), St
                     .trim();
                 println!("{name:16} {desc}");
             }
-            println!("\nInstall with: diagram skills install [--global]");
+            println!("\nInstall with: shape skills install [--global]");
             Ok(())
         }
         Some("show") => {
-            let name = args.get(1).ok_or("usage: diagram skills show NAME")?;
+            let name = args.get(1).ok_or("usage: shape skills show NAME")?;
             let (_, body) = SKILLS
                 .iter()
                 .find(|(n, _)| n == name)
@@ -56,6 +56,11 @@ pub fn run(args: &[String], global: bool, dir: Option<PathBuf>) -> Result<(), St
                     .join(".claude/skills"),
             };
             for (name, body) in SKILLS {
+                // the same skill from before the rename to Shape (`diagram-draw`…)
+                let old = base.join(name.replacen("shape-", "diagram-", 1));
+                if old.join("SKILL.md").is_file() {
+                    let _ = std::fs::remove_dir_all(&old);
+                }
                 let dir = base.join(name);
                 std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
                 std::fs::write(dir.join("SKILL.md"), body).map_err(|e| e.to_string())?;

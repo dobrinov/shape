@@ -27,7 +27,7 @@ The designer scored each render 1–5 for readability, hierarchy, aesthetics and
 
 ## Bug found and fixed
 
-`diagram png/svg --base` emitted a duplicate `stroke-width` attribute on added or changed **groups**. The SVG was invalid XML, so `png` failed with *"attribute 'stroke-width' is already defined"*. The fix is in `crates/core/src/render.rs`, with a regression test `diffed_groups_are_valid_svg` in `lib.rs`. The test fails without the fix and passes with it.
+`shape png/svg --base` emitted a duplicate `stroke-width` attribute on added or changed **groups**. The SVG was invalid XML, so `png` failed with *"attribute 'stroke-width' is already defined"*. The fix is in `crates/core/src/render.rs`, with a regression test `diffed_groups_are_valid_svg` in `lib.rs`. The test fails without the fix and passes with it.
 
 ## Other renderer defects observed
 
@@ -44,7 +44,7 @@ The designer scored each render 1–5 for readability, hierarchy, aesthetics and
 
 I prototyped two things on top of the existing engine, without changing it:
 
-- **An auto-collapsed overview** (`09-big-platform.overview.diagram` → `out/09-overview.png`): each group becomes one node, and edges between groups are aggregated with a ×N count. The 38 nodes and 44 edges become 8 readable boxes. It was derived from the JSON model in about 15 lines, so it can become a native feature.
+- **An auto-collapsed overview** (`09-big-platform.overview.shape` → `out/09-overview.png`): each group becomes one node, and edges between groups are aggregated with a ×N count. The 38 nodes and 44 edges become 8 readable boxes. It was derived from the JSON model in about 15 lines, so it can become a native feature.
 - **A tour viewer** (`make_tour.py` + `tour_template.html` → `out/09-big-platform-tour.html`):
   - narrated steps driven by a small `tour.json`;
   - dim and zoom to each step's focus on a **stable** layout;
@@ -65,7 +65,7 @@ The designer's verdict was *"partly solved"*. Steps that zoom into a group are g
 
 1. **Semantic zoom as the default.** Big diagrams open on the collapsed overview. Clicking a group expands it in place, and other groups stay collapsed with aggregated edges. There's a minimum readable text size (~11 px): if fitting the screen would go below it, show the collapsed level instead.
 2. **Tours as a first-class DSL statement**, stored and reviewed with the diagram:
-   ```diagram
+   ```shape
    step "Getting documents in" on ingest, email_in: Uploads and parsed e-mails are stored…
    ```
    Each step means "expand these groups + focus + caption". Comments can be attached to steps, so a newcomer's question becomes a review thread.

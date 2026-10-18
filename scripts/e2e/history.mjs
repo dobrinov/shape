@@ -12,20 +12,20 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const bin = join(root, "target", "debug", "diagram");
+const bin = join(root, "target", "debug", "shape");
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 6790 + Math.floor(Math.random() * 100);
 const dir = mkdtempSync(join(tmpdir(), "diagram-e2e-"));
-const file = join(dir, "board.diagram");
+const file = join(dir, "board.shape");
 writeFileSync(file, "title: History\n\na: Alpha\n");
-const kept = join(dir, ".diagram-history", "board.diagram");
+const kept = join(dir, ".shape-history", "board.shape");
 mkdirSync(kept, { recursive: true });
-writeFileSync(join(kept, "1700000000__Ana+Bell.diagram"), "title: History\n\na: Old Alpha\n");
+writeFileSync(join(kept, "1700000000__Ana+Bell.shape"), "title: History\n\na: Old Alpha\n");
 // git without a name, so the editor has to ask
 const noname = join(dir, "gitconfig");
 writeFileSync(noname, "");
 const server = spawn(bin, [file, "--no-open", "--port", String(port)], {
-  env: { ...process.env, DIAGRAM_WEB_DIR: join(root, "web"), DIAGRAM_NO_UPDATE_CHECK: "1", GIT_CONFIG_GLOBAL: noname, GIT_CONFIG_NOSYSTEM: "1" },
+  env: { ...process.env, SHAPE_WEB_DIR: join(root, "web"), SHAPE_NO_UPDATE_CHECK: "1", GIT_CONFIG_GLOBAL: noname, GIT_CONFIG_NOSYSTEM: "1" },
   stdio: "ignore",
 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -62,7 +62,7 @@ try {
       await rows.first().getByRole("button", { name: "Restore" }).click(); await sleep(1200);
       assert.match(saved(), /a: Old Alpha/);
       const names = readdirSync(kept);
-      assert.ok(names.some((n) => n.endsWith("__Bo+Chen.diagram")), names.join(", "));
+      assert.ok(names.some((n) => n.endsWith("__Bo+Chen.shape")), names.join(", "));
     } else {
       assert.equal(await rows.count(), 2);
       assert.match(await rows.first().innerText(), /Bo Chen/);

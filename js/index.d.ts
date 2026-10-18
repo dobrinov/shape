@@ -1,4 +1,4 @@
-// Types for the `diagram` package. The document types mirror
+// Types for the `@dobrinov/shape` package. The document types mirror
 // crates/core/src/model.rs (the JSON format); ops mirror crates/core/src/ops.rs.
 
 // ------------------------------------------------------------------ document
@@ -678,7 +678,7 @@ export interface SetOp {
   value: string;
 }
 
-/** Statements in the diagram language, added as if written at the end of the file; an element written again by its id gets the attributes given. */
+/** Statements in the Shape language, added as if written at the end of the file; an element written again by its id gets the attributes given. */
 export interface MergeOp {
   op: "merge";
   dsl: string;
@@ -930,7 +930,7 @@ export type InitInput =
 
 /**
  * Load the WASM module. Idempotent; await it once before anything else.
- * Node reads `pkg/diagram_wasm_bg.wasm` next to the module; browsers fetch it
+ * Node reads `pkg/shape_wasm_bg.wasm` next to the module; browsers fetch it
  * relative to the module. An explicit `input` wins.
  */
 export function init(input?: InitInput): Promise<void>;
@@ -938,7 +938,7 @@ export function init(input?: InitInput): Promise<void>;
 /** Synchronous init from the .wasm bytes or a compiled module. */
 export function initSync(bytesOrModule: ArrayBuffer | ArrayBufferView | WebAssembly.Module): void;
 
-/** A board (one `.diagram` document) being read or edited. */
+/** A board (one `.shape` document) being read or edited. */
 export class Board {
   private constructor();
 
@@ -989,7 +989,7 @@ export class Board {
   schedule(options?: { today?: Date | string }): Schedule;
 
   /**
-   * Part of the board as diagram language, picked by selectors: `ID`, `group:ID`, `chart:ID`,
+   * Part of the board as Shape language, picked by selectors: `ID`, `group:ID`, `chart:ID`,
    * `map:ID`, `near:ID`, `label~TEXT`, `kind:box|topic|task|milestone|sticky|decision|group|edge|comment`,
    * `owner:NAME`, `tag:NAME`, `color:NAME`, `comments:open`. Several selectors: everything any picks.
    * @throws DiagramError when a selector is unknown or picks nothing
@@ -999,7 +999,7 @@ export class Board {
   /** The ids the selectors pick (see query), in document order. */
   select(...selectors: (string | string[])[]): string[];
 
-  /** Add statements in the diagram language (op `merge`). */
+  /** Add statements in the Shape language (op `merge`). */
   merge(dsl: string): ApplyResult;
 
   /** A theme file the board names (`theme: ./brand.theme`): its text, under that name. @throws DiagramError */
@@ -1042,7 +1042,7 @@ export function spec(): string;
 /** JSON Schema of the document format. */
 export function jsonSchema(): Record<string, unknown>;
 
-/** Version of the diagram core. */
+/** Version of the Shape core. */
 export function version(): string;
 
 /** A prompt asking a model for a new mindmap about `topic`. Feed the reply to replyOutline() and an `add_outline` op. */

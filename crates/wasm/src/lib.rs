@@ -1,8 +1,8 @@
 //! WebAssembly bindings. Everything crosses the boundary as strings (JSON
 //! for structured values) so the JS glue stays tiny and dependency free.
-use diagram_core::prompt::PromptOptions;
-use diagram_core::{RenderOptions, Session};
 use serde_json::{json, Value};
+use shape_core::prompt::PromptOptions;
+use shape_core::{RenderOptions, Session};
 use wasm_bindgen::prelude::*;
 
 fn to_json<T: serde::Serialize>(v: &T) -> String {
@@ -86,7 +86,7 @@ impl Diagram {
     /// Replace the open canvas with a document (JSON); the rest of the board
     /// stays as written. Returns `{ok}` or `{ok: false, error}`.
     pub fn replace_here(&mut self, json: &str) -> String {
-        match serde_json::from_str::<diagram_core::Document>(json) {
+        match serde_json::from_str::<shape_core::Document>(json) {
             Ok(d) => {
                 self.inner.replace_here(d);
                 json!({"ok": true}).to_string()
@@ -143,17 +143,14 @@ impl Diagram {
             .iter()
             .find(|t| t.id == name)
             .cloned()
-            .or_else(|| diagram_core::theme::preset(name));
-        t.map(|t| diagram_core::dsl::theme_text(&t))
+            .or_else(|| shape_core::theme::preset(name));
+        t.map(|t| shape_core::dsl::theme_text(&t))
             .unwrap_or_default()
     }
 
     /// The presets' names, and the themes this board has.
     pub fn themes(&self) -> String {
-        let presets: Vec<&str> = diagram_core::theme::PRESETS
-            .iter()
-            .map(|(n, _)| *n)
-            .collect();
+        let presets: Vec<&str> = shape_core::theme::PRESETS.iter().map(|(n, _)| *n).collect();
         let own: Vec<&str> = self
             .inner
             .doc
@@ -172,7 +169,7 @@ impl Diagram {
 
     pub fn diff(&self) -> String {
         match &self.inner.base {
-            Some(b) => to_json(&diagram_core::diff::diff(b, &self.inner.doc)),
+            Some(b) => to_json(&shape_core::diff::diff(b, &self.inner.doc)),
             None => to_json(&json!({ "entries": [] })),
         }
     }
@@ -196,12 +193,12 @@ impl Diagram {
     }
 
     pub fn brief(&self) -> String {
-        diagram_core::prompt::brief(&self.inner.doc)
+        shape_core::prompt::brief(&self.inner.doc)
     }
 
     /// The mindmap under `id` as an indented outline (with `id` as the first line).
     pub fn outline(&self, id: &str) -> String {
-        diagram_core::mindmap::outline(&self.inner.doc, id, true)
+        shape_core::mindmap::outline(&self.inner.doc, id, true)
     }
 
     /// The mindmap under `id` as Markdown (title, sections, bullets): a
@@ -210,40 +207,40 @@ impl Diagram {
         if self.inner.doc.node(id).is_none() {
             return String::new();
         }
-        diagram_core::prompt::selection(&self.inner.doc, &[id.to_string()])
+        shape_core::prompt::selection(&self.inner.doc, &[id.to_string()])
     }
 
     /// The selected items (a JSON array of ids) as Markdown to paste into a
     /// prompt: sections with their blocks, arrows between them, open comments.
     pub fn selection_markdown(&self, ids: &str) -> String {
         let ids: Vec<String> = serde_json::from_str(ids).unwrap_or_default();
-        diagram_core::prompt::selection(&self.inner.doc, &ids)
+        shape_core::prompt::selection(&self.inner.doc, &ids)
     }
 
     /// The selected items as Markdown, with gantt forecasts as of `today`
     /// (`YYYY-MM-DD`; empty: none).
     pub fn selection_markdown_at(&self, ids: &str, today: &str) -> String {
         let ids: Vec<String> = serde_json::from_str(ids).unwrap_or_default();
-        let t = diagram_core::gantt::parse_date(today);
-        diagram_core::prompt::selection_at(&self.inner.doc, &ids, t)
+        let t = shape_core::gantt::parse_date(today);
+        shape_core::prompt::selection_at(&self.inner.doc, &ids, t)
     }
 
     /// The whole board, every canvas in it, as a prompt to build what it
     /// describes (gantt forecasts as of `today`, `YYYY-MM-DD`).
     pub fn build_prompt(&self, today: &str) -> String {
-        diagram_core::prompt::build(&self.inner.whole(), diagram_core::gantt::parse_date(today))
+        shape_core::prompt::build(&self.inner.whole(), shape_core::gantt::parse_date(today))
     }
 
     /// The brief, with gantt forecasts as of `today` (`YYYY-MM-DD`).
     pub fn brief_at(&self, today: &str) -> String {
-        diagram_core::prompt::brief_at(&self.inner.doc, diagram_core::gantt::parse_date(today))
+        shape_core::prompt::brief_at(&self.inner.doc, shape_core::gantt::parse_date(today))
     }
 
     /// Every gantt chart's tasks, planned against the forecast as of `today`
     /// (`YYYY-MM-DD`): `{today, charts: [{id, label, tasks: [{id, start, end,
     /// days, done, milestone, forecast_start, forecast_end, slip, status}]}]}`.
     pub fn schedule(&self, today: &str) -> String {
-        let Some(t) = diagram_core::gantt::parse_date(today) else {
+        let Some(t) = shape_core::gantt::parse_date(today) else {
             return err(format!("`{today}` is not a date (YYYY-MM-DD)"));
         };
         let doc = &self.inner.doc;
@@ -251,13 +248,13 @@ impl Diagram {
             .groups
             .iter()
             .filter(|g| g.gantt)
-            .map(|g| json!({"id": g.id, "label": g.display(), "tasks": diagram_core::gantt::track(doc, &g.id, t)}))
+            .map(|g| json!({"id": g.id, "label": g.display(), "tasks": shape_core::gantt::track(doc, &g.id, t)}))
             .collect();
-        json!({"today": diagram_core::gantt::format_date(t), "charts": charts}).to_string()
+        json!({"today": shape_core::gantt::format_date(t), "charts": charts}).to_string()
     }
 
-    /// Part of the board as diagram language: `selectors` is a JSON array
-    /// (`["group:back", "near:api"]`, see `diagram help`). Returns
+    /// Part of the board as Shape language: `selectors` is a JSON array
+    /// (`["group:back", "near:api"]`, see `shape help`). Returns
     /// `{source, ids}` or `{error}`.
     pub fn query(&self, selectors: &str) -> String {
         let sels: Vec<String> = match serde_json::from_str(selectors) {
@@ -265,9 +262,9 @@ impl Diagram {
             Err(e) => return err(format!("selectors: {e}")),
         };
         let sels: Vec<&str> = sels.iter().map(|s| s.as_str()).collect();
-        match diagram_core::query::select(&self.inner.doc, &sels) {
+        match shape_core::query::select(&self.inner.doc, &sels) {
             Ok(ids) => json!({
-                "source": diagram_core::dsl::print(&diagram_core::query::subset(&self.inner.doc, &ids)),
+                "source": shape_core::dsl::print(&shape_core::query::subset(&self.inner.doc, &ids)),
                 "ids": ids,
             })
             .to_string(),
@@ -279,7 +276,7 @@ impl Diagram {
     /// the selected `ids` (a JSON array; empty: the whole board).
     pub fn ask_prompt(&self, ids: &str, request: &str) -> String {
         let ids: Vec<String> = serde_json::from_str(ids).unwrap_or_default();
-        diagram_core::prompt::ask(&self.inner.doc, &ids, request, &self.inner.recipes)
+        shape_core::prompt::ask(&self.inner.doc, &ids, request, &self.inner.recipes)
     }
 
     /// A prompt asking `question` about the whole board (canvases included).
@@ -288,7 +285,7 @@ impl Diagram {
     pub fn question_prompt(&self, history: &str, question: &str, today: &str) -> String {
         let history: Vec<(String, String)> = serde_json::from_str(history).unwrap_or_default();
         self.inner
-            .question_prompt(&history, question, diagram_core::gantt::parse_date(today))
+            .question_prompt(&history, question, shape_core::gantt::parse_date(today))
     }
 
     /// A team's own recipes, as `{id: file text}` (each starting `# recipe:
@@ -298,14 +295,14 @@ impl Diagram {
             serde_json::from_str(files).unwrap_or_default();
         self.inner.recipes = files
             .iter()
-            .filter_map(|(id, text)| diagram_core::recipes::from_file(id, text))
+            .filter_map(|(id, text)| shape_core::recipes::from_file(id, text))
             .collect();
     }
 
     /// Every recipe (built in, then the team's): `[{id, name, when, shape, source}]`.
     pub fn recipes(&self) -> String {
         to_json(
-            &diagram_core::recipes::builtins()
+            &shape_core::recipes::builtins()
                 .into_iter()
                 .chain(self.inner.recipes.iter().cloned())
                 .collect::<Vec<_>>(),
@@ -315,13 +312,13 @@ impl Diagram {
     /// Screen `gid`'s components as text, one per line ("" when it is not
     /// a screen).
     pub fn screen_text(&self, gid: &str) -> String {
-        diagram_core::screen::text_of(&self.inner.doc, gid).unwrap_or_default()
+        shape_core::screen::text_of(&self.inner.doc, gid).unwrap_or_default()
     }
 
     /// The ops that make screen `gid` what `text` says: `{ok, ops}` or
     /// `{ok: false, error}`.
     pub fn screen_edit_ops(&self, gid: &str, text: &str) -> String {
-        match diagram_core::screen::edit_ops(&self.inner.doc, gid, text) {
+        match shape_core::screen::edit_ops(&self.inner.doc, gid, text) {
             Ok(ops) => serde_json::json!({ "ok": true, "ops": ops }).to_string(),
             Err(e) => serde_json::json!({ "ok": false, "error": e }).to_string(),
         }
@@ -344,7 +341,7 @@ impl Diagram {
     pub fn answer_board_prompt(&self, history: &str, question: &str, today: &str) -> String {
         let history: Vec<(String, String)> = serde_json::from_str(history).unwrap_or_default();
         self.inner
-            .answer_board_prompt(&history, question, diagram_core::gantt::parse_date(today))
+            .answer_board_prompt(&history, question, shape_core::gantt::parse_date(today))
     }
 
     /// The places an answer points at: `[{ref, path, id, label}]` (label
@@ -377,11 +374,11 @@ impl Diagram {
     /// A small prompt asking a model to grow the topic `id`.
     /// Options: `{instructions, count, levels}`. Returns `{prompt}` or `{error}`.
     pub fn expand_prompt(&self, id: &str, options: &str) -> String {
-        let o: diagram_core::mindmap::ExpandOptions = match opts(options) {
+        let o: shape_core::mindmap::ExpandOptions = match opts(options) {
             Ok(o) => o,
             Err(e) => return err(e),
         };
-        match diagram_core::mindmap::expand_prompt(&self.inner.doc, id, &o) {
+        match shape_core::mindmap::expand_prompt(&self.inner.doc, id, &o) {
             Ok(p) => json!({ "prompt": p }).to_string(),
             Err(e) => err(e),
         }
@@ -389,13 +386,13 @@ impl Diagram {
 }
 
 /// The three versions of a merge as boards ("" for an unknown base).
-fn merge_docs(base: &str, ours: &str, theirs: &str) -> Result<[diagram_core::Document; 3], String> {
-    let read = |what: &str, s: &str| -> Result<diagram_core::Document, String> {
-        let s = diagram_core::merge::strip_note(s);
+fn merge_docs(base: &str, ours: &str, theirs: &str) -> Result<[shape_core::Document; 3], String> {
+    let read = |what: &str, s: &str| -> Result<shape_core::Document, String> {
+        let s = shape_core::merge::strip_note(s);
         if s.trim().is_empty() {
             return Ok(Default::default());
         }
-        diagram_core::parse(s).map_err(|e| {
+        shape_core::parse(s).map_err(|e| {
             format!(
                 "{what}: {}",
                 e.iter()
@@ -425,14 +422,14 @@ pub fn merge3(base: &str, ours: &str, theirs: &str) -> String {
         Ok(d) => d,
         Err(e) => return json!({"ok": false, "error": e}).to_string(),
     };
-    let m = diagram_core::merge::merge3(&b, &o, &t);
-    let src = diagram_core::patch::patch(diagram_core::merge::strip_note(ours), &o, &m.doc);
+    let m = shape_core::merge::merge3(&b, &o, &t);
+    let src = shape_core::patch::patch(shape_core::merge::strip_note(ours), &o, &m.doc);
     let conflicts: Vec<Value> = m
         .conflicts
         .iter()
         .map(|c| {
             json!({"key": c.key(), "kind": c.kind, "id": c.id, "label": c.label, "canvas": c.canvas,
-                   "fields": c.fields, "text": diagram_core::merge::describe(c),
+                   "fields": c.fields, "text": shape_core::merge::describe(c),
                    "ours": c.ours.is_some(), "theirs": c.theirs.is_some()})
         })
         .collect();
@@ -448,19 +445,19 @@ pub fn merge_resolve(base: &str, ours: &str, theirs: &str, picks: &str, ops: &st
         Ok(d) => d,
         Err(e) => return json!({"ok": false, "error": e}).to_string(),
     };
-    let m = diagram_core::merge::merge3(&b, &o, &t);
-    let mut doc = diagram_core::merge::resolve(&m, &picks_of(picks));
+    let m = shape_core::merge::merge3(&b, &o, &t);
+    let mut doc = shape_core::merge::resolve(&m, &picks_of(picks));
     let ops: Vec<Value> = serde_json::from_str(ops).unwrap_or_default();
     if !ops.is_empty() {
-        let parsed = match diagram_core::ops::parse_ops(&json!({ "ops": ops }).to_string()) {
+        let parsed = match shape_core::ops::parse_ops(&json!({ "ops": ops }).to_string()) {
             Ok(p) => p,
             Err(e) => return json!({"ok": false, "error": e}).to_string(),
         };
-        if let Err(e) = diagram_core::ops::apply(&mut doc, &parsed) {
+        if let Err(e) = shape_core::ops::apply(&mut doc, &parsed) {
             return json!({"ok": false, "error": e.to_string()}).to_string();
         }
     }
-    let src = diagram_core::patch::patch(diagram_core::merge::strip_note(ours), &o, &doc);
+    let src = shape_core::patch::patch(shape_core::merge::strip_note(ours), &o, &doc);
     json!({"ok": true, "source": src}).to_string()
 }
 
@@ -479,15 +476,15 @@ pub fn merge_svg(
         Ok(d) => d,
         Err(e) => return err(e),
     };
-    let m = diagram_core::merge::merge3(&b, &o, &t);
+    let m = shape_core::merge::merge3(&b, &o, &t);
     let doc = match side {
         "ours" => o,
         "theirs" => t,
-        _ => diagram_core::merge::resolve(&m, &picks_of(picks)),
+        _ => shape_core::merge::resolve(&m, &picks_of(picks)),
     };
     // drawn as they are: the editor outlines what clashed
     let opts: RenderOptions = opts(options).unwrap_or_default();
-    to_json(&diagram_core::render::render(&doc, &opts))
+    to_json(&shape_core::render::render(&doc, &opts))
 }
 
 /// A prompt asking a model to settle the conflicts as `instruction` says.
@@ -495,7 +492,7 @@ pub fn merge_svg(
 pub fn merge_prompt(base: &str, ours: &str, theirs: &str, instruction: &str) -> String {
     match merge_docs(base, ours, theirs) {
         Ok([b, o, t]) => {
-            diagram_core::merge::prompt(&diagram_core::merge::merge3(&b, &o, &t), instruction)
+            shape_core::merge::prompt(&shape_core::merge::merge3(&b, &o, &t), instruction)
         }
         Err(e) => format!("error: {e}"),
     }
@@ -504,7 +501,7 @@ pub fn merge_prompt(base: &str, ours: &str, theirs: &str, instruction: &str) -> 
 /// A model's answer to `merge_prompt`: `{ok, picks, ops}` or `{ok: false, error}`.
 #[wasm_bindgen]
 pub fn merge_answer(reply: &str) -> String {
-    match diagram_core::merge::parse_answer(reply) {
+    match shape_core::merge::parse_answer(reply) {
         Ok((picks, ops)) => json!({"ok": true, "picks": picks, "ops": ops}).to_string(),
         Err(e) => json!({"ok": false, "error": e}).to_string(),
     }
@@ -514,7 +511,7 @@ pub fn merge_answer(reply: &str) -> String {
 /// git did not write it), or null without conflict markers.
 #[wasm_bindgen]
 pub fn split_markers(text: &str) -> String {
-    match diagram_core::merge::split_markers(text) {
+    match shape_core::merge::split_markers(text) {
         Some((b, o, t)) => json!({"base": b, "ours": o, "theirs": t}).to_string(),
         None => "null".into(),
     }
@@ -527,10 +524,10 @@ pub fn count_changes(old: &str, new: &str) -> i32 {
     let old = if old.trim().is_empty() {
         Ok(Default::default())
     } else {
-        diagram_core::parse(old)
+        shape_core::parse(old)
     };
-    match (old, diagram_core::parse(new)) {
-        (Ok(o), Ok(n)) => diagram_core::change_count(&o, &n) as i32,
+    match (old, shape_core::parse(new)) {
+        (Ok(o), Ok(n)) => shape_core::change_count(&o, &n) as i32,
         _ => -1,
     }
 }
@@ -538,7 +535,7 @@ pub fn count_changes(old: &str, new: &str) -> i32 {
 /// A model's answer board: `{ok, summary, source}` or `{ok: false, error}`.
 #[wasm_bindgen]
 pub fn answer_parts(reply: &str) -> String {
-    match diagram_core::prompt::answer_parts(reply) {
+    match shape_core::prompt::answer_parts(reply) {
         Ok((summary, source)) => {
             json!({"ok": true, "summary": summary, "source": source}).to_string()
         }
@@ -549,9 +546,9 @@ pub fn answer_parts(reply: &str) -> String {
 /// The names of the perspectives a board of type `kind` comes with (JSON).
 #[wasm_bindgen]
 pub fn builtin_perspectives(kind: &str) -> String {
-    let kind = diagram_core::model::BoardKind::parse(kind).unwrap_or_default();
+    let kind = shape_core::model::BoardKind::parse(kind).unwrap_or_default();
     to_json(
-        &diagram_core::perspectives::builtins(kind)
+        &shape_core::perspectives::builtins(kind)
             .into_iter()
             .map(|p| p.label)
             .collect::<Vec<_>>(),
@@ -561,25 +558,25 @@ pub fn builtin_perspectives(kind: &str) -> String {
 /// What Rethink does unless told otherwise (its editable instructions).
 #[wasm_bindgen]
 pub fn rethink_default() -> String {
-    diagram_core::prompt::RETHINK_DEFAULT.to_string()
+    shape_core::prompt::RETHINK_DEFAULT.to_string()
 }
 
 /// The note in a model's reply to a rethink prompt, or "".
 #[wasm_bindgen]
 pub fn reply_note(reply: &str) -> String {
-    diagram_core::prompt::reply_note(reply).unwrap_or_default()
+    shape_core::prompt::reply_note(reply).unwrap_or_default()
 }
 
 /// The prompt again after a reply that could not be applied.
 #[wasm_bindgen]
 pub fn ask_again(prompt: &str, reply: &str, error: &str) -> String {
-    diagram_core::prompt::ask_again(prompt, reply, error)
+    shape_core::prompt::ask_again(prompt, reply, error)
 }
 
 /// A built-in theme's text (`paper`, `blueprint`, `midnight`, `contrast`), or "".
 #[wasm_bindgen]
 pub fn theme_preset(name: &str) -> String {
-    diagram_core::theme::PRESETS
+    shape_core::theme::PRESETS
         .iter()
         .find(|(n, _)| *n == name)
         .map(|(_, s)| s.to_string())
@@ -589,14 +586,14 @@ pub fn theme_preset(name: &str) -> String {
 /// A prompt asking a model for a new mindmap about `topic`.
 #[wasm_bindgen]
 pub fn mindmap_prompt(topic: &str, options: &str) -> String {
-    let o: diagram_core::mindmap::ExpandOptions = opts(options).unwrap_or_default();
-    diagram_core::mindmap::generate_prompt(topic, &o)
+    let o: shape_core::mindmap::ExpandOptions = opts(options).unwrap_or_default();
+    shape_core::mindmap::generate_prompt(topic, &o)
 }
 
 /// A model's reply as an outline (two spaces per level), ready for `add_outline`.
 #[wasm_bindgen]
 pub fn reply_outline(reply: &str) -> String {
-    diagram_core::mindmap::parse_reply(reply)
+    shape_core::mindmap::parse_reply(reply)
         .iter()
         .map(|l| format!("{}{}\n", "  ".repeat(l.depth), l.text))
         .collect()
@@ -615,8 +612,8 @@ pub fn render(src: &str, options: &str) -> String {
         Ok(o) => o,
         Err(e) => return err(e),
     };
-    match diagram_core::parse(src) {
-        Ok(doc) => to_json(&diagram_core::render::render(&doc, &o)),
+    match shape_core::parse(src) {
+        Ok(doc) => to_json(&shape_core::render::render(&doc, &o)),
         Err(e) => to_json(
             &json!({ "error": e.iter().map(|d| d.to_string()).collect::<Vec<_>>().join("\n"), "errors": e }),
         ),
@@ -626,8 +623,8 @@ pub fn render(src: &str, options: &str) -> String {
 /// One-shot conversion: `{ok, text}` or `{ok: false, errors}`.
 #[wasm_bindgen]
 pub fn convert(src: &str, to: &str) -> String {
-    let v: Value = match diagram_core::parse(src) {
-        Ok(doc) => match diagram_core::export(&doc, to) {
+    let v: Value = match shape_core::parse(src) {
+        Ok(doc) => match shape_core::export(&doc, to) {
             Ok(text) => json!({ "ok": true, "text": text }),
             Err(e) => json!({ "ok": false, "errors": [{ "line": 0, "message": e }] }),
         },
@@ -638,12 +635,12 @@ pub fn convert(src: &str, to: &str) -> String {
 
 #[wasm_bindgen]
 pub fn spec() -> String {
-    diagram_core::spec()
+    shape_core::spec()
 }
 
 #[wasm_bindgen]
 pub fn json_schema() -> String {
-    diagram_core::json_schema().to_string()
+    shape_core::json_schema().to_string()
 }
 
 #[wasm_bindgen]

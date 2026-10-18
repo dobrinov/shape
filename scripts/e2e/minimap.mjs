@@ -14,9 +14,9 @@ const root = join(here, "..", "..");
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 7090 + Math.floor(Math.random() * 100);
 const dir = mkdtempSync(join(tmpdir(), "diagram-e2e-"));
-const file = join(dir, "board.diagram");
+const file = join(dir, "board.shape");
 writeFileSync(file, "title: Map\n\ngroup a: Left {\n  a1: One\n  a2: Two\n}\ngroup b: Right {\n  b1: Three\n  b2: Four\n}\na1 -> b1\na2 -> b2\nb2 -> far\nfar -> farther\nfarther -> farthest\n");
-const server = spawn(join(root, "target/debug/diagram"), [file, "--no-open", "--port", String(port)], { env: { ...process.env, DIAGRAM_WEB_DIR: join(root, "web"), DIAGRAM_NO_UPDATE_CHECK: "1" }, stdio: "ignore" });
+const server = spawn(join(root, "target/debug/shape"), [file, "--no-open", "--port", String(port)], { env: { ...process.env, SHAPE_WEB_DIR: join(root, "web"), SHAPE_NO_UPDATE_CHECK: "1" }, stdio: "ignore" });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = false;
 try {

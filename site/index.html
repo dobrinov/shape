@@ -47,7 +47,7 @@
       <a class="btn" href="examples/">Explore a finished board</a>
     </div>
     <div class="install-line">
-      <code id="brew-cmd">brew install dobrinov/tap/diagram</code>
+      <code id="brew-cmd">brew install dobrinov/tap/shape</code>
       <button type="button" id="brew-copy" title="Copy to clipboard">Copy</button>
       <a href="#install">Windows, Linux &amp; source ↓</a>
     </div>
@@ -59,7 +59,7 @@
     </ul>
   </div>
   <div class="hero-demo">
-    <div class="demo-frame" data-diagram data-mode="edit" data-theme="dark"><script type="text/plain">{{HERO}}</script></div>
+    <div class="demo-frame" data-shape data-mode="edit" data-theme="dark"><script type="text/plain">{{HERO}}</script></div>
     <p class="caption">This is the real editor, running in your browser. Double-click <b>Delivery plan</b> to open the board inside it, or right-click anything.</p>
   </div>
 </section>
@@ -173,7 +173,7 @@ The board below describes what to build…
       <li>Screens come out as their components, data models as tables with keys, flows and dependencies as arrows</li>
       <li><b>Prompt mindmaps</b>: branch a task into Context, Constraints, Steps and Acceptance, and copy it as a task spec</li>
       <li>Open comments become the questions the model should ask, not guess</li>
-      <li>From the terminal: <code>diagram prompt plan.diagram --target build</code></li>
+      <li>From the terminal: <code>shape prompt plan.shape --target build</code></li>
     </ul>
   </div>
 </section>
@@ -246,7 +246,7 @@ The board below describes what to build…
       <li>See what a branch changed, in green, red and amber</li>
       <li>Boards merge element by element, so most conflicts never happen</li>
       <li>Every version is one click away; restore any of them (outside git too)</li>
-      <li>Link boards to each other: <code>link: plans/q3.diagram#launch</code></li>
+      <li>Link boards to each other: <code>link: plans/q3.shape#launch</code></li>
     </ul>
   </div>
 </section>
@@ -261,7 +261,7 @@ The board below describes what to build…
       <li>Models read short outlines and small edits, never coordinates, so AI calls stay cheap</li>
     </ul>
   </div>
-<pre class="code"><span class="c"># docs/launch.diagram</span>
+<pre class="code"><span class="c"># docs/launch.shape</span>
 kanban sprint: Sprint 12 {
   column todo: To do {
     saved: Saved cards [owner: ana]
@@ -287,18 +287,18 @@ comment on onepage by mia: Behind a flag?</pre>
 
 <section id="agents" class="split reverse">
 <pre class="code"><span class="c"># in your terminal</span>
-<span class="p">$</span> diagram ask docs/launch.diagram "split Build into API and UI"
+<span class="p">$</span> shape ask docs/launch.shape "split Build into API and UI"
 
 <span class="c"># comments → a task for your coding agent</span>
-<span class="p">$</span> diagram prompt docs/launch.diagram --target code
+<span class="p">$</span> shape prompt docs/launch.shape --target code
 
 <span class="c"># let an agent read a few lines, not the whole board</span>
-<span class="p">$</span> diagram query docs/launch.diagram kind:kanban near:onepage</pre>
+<span class="p">$</span> shape query docs/launch.shape kind:kanban near:onepage</pre>
   <div>
     <h2>Made for coding agents too</h2>
     <p>Install the bundled skills and Claude Code (or any agent) can read, draw and grow boards with few tokens.</p>
-<pre class="code small">diagram skills install          <span class="c"># ./.claude/skills</span>
-diagram skills install --global <span class="c"># ~/.claude/skills</span></pre>
+<pre class="code small">shape skills install          <span class="c"># ./.claude/skills</span>
+shape skills install --global <span class="c"># ~/.claude/skills</span></pre>
   </div>
 </section>
 
@@ -307,9 +307,9 @@ diagram skills install --global <span class="c"># ~/.claude/skills</span></pre>
     <h2>Embed a board anywhere</h2>
     <p>One script tag puts a board in any page, read-only or with the full editor. It all runs in the browser; nothing is uploaded.</p>
   </div>
-<pre class="code">&lt;script src="diagram.embed.js"&gt;&lt;/script&gt;
+<pre class="code">&lt;script src="shape.embed.js"&gt;&lt;/script&gt;
 
-&lt;div data-diagram data-mode="view" style="height:420px"&gt;
+&lt;div data-shape data-mode="view" style="height:420px"&gt;
   &lt;script type="text/plain"&gt;
     user: Customer [person]
     user -> api: POST /orders
@@ -317,7 +317,7 @@ diagram skills install --global <span class="c"># ~/.claude/skills</span></pre>
 &lt;/div&gt;
 
 <span class="c">// or the npm package (Node and browsers)</span>
-import { init, Board } from "diagram";</pre>
+import { init, Board } from "@dobrinov/shape";</pre>
 </section>
 
 <section id="install" class="install">
@@ -326,12 +326,12 @@ import { init, Board } from "diagram";</pre>
   <div class="install-grid">
     <div>
       <h3>Homebrew <span>macOS · Linux</span></h3>
-<pre class="code">brew install dobrinov/tap/diagram</pre>
-      <p class="sub">Later: <code>brew upgrade diagram</code>.</p>
+<pre class="code">brew install dobrinov/tap/shape</pre>
+      <p class="sub">Later: <code>brew upgrade shape</code>.</p>
     </div>
     <div>
       <h3>Download <span>macOS · Linux · Windows</span></h3>
-      <p class="sub">Grab an archive from the <a href="{{REPO_URL}}/releases/latest">latest release</a> (Apple silicon and Intel, Linux x86_64 and arm64, Windows x86_64), unpack it and put <code>diagram</code> on your <code>PATH</code>.</p>
+      <p class="sub">Grab an archive from the <a href="{{REPO_URL}}/releases/latest">latest release</a> (Apple silicon and Intel, Linux x86_64 and arm64, Windows x86_64), unpack it and put <code>shape</code> on your <code>PATH</code>.</p>
     </div>
     <div>
       <h3>From source</h3>
@@ -340,7 +340,7 @@ make install</pre>
       <p class="sub">Needs Rust with the <code>wasm32-unknown-unknown</code> target and <code>wasm-pack</code>.</p>
     </div>
   </div>
-  <p class="sub">Then run <code>diagram</code>: it asks where to save your first board and opens it in its own window. <code>diagram install-app</code> makes <code>.diagram</code> files open with a double-click.</p>
+  <p class="sub">Then run <code>shape</code>: it asks where to save your first board and opens it in its own window. <code>shape install-app</code> makes <code>.shape</code> files open with a double-click.</p>
 </section>
 
 <section id="faq" class="faq">
@@ -351,7 +351,7 @@ make install</pre>
   <details><summary>How does my team work on the same board?</summary><p>Through git: commit the file, branch, open a pull request. Shape shows what a branch changed, merges boards element by element, and signs comments with your name. Outside git, it keeps versions you can go back to.</p></details>
   <details><summary>Can I use it to write prompts for an LLM?</summary><p>Yes, that is one of the best uses. Draw what you want built (the parts, the screens, the data, the rules), then copy the whole board or a selection as a prompt (<kbd>⌘⇧C</kbd>). It is plain Markdown, so it works with any model or coding agent, and the board stays the source you refine between attempts.</p></details>
   <details><summary>Does it replace Jira, Miro or PowerPoint?</summary><p>For the thinking, planning and explaining part of a project, often yes: it is one board instead of several. It does not try to be a ticket tracker with workflows and permissions.</p></details>
-  <details><summary>Why is the command called <code>diagram</code>?</summary><p>That was the project's first name. The command and the <code>.diagram</code> files stay as they are, so nothing breaks.</p></details>
+  <details><summary>I used <code>diagram</code> before. Does anything break?</summary><p>No. Shape was called diagram until October 2026. The <code>diagram</code> command still works as an alias, <code>.diagram</code> files open, merge and link like <code>.shape</code> ones, and <code>brew upgrade</code> moves you to the <code>shape</code> formula.</p></details>
 </section>
 
 <section id="changelog" class="changelog">
@@ -373,7 +373,7 @@ make install</pre>
   <a href="app/">Playground</a><a href="examples/">Example</a><a href="{{REPO_URL}}/blob/main/crates/core/LANGUAGE.md">Language</a><a href="#changelog">Changelog</a><a href="{{REPO_URL}}">Source</a><a href="https://dobrinov.github.io/products/">More products</a>
 </footer>
 
-<script src="diagram.embed.js"></script>
+<script src="shape.embed.js"></script>
 <script>
   // the install one-liner in the hero: copy on click
   var brewCopy = document.getElementById("brew-copy");

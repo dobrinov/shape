@@ -1,4 +1,4 @@
-# render: --base _ask-before.diagram
+# render: --base _ask-before.shape
 api: Orders API [detail: Rust · Axum]
 cache: Redis [cylinder]
 db: Postgres [cylinder]

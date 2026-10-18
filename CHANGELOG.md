@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.53.0 — 2026-10-18
+
+- **diagram is now Shape, all the way through.**
+  - The command is `shape` (`shape plan.shape`, `shape ask …`, `shape install-app`). `diagram` stays as an alias: the release archives and Homebrew install it next to `shape`.
+  - New boards are `.shape` files. `.diagram` files still open, save, link (`plans/q3.diagram#launch`), merge and show in history, and `install-app` registers both extensions.
+  - Homebrew: `brew install dobrinov/tap/shape`; `brew upgrade` moves an installed `diagram` over.
+  - The repository and the site move to github.com/dobrinov/shape and dobrinov.github.io/shape.
+  - Environment variables are `SHAPE_AI`, `SHAPE_WEB_DIR`, `SHAPE_NO_UPDATE_CHECK` and `SHAPE_SKIP_WASM`. The `DIAGRAM_*` names still work.
+  - The language is the Shape language and prompts use ```` ```shape ```` blocks. A reply with a ```` ```diagram ```` block still applies.
+  - The agent skills are `shape-draw`, `shape-review`, `shape-edit`, `shape-mindmap` and `shape-embed`; installing them removes the old `diagram-*` ones.
+  - The browser library is `Shape` (`Shape.mount`, `Shape.render`, `<div data-shape>`); `Diagram` and `data-diagram` still work. The npm package is `@dobrinov/shape`; the crates are `shape`, `shape-core` and `shape-wasm`.
+  - `shape merge --install` registers a `shape` merge driver for both extensions.
+- Fixed: `shape apply` with a reply holding a whole board in a fenced block read past the fence's name.
+
 ## 0.52.0 — 2026-10-18
 
 - **Wireframes are easier to use:**

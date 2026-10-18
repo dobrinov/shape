@@ -1,9 +1,9 @@
-//! diagram-core: lightweight, text-first diagrams.
+//! shape-core: lightweight, text-first diagrams.
 //!
 //! ```
-//! let doc = diagram_core::parse("api -> db: SQL\ncomment on api: cache this?").unwrap();
-//! let svg = diagram_core::render_svg(&doc, &Default::default());
-//! let prompt = diagram_core::prompt::prompt(&doc, &Default::default());
+//! let doc = shape_core::parse("api -> db: SQL\ncomment on api: cache this?").unwrap();
+//! let svg = shape_core::render_svg(&doc, &Default::default());
+//! let prompt = shape_core::prompt::prompt(&doc, &Default::default());
 //! assert!(svg.starts_with("<svg") && prompt.contains("cache this?"));
 //! ```
 //!
@@ -64,7 +64,7 @@ pub enum Format {
 impl Format {
     pub fn parse(s: &str) -> Option<Format> {
         match s.to_ascii_lowercase().as_str() {
-            "dsl" | "diagram" | "text" => Some(Format::Dsl),
+            "dsl" | "shape" | "diagram" | "text" => Some(Format::Dsl),
             "json" => Some(Format::Json),
             "mermaid" | "mmd" => Some(Format::Mermaid),
             _ => None,
@@ -120,7 +120,7 @@ pub fn to_json(doc: &Document) -> String {
 /// Export as `dsl`, `json`, `mermaid`, `brief` (Markdown for LLMs) or `svg`.
 pub fn export(doc: &Document, format: &str) -> Result<String, String> {
     Ok(match format {
-        "dsl" | "diagram" => dsl::print(doc),
+        "dsl" | "shape" | "diagram" => dsl::print(doc),
         "json" => to_json(doc) + "\n",
         "mermaid" | "mmd" => mermaid::export(doc),
         "brief" | "md" | "markdown" | "llm" => prompt::brief(doc),
@@ -174,8 +174,8 @@ pub fn json_schema() -> Value {
     let color = json!({"type": "string", "description": "gray, blue, green, yellow, orange, red, purple, pink, teal or #rrggbb"});
     json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "https://github.com/dobrinov/diagram/schema.json",
-        "title": "diagram document",
+        "$id": "https://github.com/dobrinov/shape/schema.json",
+        "title": "Shape board",
         "type": "object",
         "required": ["nodes"],
         "additionalProperties": false,
@@ -289,7 +289,7 @@ pub struct Session {
     /// With a canvas open: the whole board (its copy of the canvas is stale
     /// while `doc` is edited) and the canvas's path from the top.
     outer: Option<(Document, Vec<String>)>,
-    /// A team's own recipes (`recipes/*.diagram`), for prompts with the
+    /// A team's own recipes (`recipes/*.shape`), for prompts with the
     /// built-in ones (see [`recipes`]).
     pub recipes: Vec<recipes::Recipe>,
 }
@@ -382,7 +382,7 @@ impl Session {
     pub fn source(&self, format: &str) -> Result<String, String> {
         let whole = self.whole();
         match (&self.written, format) {
-            (Some((src, old)), "dsl" | "diagram") => Ok(patch::patch(src, old, &whole)),
+            (Some((src, old)), "dsl" | "shape" | "diagram") => Ok(patch::patch(src, old, &whole)),
             _ => export(&whole, format),
         }
     }
@@ -577,12 +577,14 @@ mod tests {
                 && p.contains("## The question\n\nWhat blocks SSO?"),
             "{p}"
         );
-        let (summary, source) = prompt::answer_parts("SSO waits on the IdP.\n\n```diagram\ntitle: SSO\nsso: SSO login [link: #/plan/sso]\nidp: Pick an IdP [sticky]\nidp -> sso\n```\nThat is all.").unwrap();
+        let (summary, source) = prompt::answer_parts("SSO waits on the IdP.\n\n```shape\ntitle: SSO\nsso: SSO login [link: #/plan/sso]\nidp: Pick an IdP [sticky]\nidp -> sso\n```\nThat is all.").unwrap();
         assert_eq!(summary, "SSO waits on the IdP. That is all.");
         let d = dsl::parse(&source).unwrap();
         assert_eq!(d.node("sso").unwrap().link.as_deref(), Some("#/plan/sso"));
         assert!(prompt::answer_parts("no diagram here").is_err());
-        assert!(prompt::answer_parts("```diagram\na -> -> [\n```").is_err());
+        assert!(prompt::answer_parts("```shape\na -> -> [\n```").is_err());
+        // the fence's name from before the rename still works
+        assert!(prompt::answer_parts("Here.\n\n```diagram\na: A\n```").is_ok());
     }
 
     #[test]

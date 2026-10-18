@@ -6,8 +6,8 @@ import { readFileSync } from "node:fs";
 
 const pkg = new URL("../pkg/", import.meta.url);
 // the bundle is a classic script defining `wasm_bindgen`; evaluate it globally
-(0, eval)(readFileSync(new URL("diagram_wasm.js", pkg), "utf8") + "\nglobalThis.wasm_bindgen = wasm_bindgen;");
-await globalThis.wasm_bindgen({ module_or_path: new Uint8Array(readFileSync(new URL("diagram_wasm_bg.wasm", pkg))) });
+(0, eval)(readFileSync(new URL("shape_wasm.js", pkg), "utf8") + "\nglobalThis.wasm_bindgen = wasm_bindgen;");
+await globalThis.wasm_bindgen({ module_or_path: new Uint8Array(readFileSync(new URL("shape_wasm_bg.wasm", pkg))) });
 const w = globalThis.wasm_bindgen;
 
 test("parses, renders and reports errors", () => {
@@ -36,7 +36,7 @@ test("ops, comments and prompts", () => {
   assert.match(d.source("dsl"), /comment c1 on a by ana: rename this\?/);
   const p = d.prompt(JSON.stringify({ target: "code" }));
   assert.match(p, /rename this\?/);
-  assert.match(d.brief(), /## Source\n\n```diagram\n[^]*comment c1 on a by ana: rename this\?/);
+  assert.match(d.brief(), /## Source\n\n```shape\n[^]*comment c1 on a by ana: rename this\?/);
   const fail = JSON.parse(d.apply('{"ops":[{"op":"remove","id":"nope"}]}'));
   assert.equal(fail.ok, false);
   d.free();
@@ -45,8 +45,8 @@ test("ops, comments and prompts", () => {
 test("one-shot helpers", () => {
   assert.equal(JSON.parse(w.convert("flowchart LR\n A --> B", "dsl")).text, "A -> B\n");
   assert.match(JSON.parse(w.render("x", "{}")).svg, /data-id="x"/);
-  assert.equal(JSON.parse(w.json_schema()).title, "diagram document");
-  assert.match(w.spec(), /# The diagram language/);
+  assert.equal(JSON.parse(w.json_schema()).title, "Shape board");
+  assert.match(w.spec(), /# The Shape language/);
 });
 
 test("mindmaps: outline in, outline and markdown out, prompts", () => {

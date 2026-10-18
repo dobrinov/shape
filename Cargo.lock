@@ -379,38 +379,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diagram"
-version = "0.52.0"
-dependencies = [
- "diagram-core",
- "muda",
- "resvg",
- "rfd",
- "serde_json",
- "tao",
- "tiny_http",
- "wry",
-]
-
-[[package]]
-name = "diagram-core"
-version = "0.52.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "diagram-wasm"
-version = "0.52.0"
-dependencies = [
- "diagram-core",
- "serde",
- "serde_json",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2247,6 +2215,38 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "shape"
+version = "0.53.0"
+dependencies = [
+ "muda",
+ "resvg",
+ "rfd",
+ "serde_json",
+ "shape-core",
+ "tao",
+ "tiny_http",
+ "wry",
+]
+
+[[package]]
+name = "shape-core"
+version = "0.53.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "shape-wasm"
+version = "0.53.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "shape-core",
+ "wasm-bindgen",
 ]
 
 [[package]]

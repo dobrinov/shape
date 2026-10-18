@@ -1,29 +1,29 @@
-# diagram
+# Shape
 
 ## Where this is going
 
-diagram is the core of an **AI-first, all-in-one project-management tool for the agentic world**: a FigJam-like board where people draw and collaborate, discover a problem, and specify *what* should happen and *how*. Principles:
+Shape (called diagram until October 2026; the repo folder, the `diagram` command alias and `.diagram` files still carry that name) is the core of an **AI-first, all-in-one project-management tool for the agentic world**: a FigJam-like board where people draw and collaborate, discover a problem, and specify *what* should happen and *how*. Principles:
 
-- **Simple first.** The previous attempt (Shape, in `../spec`) grew a milestone-heavy flow and was dropped for being too complex. Add features only when the owner asks; prefer fewer screens and fewer concepts.
-- **Git(Hub) is the database.** Everything is text that diffs and reviews well (`.diagram` files). Collaboration happens through commits and PRs, not a server.
+- **Simple first.** An earlier attempt (also called Shape, in `../spec`) grew a milestone-heavy flow and was dropped for being too complex. Add features only when the owner asks; prefer fewer screens and fewer concepts.
+- **Git(Hub) is the database.** Everything is text that diffs and reviews well (`.shape` files). Collaboration happens through commits and PRs, not a server.
 - **AI-first, few tokens.** Models read and write compact forms: indented outlines for mindmaps, ops JSON for edits. Never round-trip coordinates or the whole JSON model through a model when an outline or a few ops will do.
-- **The user's own AI subscription.** AI goes through one seam: a command that reads a prompt on stdin, normally the CLI of a subscription the user already has and is signed into (`--ai claude | claude:MODEL | codex | gemini | CMD` / `$DIAGRAM_AI`; default: the first of those installed), or the editor's `ai(prompt) → Promise<string>` option. No local models for now (owner's call). Without a harness, the editor shows the prompt to copy and takes the reply back.
-- **Library-first.** The owner builds small tools that are also libraries and composes them: this repo is the canvas and FigJam-style functionality; `../schema` (DB schemas, crate `schema-core`) is next to be brought onto the board as a block type. Keep `diagram-core` free of app concerns so it can be embedded.
-- **Mindmaps are central**, including **prompts written as mindmaps** (centre = task, branches = Context / Constraints / Steps / Acceptance → "Copy as prompt" Markdown). See the Discovery canvas in `examples/example.diagram`.
+- **The user's own AI subscription.** AI goes through one seam: a command that reads a prompt on stdin, normally the CLI of a subscription the user already has and is signed into (`--ai claude | claude:MODEL | codex | gemini | CMD` / `$SHAPE_AI`; default: the first of those installed), or the editor's `ai(prompt) → Promise<string>` option. No local models for now (owner's call). Without a harness, the editor shows the prompt to copy and takes the reply back.
+- **Library-first.** The owner builds small tools that are also libraries and composes them: this repo is the canvas and FigJam-style functionality; `../schema` (DB schemas, crate `schema-core`) is next to be brought onto the board as a block type. Keep `shape-core` free of app concerns so it can be embedded.
+- **Mindmaps are central**, including **prompts written as mindmaps** (centre = task, branches = Context / Constraints / Steps / Acceptance → "Copy as prompt" Markdown). See the Discovery canvas in `examples/example.shape`.
 
-A board is one `.diagram` file, optionally with a theme (`theme:`; presets, `theme` blocks or a shared `.theme` file). Blocks (mindmaps, swimlanes, gantt charts, risk matrices, charts, tables and database tables (`entity`) today; schemas and more later) sit on it next to free boxes, stickies, groups, arrows and comments.
+A board is one `.shape` file, optionally with a theme (`theme:`; presets, `theme` blocks or a shared `.theme` file). Blocks (mindmaps, swimlanes, gantt charts, risk matrices, charts, tables and database tables (`entity`) today; schemas and more later) sit on it next to free boxes, stickies, groups, arrows and comments.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `crates/core` | Model (`model.rs`, also the JSON format), DSL (`dsl.rs`), ops (`ops.rs`, the only way to change a document), layout / routing / SVG render, diff, prompts, Mermaid, `mindmap.rs` (outline parser, tree layout, Markdown, AI prompts). `LANGUAGE.md` is the language reference (`diagram spec`). |
+| `crates/core` | Model (`model.rs`, also the JSON format), DSL (`dsl.rs`), ops (`ops.rs`, the only way to change a document), layout / routing / SVG render, diff, prompts, Mermaid, `mindmap.rs` (outline parser, tree layout, Markdown, AI prompts). `LANGUAGE.md` is the language reference (`shape spec`). |
 | `crates/wasm` | wasm-bindgen API used by the editor (`Diagram` class + one-shot helpers). |
-| `crates/cli` | `diagram` binary: local editor server (`server.rs`, `/api/file`, `/api/git`, `/api/ai`), exports, review commands, `ai.rs` (harness), skills, `update.rs` (daily new-version check), `app.rs` (`install-app`: OS file type and icons from `crates/cli/icons/`). Web assets are embedded at build time. |
+| `crates/cli` | `shape` binary (shipped with a `diagram` alias): local editor server (`server.rs`, `/api/file`, `/api/git`, `/api/ai`), exports, review commands, `ai.rs` (harness), skills, `update.rs` (daily new-version check), `app.rs` (`install-app`: OS file type and icons from `crates/cli/icons/`). Web assets are embedded at build time. |
 | `web/` | No-build editor: `editor.js` (component), `editor.css`, `app.js` (shell for the local server and the static playground), `embed.js`. `web/pkg` is generated. |
-| `js/` | npm package `diagram` (ESM, Node >= 18 and browsers): `index.mjs` wraps the WASM `Diagram` as `Board` + one-shot helpers, `index.d.ts` types (keep in step with `model.rs` / `ops.rs`), `test/`. `js/pkg` is generated by `make js`. |
-| `skills/` | Agent skills shipped in the binary (`diagram skills install`). |
-| `examples/` | `example.diagram`: one board that uses every feature (canvases for discovery, plan, data, metrics); keep it current when a feature ships. Also published on the site. `examples/stress/` is a v0.1 stress test with a report. |
+| `js/` | npm package `@dobrinov/shape` (ESM, Node >= 18 and browsers): `index.mjs` wraps the WASM `Diagram` class as `Board` + one-shot helpers, `index.d.ts` types (keep in step with `model.rs` / `ops.rs`), `test/`. `js/pkg` is generated by `make js`. |
+| `skills/` | Agent skills shipped in the binary (`shape skills install`). |
+| `examples/` | `example.shape`: one board that uses every feature (canvases for discovery, plan, data, metrics); keep it current when a feature ships. Also published on the site. `examples/stress/` is a v0.1 stress test with a report. |
 | `scripts/e2e/` | Playwright browser tests (`make e2e`). |
 
 Mindmap model: topics are ordinary nodes with `parent`; the centre has `mindmap: right|left|both|down`; siblings keep document order; `collapsed` folds. In layout a map is one item (its centre stands in for the whole map), so maps live in groups and next to other content.
@@ -35,9 +35,9 @@ make wasm                 # rebuild web/pkg after changing core or wasm
 make test                 # cargo tests + node tests of the WASM API (+ js/ tests when js/pkg is built)
 make js                   # rebuild js/pkg (ES-module WASM for the js/ package; own target dir)
 make e2e                  # browser test of the editor (installed Chrome via Playwright)
-make dev                  # editor on examples/example.diagram, web/ served from disk
-DIAGRAM_SKIP_WASM=1 cargo build   # CLI only, when web/pkg is current
-DIAGRAM_WEB_DIR=web ./target/debug/diagram FILE --no-open --port N --ai CMD   # manual testing
+make dev                  # editor on examples/example.shape, web/ served from disk
+SHAPE_SKIP_WASM=1 cargo build   # CLI only, when web/pkg is current
+SHAPE_WEB_DIR=web ./target/debug/shape FILE --no-open --port N --ai CMD   # manual testing
 ```
 
 ## Working rules
@@ -46,5 +46,5 @@ DIAGRAM_WEB_DIR=web ./target/debug/diagram FILE --no-open --port N --ai CMD   # 
 - Every change goes through ops in the core; the editor, CLI, LLM replies and undo all rely on that. Keep the DSL round-trip exact (`parse(print(doc)) == doc`) and add a test when the format changes.
 - Check UI changes in a real browser (screenshots via Playwright), in light and dark.
 - Run `cargo fmt` only on files you change (the tree isn't fmt-clean; don't reformat unrelated files).
-- Release per shipped change: bump `Cargo.toml` version, add a `CHANGELOG.md` entry, commit, tag `vX.Y.Z`. Don't push unless asked. Pushing a tag runs `.github/workflows/release.yml` (binaries for macOS / Linux / Windows, the GitHub Release, and, within the hour, the Homebrew formula: dobrinov/homebrew-tap updates itself); pushing `main` deploys the site (`site/`, `scripts/build-site.sh`) to dobrinov.github.io/diagram.
+- Keep `.diagram` files, the `diagram` command alias and `DIAGRAM_*` variables working (people used them before the rename). Release per shipped change: bump `Cargo.toml` version, add a `CHANGELOG.md` entry, commit, tag `vX.Y.Z`. Don't push unless asked. Pushing a tag runs `.github/workflows/release.yml` (binaries for macOS / Linux / Windows, the GitHub Release, and, within the hour, the Homebrew formula: dobrinov/homebrew-tap updates itself); pushing `main` deploys the site (`site/`, `scripts/build-site.sh`) to dobrinov.github.io/shape.
 - On design questions: explain how it works today, propose two options (high level), build after the owner picks.

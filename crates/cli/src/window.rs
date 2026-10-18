@@ -1,5 +1,5 @@
-//! The editor in a native window (`diagram FILE`), and the save dialog that
-//! names a new board (`diagram` with no FILE).
+//! The editor in a native window (`shape FILE`), and the save dialog that
+//! names a new board (`shape` with no FILE).
 //!
 //! The window is a system webview (WKWebView on macOS, WebView2 on Windows,
 //! WebKitGTK on Linux) pointed at the local server, which keeps running on a
@@ -27,18 +27,18 @@ pub fn choose(no_open: bool, browser: bool, window_built: bool) -> Open {
     }
 }
 
-/// A name typed in the save dialog, with `.diagram` added unless it names a
-/// board format already (`plan` → `plan.diagram`, `v1.2` → `v1.2.diagram`).
+/// A name typed in the save dialog, with `.shape` added unless it names a
+/// board format already (`plan` → `plan.shape`, `v1.2` → `v1.2.shape`).
 #[cfg_attr(not(feature = "window"), allow(dead_code))]
 pub fn with_extension(p: PathBuf) -> PathBuf {
     let ext = p
         .extension()
         .map(|e| e.to_string_lossy().to_ascii_lowercase());
-    if matches!(ext.as_deref(), Some("diagram" | "json" | "mmd")) {
+    if matches!(ext.as_deref(), Some("shape" | "diagram" | "json" | "mmd")) {
         return p;
     }
     let mut s = p.into_os_string();
-    s.push(".diagram");
+    s.push(".shape");
     PathBuf::from(s)
 }
 
@@ -49,7 +49,7 @@ pub fn board_name(file: &Path) -> String {
         .unwrap_or_else(|| file.display().to_string())
 }
 
-/// The window title for the page's title (`plan.diagram — Shape`).
+/// The window title for the page's title (`plan.shape — Shape`).
 #[cfg_attr(not(feature = "window"), allow(dead_code))]
 pub fn title(page: &str) -> String {
     let name = page.trim().trim_end_matches("— Shape").trim();
@@ -86,7 +86,7 @@ pub fn open_external(url: &str) {
         .iter()
         .any(|s| lower.starts_with(s))
     {
-        eprintln!("diagram: not opening {url}");
+        eprintln!("shape: not opening {url}");
         return;
     }
     let mut cmd = if cfg!(target_os = "macos") {
@@ -181,8 +181,8 @@ mod native {
         pub fn ask_new_board(&self, dir: &Path) -> Option<PathBuf> {
             rfd::FileDialog::new()
                 .set_title("New board")
-                .set_file_name("Untitled.diagram")
-                .add_filter("Shape board", &["diagram"])
+                .set_file_name("Untitled.shape")
+                .add_filter("Shape board", &["shape", "diagram"])
                 .set_directory(dir)
                 .save_file()
                 .map(super::with_extension)
@@ -241,7 +241,7 @@ mod native {
                     NewWindowResponse::Deny
                 })
                 .with_download_started_handler(|_, path: &mut PathBuf| {
-                    eprintln!("diagram: saving {}", path.display());
+                    eprintln!("shape: saving {}", path.display());
                     true
                 })
                 .with_ipc_handler(move |req| {
@@ -387,16 +387,17 @@ mod tests {
     #[test]
     fn new_boards_get_the_extension() {
         let p = |s: &str| with_extension(PathBuf::from(s));
-        assert_eq!(p("/a/plan"), PathBuf::from("/a/plan.diagram"));
+        assert_eq!(p("/a/plan"), PathBuf::from("/a/plan.shape"));
+        assert_eq!(p("/a/plan.shape"), PathBuf::from("/a/plan.shape"));
         assert_eq!(p("/a/plan.diagram"), PathBuf::from("/a/plan.diagram"));
         assert_eq!(p("/a/plan.json"), PathBuf::from("/a/plan.json"));
-        assert_eq!(p("/a/v1.2"), PathBuf::from("/a/v1.2.diagram"));
+        assert_eq!(p("/a/v1.2"), PathBuf::from("/a/v1.2.shape"));
     }
 
     #[test]
     fn window_titles() {
-        assert_eq!(title("plan.diagram"), "plan.diagram — Shape");
-        assert_eq!(title("plan.diagram — Shape"), "plan.diagram — Shape");
+        assert_eq!(title("plan.shape"), "plan.shape — Shape");
+        assert_eq!(title("plan.shape — Shape"), "plan.shape — Shape");
         assert_eq!(title("Shape"), "Shape");
         assert_eq!(title(""), "Shape");
     }

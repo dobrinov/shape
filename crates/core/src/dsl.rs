@@ -1,4 +1,4 @@
-//! The human-friendly text format (`.diagram` files).
+//! The human-friendly text format (`.shape` files).
 //!
 //! ```text
 //! title: Checkout

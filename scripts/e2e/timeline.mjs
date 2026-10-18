@@ -12,14 +12,14 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const bin = join(root, "target", "debug", "diagram");
+const bin = join(root, "target", "debug", "shape");
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 6490 + Math.floor(Math.random() * 100);
 const dir = mkdtempSync(join(tmpdir(), "diagram-e2e-"));
-const file = join(dir, "board.diagram");
+const file = join(dir, "board.shape");
 writeFileSync(file, "title: History\n\ntable log: Log [x: 0, y: 400] {\n  date | event\n  Dec 2024 | Deal signed\n  7–14 May 2026 | Visa approves\n}\n");
 const server = spawn(bin, [file, "--no-open", "--port", String(port)], {
-  env: { ...process.env, DIAGRAM_WEB_DIR: join(root, "web"), DIAGRAM_NO_UPDATE_CHECK: "1" },
+  env: { ...process.env, SHAPE_WEB_DIR: join(root, "web"), SHAPE_NO_UPDATE_CHECK: "1" },
   stdio: "ignore",
 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

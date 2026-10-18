@@ -1,5 +1,5 @@
 [package]
-name = "diagram-wasm"
+name = "shape-wasm"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-diagram-core = { path = "../core" }
+shape-core = { path = "../core" }
 wasm-bindgen = "=0.2.129"
 serde_json.workspace = true
 serde.workspace = true

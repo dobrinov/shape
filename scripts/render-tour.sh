@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Renders the feature tour on the landing page: each site/tour/NAME.diagram
+# Renders the feature tour on the landing page: each site/tour/NAME.shape
 # becomes OUT/NAME.svg, in dark mode unless its `# render:` line says --light.
-# A `# render: …` line adds options (e.g. --as-of DATE, --base OTHER.diagram);
+# A `# render: …` line adds options (e.g. --as-of DATE, --base OTHER.shape);
 # files starting with `_` are only inputs to others.
 # Usage: scripts/render-tour.sh BIN OUT_DIR
 set -euo pipefail
@@ -10,9 +10,9 @@ OUT=$2
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$OUT"
 cd "$ROOT/site/tour"
-for f in *.diagram; do
+for f in *.shape; do
   case "$f" in _*) continue ;; esac
-  name=${f%.diagram}
+  name=${f%.shape}
   opts=$(sed -n 's/^# render: //p' "$f" | head -1)
   mode=--dark
   case " $opts " in *" --light "*) mode=""; opts=${opts/--light/} ;; esac

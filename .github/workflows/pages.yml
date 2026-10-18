@@ -35,9 +35,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
       - name: Test
-        run: make wasm && DIAGRAM_SKIP_WASM=1 cargo test --workspace && node --test web/test/*.test.mjs
+        run: make wasm && SHAPE_SKIP_WASM=1 cargo test --workspace && node --test web/test/*.test.mjs
       - name: Check the example
-        run: DIAGRAM_SKIP_WASM=1 cargo run -q -p diagram -- check examples/example.diagram
+        run: SHAPE_SKIP_WASM=1 cargo run -q -p shape -- check examples/example.shape
       - name: Build site
         run: make site
         env:

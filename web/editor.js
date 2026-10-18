@@ -11,7 +11,7 @@
  *     shareUrl: null,     // playground URL, enables "Copy share link"
  *     ai: null,           // function (prompt) → Promise<string>: your model / harness.
  *                         // Without it, ✦ actions show the prompt to copy and take the reply.
- *     openBoard: null,    // function (path, id): follow a `board.diagram#id` link (else a new tab)
+ *     openBoard: null,    // function (path, id): follow a `board.shape#id` link (else a new tab)
  *     boards: null,       // function () → Promise<[path]>: boards to offer in "Link to a board…"
  *     onChange: function (source, ed) {},
  *     onSave: function (source, ed) {}   // Cmd/Ctrl+S
@@ -656,7 +656,7 @@
       [["dsl", "Diagram"], ["json", "JSON"], ["mermaid", "Mermaid"]].forEach(function (t) {
         codeTabs.appendChild(h("button", { class: st.codeFormat === t[0] ? "on" : "", onclick: function () { st.codeFormat = t[0]; buildTabs(); syncCode(true); } }, [t[1]]));
       });
-      codeTabs.appendChild(h("a", { class: "dge-help", href: "https://github.com/dobrinov/diagram/blob/main/crates/core/LANGUAGE.md", target: "_blank", rel: "noopener" }, ["syntax ↗"]));
+      codeTabs.appendChild(h("a", { class: "dge-help", href: "https://github.com/dobrinov/shape/blob/main/crates/core/LANGUAGE.md", target: "_blank", rel: "noopener" }, ["syntax ↗"]));
     }
 
     // --------------------------------------------------------- doc state
@@ -1207,7 +1207,7 @@
           if (failure.hint) body.appendChild(h("p", {}, [h("b", {}, ["What to try: "]), said(failure.hint)]));
         }
         if (opts.ai) {
-          if (info && info.command) body.appendChild(h("p", {}, ["Connected through ", code(info.command), ". To use another one, start the editor with ", code("diagram FILE --ai codex"), " (or ", code("claude"), ", ", code("gemini"), ", ", code("claude:opus"), ", any command that reads a prompt and prints the answer), or set ", code("DIAGRAM_AI"), "."]));
+          if (info && info.command) body.appendChild(h("p", {}, ["Connected through ", code(info.command), ". To use another one, start the editor with ", code("shape FILE --ai codex"), " (or ", code("claude"), ", ", code("gemini"), ", ", code("claude:opus"), ", any command that reads a prompt and prints the answer), or set ", code("SHAPE_AI"), "."]));
           else body.appendChild(h("p", {}, ["The AI is the one this app was set up with."]));
           if (setup) body.appendChild(status);
           return;
@@ -1228,7 +1228,7 @@
         });
         body.appendChild(h("p", {}, [installed.length
           ? "One is installed but this editor started without it: close it and open the board again (" : "Then open the board again (",
-          code("diagram FILE"), "); it uses the first one it finds. Pick one with ", code("--ai codex"), ", or use any command that reads a prompt and prints the answer: ", code("--ai \"my-tool --flag\""), "."]));
+          code("shape FILE"), "); it uses the first one it finds. Pick one with ", code("--ai codex"), ", or use any command that reads a prompt and prints the answer: ", code("--ai \"my-tool --flag\""), "."]));
         body.appendChild(h("p", { class: "dge-muted" }, ["Until then, the ✦ actions show the prompt to paste into any chat, and take the reply back."]));
       };
       showModal(failure ? "The AI did not answer" : opts.ai ? "Your AI" : "Connect your AI", body, [
@@ -1513,7 +1513,7 @@
       if (!a) return;
       var drawn = st.session.source("dsl");
       var talk = (st.doc.comments || []).length ? " Act on the comments on it too: they say what the person thinks of the answer." : "";
-      var instructions = "The person asked: “" + a.question + "”. The answer was drawn as this small board:\n\n```diagram\n" + drawn + "```\n\nBring the board up to date with what this answer shows." + talk + " Keep every piece of information: reorganise, merge and move it, but never drop it.";
+      var instructions = "The person asked: “" + a.question + "”. The answer was drawn as this small board:\n\n```shape\n" + drawn + "```\n\nBring the board up to date with what this answer shows." + talk + " Keep every piece of information: reorganise, merge and move it, but never drop it.";
       closeAnswer();
       runRethink(instructions);
     }
@@ -1960,7 +1960,7 @@
       if (t.type !== "node" || view) return items;
       var lk = node(t.id).link;
       var links = [["Link to…", function () { startLinking(t.id); }, "Then click the element this one should take you to"],
-        ["Link to a board…", function () { linkToBoard(t.id, st.menuAt); }, "Another .diagram file; add #id to go to one element on it"]];
+        ["Link to a board…", function () { linkToBoard(t.id, st.menuAt); }, "Another board file; add #id to go to one element on it"]];
       if (lk) links.push(["Remove link", function () { applyOps([{ op: "update_node", id: t.id, link: "" }]); }, lk]);
       var cut = items.lastIndexOf("-");
       return cut > 0 ? items.slice(0, cut).concat(links, items.slice(cut)) : items.concat(["-"], links);
@@ -3760,17 +3760,17 @@
       toast.className = "dge-toast";
     }
     /* `#id` goes to that element on the board; anything else opens in a new tab. */
-    /* `delivery.diagram` or `../plans/q3.diagram#m1`: another board, relative to this one. */
+    /* `delivery.shape` or `../plans/q3.shape#m1`: another board, relative to this one. */
     function boardLink(link) {
-      var m = /^([^#]+\.diagram)(?:#(.*))?$/.exec(link || "");
+      var m = /^([^#]+\.(?:shape|diagram))(?:#(.*))?$/.exec(link || "");
       return m && !/^[a-z][a-z0-9+.-]*:/i.test(link) ? { path: m[1], id: m[2] || null } : null;
     }
     function linkToBoard(id, at) {
       var cur = node(id).link || "";
       function set(v) { applyOps([{ op: "update_node", id: id, link: v }]); }
       function typed() {
-        askAt(at, boardLink(cur) ? cur : "", "delivery.diagram#element", function (v) {
-          if (v && !boardLink(v)) return flash("A board link ends in .diagram, optionally with #id", true);
+        askAt(at, boardLink(cur) ? cur : "", "delivery.shape#element", function (v) {
+          if (v && !boardLink(v)) return flash("A board link ends in .shape (or .diagram), optionally with #id", true);
           set(v);
         });
       }
@@ -3778,7 +3778,7 @@
       opts.boards().then(function (list) {
         if (!list.length) return typed();
         openMenu(at, list.map(function (b) { return [b, function () { set(b); flash("Linked to " + b + " — add #id to the link to go to one element"); }]; })
-          .concat(["-", ["Type a link…", typed, "board.diagram#element"]]));
+          .concat(["-", ["Type a link…", typed, "board.shape#element"]]));
       }).catch(typed);
     }
     function followLink(link) {
@@ -4775,7 +4775,7 @@
     });
 
     function baseName() {
-      return slug((st.doc && st.doc.title) || opts.name || "diagram");
+      return slug((st.doc && st.doc.title) || opts.name || "board");
     }
     function openExport(anchor) {
       var items = [
@@ -4787,7 +4787,7 @@
         }],
         ["Copy SVG", function () { copyText(exportSVG()).then(function () { flash("SVG copied"); }); }],
         "-",
-        ["Download .diagram", function () { download(baseName() + ".diagram", st.text); }],
+        ["Download .shape", function () { download(baseName() + ".shape", st.text); }],
         ["Download JSON", function () { download(baseName() + ".json", st.session.source("json"), "application/json"); }],
         ["Copy as Mermaid", function () { copyText(st.session.source("mermaid")).then(function () { flash("Mermaid copied — paste it into GitHub Markdown"); }); }],
         ["Copy as a prompt to build it", function () { copyBoardPrompt(); }],
@@ -4866,7 +4866,7 @@
     }
 
     function openApply() {
-      var ta = h("textarea", { class: "dge-preview", rows: 14, placeholder: "Paste the LLM's reply here: a ```json {\"ops\": [...]} block, or a ```diagram block with the whole diagram." });
+      var ta = h("textarea", { class: "dge-preview", rows: 14, placeholder: "Paste the LLM's reply here: a ```json {\"ops\": [...]} block, or a ```shape block with the whole diagram." });
       var out = h("div", { class: "dge-muted" });
       showModal("Apply an LLM reply", h("div", {}, [ta, out]), [
         h("button", { onclick: closeModal }, ["Cancel"]),
@@ -4879,9 +4879,9 @@
       setTimeout(function () { ta.focus(); }, 0);
     }
 
-    /* Apply a chat reply: ops JSON, or a whole diagram in a ```diagram block. */
+    /* Apply a chat reply: ops JSON, or a whole diagram in a ```shape block. */
     function applyReply(text) {
-      var m = /```(?:diagram|dsl)\s*\n([\s\S]*?)```/.exec(text);
+      var m = /```(?:shape|diagram|dsl)\s*\n([\s\S]*?)```/.exec(text);
       if (m && !/```json/.test(text)) {
         var test = new wasm.Diagram();
         var r = JSON.parse(test.set_source(m[1]));

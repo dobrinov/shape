@@ -4,7 +4,7 @@
 # A rethink gets a note and a section; a question an answer with links.
 p=$(cat)
 case "$p" in
-  *"# A question about the board"*) printf 'The API writes to Postgres.\n\n```diagram\ntitle: Writes\nwriter: Orders API [link: #/api]\nstore: Postgres [link: #/db]\nwriter -> store: writes\n```\n' ;;
+  *"# A question about the board"*) printf 'The API writes to Postgres.\n\n```shape\ntitle: Writes\nwriter: Orders API [link: #/api]\nstore: Postgres [link: #/db]\nwriter -> store: writes\n```\n' ;;
   *"# Rethink the board"*"The answer was drawn as this small board"*) printf '```json\n{"note":"Took the answer in.","ops":[{"op":"update_node","id":"api","detail":"writes to Postgres"}]}\n```\n' ;;
   *"# Rethink the board"*"Adapt this canvas for senior management"*) printf '```json\n{"note":"Adapted for management.","ops":[{"op":"update_node","id":"api","detail":"Orders"}]}\n```\n' ;;
   *"# Rethink the board"*"Two card products now"*) printf '```json\n{"note":"Scope now has both card products.","ops":[{"op":"in","canvas":"notes","ops":[{"op":"update_node","id":"n1","label":"Two products: virtual cards and spend cards"},{"op":"resolve_comment","id":"c1","resolution":"Scope updated"}]}]}\n```\n' ;;

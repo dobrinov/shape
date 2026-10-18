@@ -2188,7 +2188,7 @@ fn node_svg(
 }
 
 /// A node's link when it is a web page (`#id` links point at elements,
-/// `x.diagram#id` at other boards; the editor follows those).
+/// `x.shape#id` at other boards; the editor follows those).
 fn web_link(node: &Node) -> Option<&str> {
     node.link
         .as_deref()
@@ -2288,7 +2288,7 @@ mod tests {
     #[test]
     fn labels_and_parallel_lines_keep_apart() {
         // the shape of a real board where they did not
-        let d = dsl::parse(include_str!("../tests/fixtures/crowded.diagram")).unwrap();
+        let d = dsl::parse(include_str!("../tests/fixtures/crowded.shape")).unwrap();
         let r = render(&d, &RenderOptions::default());
         let nums = |tag: &str, key: &str| -> f64 {
             let i = tag.find(&format!(" {key}=\"")).unwrap() + key.len() + 3;

@@ -137,7 +137,7 @@ pub const OPS_REFERENCE: &str = r#"Operations (fields in [] are optional; ids ar
 - {"op":"perspective","id":"exec",["label","tags":["exec"],"show":["adr","risks"],"details":false,"remove":true]}   (a way of looking at the board: elements with one of its tags, blocks of the kinds in show; elements carry tags such as tech, product, user, exec, team)
 - {"op":"presentation",["title","transition":"glide|fade|zoom|none","instructions","slides":[{"target":"risks",["title","notes","transition"]}],"remove":true]}   (the board as slides, in order; a target is a top-level section, block, mindmap centre or box, or "*" for the whole board; slides replaces the whole list; notes are what to say)
 - {"op":"theme","source":"theme brand {\n  blue: #3b6fd8\n  light {\n    background: #faf9f6\n  }\n  dark {\n    background: #101418\n  }\n}"}   (adds or replaces a theme; top lines apply in both modes, light { } and dark { } what differs; keys: background, dots, text, muted, surface, border, line, section, header, title, title-text, pin, font, radius and the named colours)
-- {"op":"merge","dsl":"cache: Redis [cylinder]\napi -> cache: reads\napi [red]"}   (statements in the diagram language, as if written at the end of the file: adds new elements; one written again by its id gets the attributes given. Cheapest for many changes)
+- {"op":"merge","dsl":"cache: Redis [cylinder]\napi -> cache: reads\napi [red]"}   (statements in the Shape language, as if written at the end of the file: adds new elements; one written again by its id gets the attributes given. Cheapest for many changes)
 - Database table: {"op":"add_group","id":"users","label":"Users","entity":true}; its columns are add_node / update_node with "id":"users.email","label":"email","group":"users","column":{"type":"text",["pk":true,"unique":true,"null":true,"fk":"teams.id","default":"now()"]}. Or merge: "entity users: Users {\n  id: uuid [pk]\n  team_id: uuid [fk: teams]\n}"
 - Canvases: a box with "canvas":"payments" opens a board inside this one (not shown to you; keep the attribute when you rewrite a box). {"op":"add_canvas","title":"Payments"} adds one; removing the box that opens it removes it. {"op":"in","canvas":"payments","ops":[…]} applies ops inside canvas `payments` (`payments/fraud` for one inside it).
 - Images: a box with "image":"img1" shows asset img1 (its data is not shown to you); keep the image attribute when you rewrite a box.
@@ -205,7 +205,7 @@ pub fn ask(
 ) -> String {
     let title = doc.title.as_deref().unwrap_or("Untitled diagram");
     let mut s = format!("# Change the diagram \"{title}\"\n\n");
-    s.push_str("The diagram is written in the `diagram` language: one statement per line (`id: Label [attrs]` declares a box, `a -> b: label` connects two, `group id: Label { … }` is a section; `mindmap`, `gantt`, `chart`, `table` and `risks` blocks hold their items one per line). The request below either gives information to add (facts, details, notes: put each where it belongs, in or next to what it is about, or as a detail of it) or asks for a change; do what it says.\n\n");
+    s.push_str("The diagram is written in the `shape` language: one statement per line (`id: Label [attrs]` declares a box, `a -> b: label` connects two, `group id: Label { … }` is a section; `mindmap`, `gantt`, `chart`, `table` and `risks` blocks hold their items one per line). The request below either gives information to add (facts, details, notes: put each where it belongs, in or next to what it is about, or as a detail of it) or asks for a change; do what it says.\n\n");
     if let Some(d) = &doc.description {
         s.push_str(&format!("About the diagram: {d}\n\n"));
     }
@@ -232,13 +232,13 @@ pub fn ask(
             let shown = sub.nodes.len() + sub.edges.len() + sub.groups.len();
             let all = doc.nodes.len() + doc.edges.len() + doc.groups.len();
             s.push_str(&format!(
-                "## The part of the board this is about\n\nSelected: {}. Shown with what is around it ({shown} of the board's {all} elements); the rest exists too: keep its ids, do not remove or recreate it.\n\n```diagram\n{}```\n\n",
+                "## The part of the board this is about\n\nSelected: {}. Shown with what is around it ({shown} of the board's {all} elements); the rest exists too: keep its ids, do not remove or recreate it.\n\n```shape\n{}```\n\n",
                 ids.iter().map(|i| format!("`{i}`")).collect::<Vec<_>>().join(", "),
                 dsl::print_lean(&sub)
             ));
         }
         None => s.push_str(&format!(
-            "## The board\n\n```diagram\n{}```\n\n",
+            "## The board\n\n```shape\n{}```\n\n",
             dsl::print_lean(doc)
         )),
     }
@@ -247,7 +247,7 @@ pub fn ask(
     s.push('\n');
     s.push_str("## How to respond\n\nReply with a single ```json code block holding the operations, for example:\n\n```json\n{\"ops\": [\n  {\"op\": \"update_node\", \"id\": \"api\", \"color\": \"red\"},\n  {\"op\": \"merge\", \"dsl\": \"cache: Redis [cylinder]\\napi -> cache: reads\"}\n]}\n```\n\n");
     s.push_str(OPS_REFERENCE);
-    s.push_str("\n\nRules:\n- Change only what the request asks for; keep existing ids.\n- Information that fits an existing item goes into it (its label or `detail`); new topics become new boxes or stickies near what they relate to, in the right section.\n- To add several things, prefer one `merge` with statements in the diagram language.\n- The batch is applied all at once or not at all, so it must be valid as a whole.\n- No explanation is needed outside the code block.\n");
+    s.push_str("\n\nRules:\n- Change only what the request asks for; keep existing ids.\n- Information that fits an existing item goes into it (its label or `detail`); new topics become new boxes or stickies near what they relate to, in the right section.\n- To add several things, prefer one `merge` with statements in the Shape language.\n- The batch is applied all at once or not at all, so it must be valid as a whole.\n- No explanation is needed outside the code block.\n");
     s
 }
 
@@ -320,7 +320,7 @@ pub fn rethink(
     let title = root.title.as_deref().unwrap_or("Untitled diagram");
     let mut s = format!("# Rethink the board \"{title}\"\n\n");
     s.push_str("People have been collecting information on this board: findings, ideas, notes, decisions, plans and comments, added one by one as they came. Bring it up to date with everything on it, then organise it so it reads well now.\n\n");
-    s.push_str("The board is written in the `diagram` language: one statement per line (`id: Label [attrs]` declares a box, `a -> b: label` connects two, `group id: Label { … }` is a section; `mindmap`, `gantt`, `chart`, `table` and `risks` blocks hold their items one per line; `comment` lines are what people said). Below are the top board and every canvas inside it (a board inside the board, opened from a box with `canvas: ID`).\n\n");
+    s.push_str("The board is written in the `shape` language: one statement per line (`id: Label [attrs]` declares a box, `a -> b: label` connects two, `group id: Label { … }` is a section; `mindmap`, `gantt`, `chart`, `table` and `risks` blocks hold their items one per line; `comment` lines are what people said). Below are the top board and every canvas inside it (a board inside the board, opened from a box with `canvas: ID`).\n\n");
     if let Some(d) = &root.description {
         s.push_str(&format!("About the board: {d}\n\n"));
     }
@@ -439,7 +439,7 @@ pub fn question(
     today: Option<i64>,
 ) -> String {
     let title = root.title.as_deref().unwrap_or("Untitled diagram");
-    let mut s = format!("# A question about the board \"{title}\"\n\nAnswer the question at the end from what is on this board. The board is below: the top board, then each canvas inside it (a board inside the board, opened from a box), each in the `diagram` language with every id.\n\n");
+    let mut s = format!("# A question about the board \"{title}\"\n\nAnswer the question at the end from what is on this board. The board is below: the top board, then each canvas inside it (a board inside the board, opened from a box), each in the `shape` language with every id.\n\n");
     s.push_str(&board_by_canvas(root, today));
     if !history.is_empty() {
         s.push_str("## Earlier in this conversation\n\n");
@@ -454,7 +454,7 @@ pub fn question(
 
 /// A prompt asking a model to answer `question` about the whole board
 /// (`root`, canvases included) with a small diagram of its own: a summary
-/// in a sentence or two, then a board in the `diagram` language whose
+/// in a sentence or two, then a board in the `shape` language whose
 /// elements link back to where they come from (`#/id` on the top board,
 /// `#/plan/id` inside a canvas). See [`answer_parts`].
 pub fn answer_board(
@@ -465,7 +465,7 @@ pub fn answer_board(
     recipes: &[crate::recipes::Recipe],
 ) -> String {
     let title = root.title.as_deref().unwrap_or("Untitled diagram");
-    let mut s = format!("# A question about the board \"{title}\"\n\nAnswer the question at the end by drawing a small board of your own: a diagram made for this question from what is on the board below (the top board, then each canvas inside it, in the `diagram` language with every id).\n\n");
+    let mut s = format!("# A question about the board \"{title}\"\n\nAnswer the question at the end by drawing a small board of your own: a diagram made for this question from what is on the board below (the top board, then each canvas inside it, in the `shape` language with every id).\n\n");
     s.push_str(&board_by_canvas(root, today));
     if !history.is_empty() {
         s.push_str("## Earlier in this conversation\n\n");
@@ -476,20 +476,20 @@ pub fn answer_board(
     s.push_str(&format!("## The question\n\n{}\n\n", question.trim()));
     s.push_str(&crate::recipes::prompt_section(recipes));
     s.push('\n');
-    s.push_str("## How to answer\n\nFirst one or two short plain sentences that answer the question (40 words at most; the diagram carries the detail). Then one ```diagram code block: a small board that shows the answer.\n\n- Pick the form that fits the question: boxes and arrows for what depends on what, sections to group, a `timeline` for when things happened, a `table` to compare, a `mindmap` to break something down, stickies for open questions.\n- Keep it small: about 4 to 15 elements, short labels, details (`detail:`) for the rest.\n- Link every element that comes from the board to its place there: `[link: #/id]` for the top board, `[link: #/plan/id]` for an element inside canvas `plan` (the canvas path, then the id). Only ids that are on the board.\n- Start it with `title:` (a short name for the answer). Do not copy the whole board; show only what answers the question.\n- When the board does not answer it, say so in the sentences and draw what is known and what is missing (a sticky per missing piece).\n\nExample:\n\nFraud reporting is the long pole: it must ship before the open beta.\n\n```diagram\ntitle: What blocks the launch\nfraud: Fraud reporting API [red, link: #/blockers/b-fraud, detail: owner rado]\nbeta: Open beta, 28 Oct [link: #/status/beta]\nfraud -> beta: must ship first\n```\n");
+    s.push_str("## How to answer\n\nFirst one or two short plain sentences that answer the question (40 words at most; the diagram carries the detail). Then one ```shape code block: a small board that shows the answer.\n\n- Pick the form that fits the question: boxes and arrows for what depends on what, sections to group, a `timeline` for when things happened, a `table` to compare, a `mindmap` to break something down, stickies for open questions.\n- Keep it small: about 4 to 15 elements, short labels, details (`detail:`) for the rest.\n- Link every element that comes from the board to its place there: `[link: #/id]` for the top board, `[link: #/plan/id]` for an element inside canvas `plan` (the canvas path, then the id). Only ids that are on the board.\n- Start it with `title:` (a short name for the answer). Do not copy the whole board; show only what answers the question.\n- When the board does not answer it, say so in the sentences and draw what is known and what is missing (a sticky per missing piece).\n\nExample:\n\nFraud reporting is the long pole: it must ship before the open beta.\n\n```shape\ntitle: What blocks the launch\nfraud: Fraud reporting API [red, link: #/blockers/b-fraud, detail: owner rado]\nbeta: Open beta, 28 Oct [link: #/status/beta]\nfraud -> beta: must ship first\n```\n");
     s
 }
 
 /// A model's reply to [`answer_board`]: its sentences and its board (the
-/// `diagram` block), or why it cannot be used.
+/// `shape` block; `diagram`, the name before, works too), or why it cannot
+/// be used.
 pub fn answer_parts(reply: &str) -> Result<(String, String), String> {
-    let start = reply
-        .find("```diagram")
-        .ok_or("the reply has no ```diagram block")?;
-    let body = &reply[start + "```diagram".len()..];
-    let end = body
-        .find("```")
-        .ok_or("the ```diagram block is not closed")?;
+    let (start, fence) = ["```shape", "```diagram"]
+        .iter()
+        .find_map(|f| reply.find(f).map(|i| (i, *f)))
+        .ok_or("the reply has no ```shape block")?;
+    let body = &reply[start + fence.len()..];
+    let end = body.find("```").ok_or("the ```shape block is not closed")?;
     let source = body[..end].trim_matches('\n').to_string() + "\n";
     crate::dsl::parse(&source).map_err(|e| {
         e.iter()
@@ -669,7 +669,7 @@ pub fn brief(doc: &Document) -> String {
         s.push('\n');
     }
     s.push_str(&format!(
-        "## Source\n\n```diagram\n{}```\n",
+        "## Source\n\n```shape\n{}```\n",
         dsl::print_lean(doc)
     ));
     s
@@ -686,7 +686,7 @@ pub fn prompt(doc: &Document, opts: &PromptOptions) -> String {
             s.push_str(&format!(
                 "# Update the diagram \"{title}\" from review comments\n\n"
             ));
-            s.push_str("The diagram below is written in the `diagram` language (one statement per line: `id: Label [attrs]` declares a node, `a -> b: label` connects nodes, `group id: Label { … }` groups them, `comment` / `reply` lines are review threads). Reviewers left comments on it. Address each comment listed under *Comments to address*.\n\n");
+            s.push_str("The diagram below is written in the `shape` language (one statement per line: `id: Label [attrs]` declares a node, `a -> b: label` connects nodes, `group id: Label { … }` groups them, `comment` / `reply` lines are review threads). Reviewers left comments on it. Address each comment listed under *Comments to address*.\n\n");
         }
         Target::Code => {
             s.push_str(&format!(
@@ -714,9 +714,9 @@ pub fn prompt(doc: &Document, opts: &PromptOptions) -> String {
             let shown = part.nodes.len() + part.edges.len() + part.groups.len();
             let all = doc.nodes.len() + doc.edges.len() + doc.groups.len();
             s.push_str(&format!("The part of the board the comments are about ({shown} of its {all} elements). The rest exists too: keep its ids and do not remove or recreate it.\n\n"));
-            s.push_str(&format!("```diagram\n{}```\n\n", dsl::print_lean(&part)));
+            s.push_str(&format!("```shape\n{}```\n\n", dsl::print_lean(&part)));
         }
-        None => s.push_str(&format!("```diagram\n{}```\n\n", dsl::print_lean(doc))),
+        None => s.push_str(&format!("```shape\n{}```\n\n", dsl::print_lean(doc))),
     }
     s.push_str(&format!("## Comments to address ({})\n\n", comments.len()));
     if comments.is_empty() {
@@ -734,12 +734,12 @@ pub fn prompt(doc: &Document, opts: &PromptOptions) -> String {
             s.push_str("\n\nRules:\n- Change only what the comments ask for; keep existing ids.\n- Resolve every comment you addressed with `resolve_comment` and a one-sentence `resolution`.\n- If a comment is a question or you disagree, answer with `reply` (author \"agent\") and leave it open.\n- The batch is applied atomically, so it must be valid as a whole.\n");
         }
         (Target::Diagram, Reply::Dsl) => {
-            s.push_str("Reply with the complete updated diagram in a single ```diagram code block. Keep existing ids. Mark every comment you addressed as resolved by adding `[resolved, resolution: what you did]` at the end of its `comment` line. For questions, add a `reply <id> by agent: …` line and leave the comment open.\n");
+            s.push_str("Reply with the complete updated diagram in a single ```shape code block. Keep existing ids. Mark every comment you addressed as resolved by adding `[resolved, resolution: what you did]` at the end of its `comment` line. For questions, add a `reply <id> by agent: …` line and leave the comment open.\n");
         }
         (Target::Code, _) => {
             s.push_str("1. Make the code changes. Follow the conventions of the codebase.\n2. For each comment, report what you did (by comment id), or why you did not change anything.\n");
             match file {
-                Some(f) => s.push_str(&format!("3. If the design changed, update the diagram to match and resolve the addressed comments:\n   `diagram apply {f} ops.json` (operations as below), or edit `{f}` directly and add `[resolved, resolution: …]` to the comment lines.\n\n{OPS_REFERENCE}\n")),
+                Some(f) => s.push_str(&format!("3. If the design changed, update the diagram to match and resolve the addressed comments:\n   `shape apply {f} ops.json` (operations as below), or edit `{f}` directly and add `[resolved, resolution: …]` to the comment lines.\n\n{OPS_REFERENCE}\n")),
                 None => s.push_str("3. If the design changed, also return the diagram changes as operations in a ```json {\"ops\": [...]} block, including a `resolve_comment` for each comment you addressed.\n\n"),
             }
             if file.is_none() {
@@ -1687,12 +1687,12 @@ mod tests {
             &PromptOptions {
                 include_resolved: true,
                 target: Target::Code,
-                file: Some("docs/shop.diagram".into()),
+                file: Some("docs/shop.shape".into()),
                 ..Default::default()
             },
         );
         assert!(p.contains("**c2** on edge `api` → `db` (resolved)"), "{p}");
-        assert!(p.contains("diagram apply docs/shop.diagram"));
+        assert!(p.contains("shape apply docs/shop.shape"));
     }
 
     #[test]
@@ -1757,7 +1757,7 @@ mod tests {
     fn brief_describes_everything() {
         let b = brief(&doc());
         assert!(b.starts_with("# Shop"));
-        assert!(b.contains("```diagram\n"));
+        assert!(b.contains("```shape\n"));
         assert!(
             b.contains("comment c1 on api by deyan: Split payments out?"),
             "{b}"

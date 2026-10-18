@@ -82,15 +82,15 @@ jobs:
       - name: Build the CLI
         shell: bash
         env:
-          DIAGRAM_SKIP_WASM: "1"
-          DIAGRAM_RELEASE_TAG: ${{ env.TAG }}
+          SHAPE_SKIP_WASM: "1"
+          SHAPE_RELEASE_TAG: ${{ env.TAG }}
         # Linux binaries leave the native window out: with it they would need
         # WebKitGTK installed just to start (servers, CI); they open the browser
         run: |
           if [[ "${{ matrix.os }}" == ubuntu* ]]; then
-            cargo build --release --locked -p diagram --target ${{ matrix.target }} --no-default-features
+            cargo build --release --locked -p shape --target ${{ matrix.target }} --no-default-features
           else
-            cargo build --release --locked -p diagram --target ${{ matrix.target }}
+            cargo build --release --locked -p shape --target ${{ matrix.target }}
           fi
 
       - name: Package
@@ -98,17 +98,20 @@ jobs:
         shell: bash
         run: |
           version="${TAG#v}"
-          name="diagram-${version}-${{ matrix.name }}"
+          name="shape-${version}-${{ matrix.name }}"
           mkdir -p dist
+          # `diagram`, the command's name before the rename, stays as an alias
           if [[ "${{ matrix.os }}" == windows* ]]; then
-            cp "target/${{ matrix.target }}/release/diagram.exe" dist/
+            cp "target/${{ matrix.target }}/release/shape.exe" dist/
+            cp dist/shape.exe dist/diagram.exe
             cp README.md LICENSE* dist/ 2>/dev/null || true
-            (cd dist && 7z a -tzip "../${name}.zip" diagram.exe README.md LICENSE* >/dev/null)
+            (cd dist && 7z a -tzip "../${name}.zip" shape.exe diagram.exe README.md LICENSE* >/dev/null)
             asset="${name}.zip"
           else
-            cp "target/${{ matrix.target }}/release/diagram" dist/
+            cp "target/${{ matrix.target }}/release/shape" dist/
+            ln -s shape dist/diagram
             cp README.md LICENSE* dist/ 2>/dev/null || true
-            tar -C dist -czf "${name}.tar.gz" diagram README.md $(cd dist && ls LICENSE* 2>/dev/null)
+            tar -C dist -czf "${name}.tar.gz" shape diagram README.md $(cd dist && ls LICENSE* 2>/dev/null)
             asset="${name}.tar.gz"
           fi
           if command -v sha256sum >/dev/null; then sha256sum "$asset" > "$asset.sha256"; else shasum -a 256 "$asset" > "$asset.sha256"; fi
@@ -119,11 +122,11 @@ jobs:
         if: ${{ !matrix.cross }}
         shell: bash
         run: |
-          bin="target/${{ matrix.target }}/release/diagram"
+          bin="target/${{ matrix.target }}/release/shape"
           [[ "${{ matrix.os }}" == windows* ]] && bin="$bin.exe"
           "$bin" --version
-          "$bin" check examples/example.diagram
-          "$bin" svg examples/example.diagram --canvas metrics -o smoke.svg
+          "$bin" check examples/example.shape
+          "$bin" svg examples/example.shape --canvas metrics -o smoke.svg
 
       - uses: actions/upload-artifact@v7
         with:
@@ -166,7 +169,7 @@ jobs:
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.TAG }}
-          name: diagram ${{ env.TAG }}
+          name: Shape ${{ env.TAG }}
           body_path: notes.md
           generate_release_notes: true
           files: assets/*

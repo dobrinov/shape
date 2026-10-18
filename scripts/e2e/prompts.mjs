@@ -13,9 +13,9 @@ const root = join(here, "..", "..");
 const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 6890 + Math.floor(Math.random() * 100);
 const dir = mkdtempSync(join(tmpdir(), "diagram-e2e-"));
-const file = join(dir, "board.diagram");
+const file = join(dir, "board.shape");
 writeFileSync(file, "title: Prompts\ntype: product\n\napi: Orders API\nweb: Web app\nweb -> api\ncomment on api: why Rust?\n");
-const server = spawn(join(root, "target/debug/diagram"), [file, "--no-open", "--port", String(port)], { env: { ...process.env, DIAGRAM_WEB_DIR: join(root, "web"), DIAGRAM_NO_UPDATE_CHECK: "1" }, stdio: "ignore" });
+const server = spawn(join(root, "target/debug/shape"), [file, "--no-open", "--port", String(port)], { env: { ...process.env, SHAPE_WEB_DIR: join(root, "web"), SHAPE_NO_UPDATE_CHECK: "1" }, stdio: "ignore" });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 try {
   await sleep(600);

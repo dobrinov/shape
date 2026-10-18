@@ -1,6 +1,6 @@
-# diagram (JavaScript / TypeScript)
+# Shape (JavaScript / TypeScript)
 
-Build tools on top of [diagram](../README.md) boards from Node (>= 18) and the browser: parse `.diagram` files (DSL, JSON or Mermaid), render SVG with geometry, edit through ops (or straight from a model's reply), and turn boards, comments and mindmaps into prompts.
+Build tools on top of [Shape](../README.md) boards from Node (>= 18) and the browser: parse `.shape` files (DSL, JSON or Mermaid), render SVG with geometry, edit through ops (or straight from a model's reply), and turn boards, comments and mindmaps into prompts.
 
 It is the same Rust core as the CLI and the editor, compiled to WebAssembly, with a small typed ES-module API on top. No dependencies.
 
@@ -9,11 +9,11 @@ It is the same Rust core as the CLI and the editor, compiled to WebAssembly, wit
 From the repo root (needs `wasm-pack` and the `wasm32-unknown-unknown` target, like `make wasm`):
 
 ```bash
-make js                    # → js/pkg/diagram_wasm.js + diagram_wasm_bg.wasm
+make js                    # → js/pkg/shape_wasm.js + shape_wasm_bg.wasm
 node --test js/test/       # also run by `make test` once js/pkg exists
 ```
 
-Use it from another project with a path or `file:` dependency (`npm install ../diagram/js`) or `npm pack` in `js/`. (The name `diagram` is taken on the npm registry; pick a scoped name before publishing.)
+Use it from another project with a path or `file:` dependency (`npm install ../shape/js`) or `npm pack` in `js/`. The package is `@dobrinov/shape`.
 
 ## Quick start
 
@@ -21,12 +21,12 @@ Use it from another project with a path or `file:` dependency (`npm install ../d
 
 ```js
 import { readFile, writeFile } from "node:fs/promises";
-import { init, Board } from "diagram";   // or "./js/index.mjs"
+import { init, Board } from "@dobrinov/shape";   // or "./js/index.mjs"
 
-await init();                            // reads pkg/diagram_wasm_bg.wasm next to the module
-const board = Board.parse(await readFile("checkout.diagram", "utf8"));
+await init();                            // reads pkg/shape_wasm_bg.wasm next to the module
+const board = Board.parse(await readFile("checkout.shape", "utf8"));
 board.apply([{ op: "add_node", id: "cache", label: "Redis", shape: "cylinder" }]);
-await writeFile("checkout.diagram", board.source());          // DSL, diffs well
+await writeFile("checkout.shape", board.source());          // DSL, diffs well
 await writeFile("checkout.svg", board.render({ theme: "light" }).svg);
 board.free();
 ```
@@ -36,13 +36,13 @@ board.free();
 ```html
 <script type="module">
   import { init, Board } from "/js/index.mjs";
-  await init();                          // fetches ./pkg/diagram_wasm_bg.wasm relative to index.mjs
+  await init();                          // fetches ./pkg/shape_wasm_bg.wasm relative to index.mjs
   const board = Board.parse("api: Orders API\napi -> db: SQL");
   document.querySelector("#board").innerHTML = board.render().svg;
 </script>
 ```
 
-Serve `index.mjs` and `pkg/` together. Bundlers that understand `new URL("…", import.meta.url)` (Vite, webpack 5, esbuild with a loader) pick up the `.wasm`; otherwise pass it yourself: `await init("/assets/diagram_wasm_bg.wasm")` (also accepts bytes, a `Response`, a `WebAssembly.Module` or a promise of one). `initSync(bytes)` works where top-level `await` doesn't.
+Serve `index.mjs` and `pkg/` together. Bundlers that understand `new URL("…", import.meta.url)` (Vite, webpack 5, esbuild with a loader) pick up the `.wasm`; otherwise pass it yourself: `await init("/assets/shape_wasm_bg.wasm")` (also accepts bytes, a `Response`, a `WebAssembly.Module` or a promise of one). `initSync(bytes)` works where top-level `await` doesn't.
 
 Everything except `init`/`initSync` throws a clear error until `init()` has resolved. `init()` can be called any number of times.
 
@@ -75,17 +75,17 @@ Types are in `index.d.ts`: `Document`, `Node`, `Edge`, `Group`, `Comment`, `Op` 
 
 ## An AI loop
 
-Any model works: the board produces the prompt, the model answers with ops, the board applies the reply. Here with the `claude` CLI (the same seam the diagram CLI uses), but `ask` can call any API.
+Any model works: the board produces the prompt, the model answers with ops, the board applies the reply. Here with the `claude` CLI (the same seam the `shape` CLI uses), but `ask` can call any API.
 
 ```js
 import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
-import { init, Board, DiagramError, replyOutline } from "diagram";
+import { init, Board, DiagramError, replyOutline } from "@dobrinov/shape";
 
 const ask = (prompt) => execFileSync("claude", ["-p", "--model", "haiku"], { input: prompt, encoding: "utf8" });
 
 await init();
-const file = "checkout.diagram";
+const file = "checkout.shape";
 const board = Board.parse(await readFile(file, "utf8"));
 
 // 1. review comments → prompt → reply with {"ops": [...]} → applied atomically

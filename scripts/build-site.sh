@@ -4,11 +4,11 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT=${1:-$ROOT/docs}
-BIN=${DIAGRAM_BIN:-$ROOT/target/release/diagram}
+BIN=${SHAPE_BIN:-$ROOT/target/release/shape}
 [ -x "$BIN" ] || { echo "missing $BIN — run 'make release' first" >&2; exit 1; }
 
 REPO_URL=${SITE_REPO_URL:-$(git -C "$ROOT" remote get-url origin 2>/dev/null | sed -E 's#^git@github.com:#https://github.com/#; s#\.git$##' || true)}
-REPO_URL=${REPO_URL:-https://github.com/dobrinov/diagram}
+REPO_URL=${REPO_URL:-https://github.com/dobrinov/shape}
 # https://github.com/owner/repo → https://owner.github.io/repo/ (override with SITE_URL)
 SITE_URL=${SITE_URL:-$(echo "$REPO_URL" | sed -nE 's#^https://github.com/([^/]+)/([^/]+)$#https://\1.github.io/\2/#p')}
 SITE_URL=${SITE_URL:-/}
@@ -26,8 +26,8 @@ html = open(page).read()
 assert "<!-- CHANGELOG -->" in html, "site/index.html lost its <!-- CHANGELOG --> marker"
 open(page, "w").write(html.replace("<!-- CHANGELOG -->", fragment, 1))
 PY
-# the live board in the hero is site/hero.diagram
-python3 - "$OUT/index.html" "$ROOT/site/hero.diagram" <<'PY'
+# the live board in the hero is site/hero.shape
+python3 - "$OUT/index.html" "$ROOT/site/hero.shape" <<'PY'
 import sys
 page, hero = sys.argv[1:3]
 html, board = open(page).read(), open(hero).read()
@@ -36,15 +36,15 @@ assert "</script" not in board.lower()
 open(page, "w").write(html.replace("{{HERO}}", board.rstrip("\n"), 1))
 PY
 cp "$ROOT/site/site.css" "$ROOT/site/og.png" "$ROOT/site/apple-touch-icon.png" "$ROOT/site/merge.png" "$ROOT/web/favicon.svg" "$OUT/"
-# the feature tour: a picture per feature, drawn from site/tour/*.diagram
+# the feature tour: a picture per feature, drawn from site/tour/*.shape
 "$ROOT/scripts/render-tour.sh" "$BIN" "$OUT/tour"
 
 # one bundle (JS + inlined WASM + the editor) for every embedded board
-"$BIN" embed -o "$OUT/diagram.embed.js" 2>/dev/null
+"$BIN" embed -o "$OUT/shape.embed.js" 2>/dev/null
 
 # the example: its source, and a picture of the board and of each canvas in it
 subst "$ROOT/site/examples/index.html" "$OUT/examples/index.html"
-EX="$ROOT/examples/example.diagram"
+EX="$ROOT/examples/example.shape"
 cp "$EX" "$OUT/examples/"
 "$BIN" svg "$EX" --comments none -o "$OUT/examples/board.svg" 2>/dev/null
 for c in discovery plan data metrics screens; do
@@ -53,15 +53,15 @@ done
 
 # playground: the editor app without a server
 cp "$ROOT/web/app.js" "$ROOT/web/editor.js" "$ROOT/web/editor.css" "$ROOT/web/favicon.svg" "$OUT/app/"
-cp "$ROOT/web/pkg/diagram_wasm.js" "$ROOT/web/pkg/diagram_wasm_bg.wasm" "$OUT/app/pkg/"
-STATIC='<script>window.DIAGRAM_STATIC = { shareUrl: "'"$SITE_URL"'app/", examples: [
-  { name: "Checkout relaunch (every feature)", url: "../examples/example.diagram" }
+cp "$ROOT/web/pkg/shape_wasm.js" "$ROOT/web/pkg/shape_wasm_bg.wasm" "$OUT/app/pkg/"
+STATIC='<script>window.SHAPE_STATIC = { shareUrl: "'"$SITE_URL"'app/", examples: [
+  { name: "Checkout relaunch (every feature)", url: "../examples/example.shape" }
 ] };</script>'
 python3 - "$ROOT/web/index.html" "$OUT/app/index.html" "$STATIC" <<'PY'
 import sys
 src, dst, static = sys.argv[1:4]
 html = open(src).read()
-marker = '<script src="pkg/diagram_wasm.js"></script>'
+marker = '<script src="pkg/shape_wasm.js"></script>'
 assert marker in html, "web/index.html lost its wasm <script>"
 html = html.replace(marker, static + "\n" + marker).replace("<title>Shape</title>", "<title>Playground — Shape</title>")
 open(dst, "w").write(html)

@@ -1,10 +1,10 @@
-// diagram: FigJam-style boards as text, from JavaScript (Node >= 18 and
+// Shape: boards as text, from JavaScript (Node >= 18 and
 // browsers). A thin, typed layer over the WASM build in ./pkg (`make js`):
 // everything crosses the WASM boundary as JSON strings; this module parses
 // them, maps camelCase options and turns failures into DiagramError.
-import wbgInit, { initSync as wbgInitSync, Diagram, render as wRender, convert as wConvert, spec as wSpec, json_schema, version as wVersion, mindmap_prompt, reply_outline, ask_again as wasm_ask_again, reply_note } from "./pkg/diagram_wasm.js";
+import wbgInit, { initSync as wbgInitSync, Diagram, render as wRender, convert as wConvert, spec as wSpec, json_schema, version as wVersion, mindmap_prompt, reply_outline, ask_again as wasm_ask_again, reply_note } from "./pkg/shape_wasm.js";
 
-const WASM_URL = new URL("./pkg/diagram_wasm_bg.wasm", import.meta.url);
+const WASM_URL = new URL("./pkg/shape_wasm_bg.wasm", import.meta.url);
 
 let ready = false;
 let loading = null;
@@ -67,7 +67,7 @@ export function initSync(bytesOrModule) {
 }
 
 function need() {
-  if (!ready) throw new Error("diagram: the WASM module is not loaded; `await init()` first");
+  if (!ready) throw new Error("shape: the WASM module is not loaded; `await init()` first");
 }
 
 const json = (v) => (v === undefined || v === null ? "" : JSON.stringify(v));
@@ -123,7 +123,7 @@ function textOrThrow(out) {
   return r.text;
 }
 
-/** A board (one `.diagram` document) being read or edited. Wraps the WASM `Diagram`. */
+/** A board (one `.shape` document) being read or edited. Wraps the WASM `Diagram`. */
 export class Board {
   #d;
 
@@ -151,7 +151,7 @@ export class Board {
   }
 
   #live() {
-    if (!this.#d) throw new Error("diagram: this board was freed");
+    if (!this.#d) throw new Error("shape: this board was freed");
     return this.#d;
   }
 
@@ -228,7 +228,7 @@ export class Board {
     return parseResult(this.#live().schedule(isoDate(today ?? new Date())));
   }
 
-  /** Part of the board as diagram language, picked by selectors (`group:back`, `near:api`, `label~ledger`, …). */
+  /** Part of the board as Shape language, picked by selectors (`group:back`, `near:api`, `label~ledger`, …). */
   query(...selectors) {
     return parseResult(this.#live().query(JSON.stringify(selectors.flat()))).source;
   }
@@ -238,7 +238,7 @@ export class Board {
     return parseResult(this.#live().query(JSON.stringify(selectors.flat()))).ids;
   }
 
-  /** Add statements in the diagram language (an element written again by its id gets the attributes given). */
+  /** Add statements in the Shape language (an element written again by its id gets the attributes given). */
   addThemeFile(name, source) {
     parseResult(this.#live().add_theme_file(String(name), String(source)));
   }
@@ -326,7 +326,7 @@ export function jsonSchema() {
   return JSON.parse(json_schema());
 }
 
-/** Version of the diagram core. */
+/** Version of the Shape core. */
 export function version() {
   need();
   return wVersion();

@@ -1,5 +1,5 @@
 //! Reading part of a board: selectors pick elements, and the answer is the
-//! diagram language for just those (with the sections they sit in), so an
+//! Shape language for just those (with the sections they sit in), so an
 //! agent reads a few lines instead of the whole file.
 //!
 //! | Selector | Picks |
@@ -228,7 +228,7 @@ fn pick(doc: &Document, sel: &str) -> Result<Vec<String>, String> {
 
 /// The picked elements as a board of their own: the sections they sit in
 /// (without their other contents), the path from a mindmap's centre to its
-/// topics, arrows and comments. Printing it gives valid diagram language.
+/// topics, arrows and comments. Printing it gives valid Shape language.
 pub fn subset(doc: &Document, ids: &[String]) -> Document {
     let want: HashSet<&str> = ids.iter().map(|s| s.as_str()).collect();
     let mut keep_nodes: HashSet<String> = HashSet::new();

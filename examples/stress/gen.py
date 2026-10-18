@@ -62,6 +62,6 @@ def raci():
         L.append(f"lg{k}: {ch} = {n} [rounded, {colr[ch]}, x: {20+k*160}, y: {y}, w: 150, h: 32]")
     return "\n".join(L)
 
-open("03-gantt.diagram","w").write(gantt()+"\n")
-open("05-risk-matrix.diagram","w").write(risk()+"\n")
-open("07-raci.diagram","w").write(raci()+"\n")
+open("03-gantt.shape","w").write(gantt()+"\n")
+open("05-risk-matrix.shape","w").write(risk()+"\n")
+open("07-raci.shape","w").write(raci()+"\n")

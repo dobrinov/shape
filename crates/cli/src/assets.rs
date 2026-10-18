@@ -1,4 +1,4 @@
-//! Web assets compiled into the binary. Set DIAGRAM_WEB_DIR to serve them
+//! Web assets compiled into the binary. Set SHAPE_WEB_DIR to serve them
 //! from disk instead while hacking on the frontend.
 use std::borrow::Cow;
 
@@ -14,8 +14,8 @@ pub const EDITOR_JS: &[u8] = web!("editor.js");
 pub const EDITOR_CSS: &[u8] = web!("editor.css");
 pub const EMBED_JS: &[u8] = web!("embed.js");
 pub const FAVICON: &[u8] = web!("favicon.svg");
-pub const GLUE_JS: &[u8] = web!("pkg/diagram_wasm.js");
-pub const WASM: &[u8] = web!("pkg/diagram_wasm_bg.wasm");
+pub const GLUE_JS: &[u8] = web!("pkg/shape_wasm.js");
+pub const WASM: &[u8] = web!("pkg/shape_wasm_bg.wasm");
 
 pub fn get(path: &str) -> Option<(Cow<'static, [u8]>, &'static str)> {
     let (bytes, ct): (&'static [u8], &str) = match path {
@@ -25,11 +25,13 @@ pub fn get(path: &str) -> Option<(Cow<'static, [u8]>, &'static str)> {
         "/editor.css" => (EDITOR_CSS, "text/css; charset=utf-8"),
         "/embed.js" => (EMBED_JS, "text/javascript; charset=utf-8"),
         "/favicon.svg" => (FAVICON, "image/svg+xml"),
-        "/pkg/diagram_wasm.js" => (GLUE_JS, "text/javascript; charset=utf-8"),
-        "/pkg/diagram_wasm_bg.wasm" => (WASM, "application/wasm"),
+        "/pkg/shape_wasm.js" => (GLUE_JS, "text/javascript; charset=utf-8"),
+        "/pkg/shape_wasm_bg.wasm" => (WASM, "application/wasm"),
         _ => return None,
     };
-    if let Some(dir) = std::env::var_os("DIAGRAM_WEB_DIR") {
+    if let Some(dir) =
+        std::env::var_os("SHAPE_WEB_DIR").or_else(|| std::env::var_os("DIAGRAM_WEB_DIR"))
+    {
         let rel = if path == "/" {
             "index.html"
         } else {

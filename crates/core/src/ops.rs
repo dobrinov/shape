@@ -506,7 +506,7 @@ pub enum Op {
         key: String,
         value: String,
     },
-    /// Statements in the diagram language, added to the board as if they
+    /// Statements in the Shape language, added to the board as if they
     /// were written at its end: new elements are created, and a box, group
     /// or arrow written again by its id gets the attributes given (`api
     /// [red]`). The cheapest way to add a lot at once.

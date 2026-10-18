@@ -14,15 +14,15 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const bin = join(root, "target", "debug", "diagram");
+const bin = join(root, "target", "debug", "shape");
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 5790 + Math.floor(Math.random() * 100);
 const dir = mkdtempSync(join(tmpdir(), "diagram-e2e-"));
-const file = join(dir, "board.diagram");
+const file = join(dir, "board.shape");
 writeFileSync(file, "title: Test board\n");
 
 const server = spawn(bin, [file, "--no-open", "--port", String(port), "--ai", join(here, "fake-ai.sh")], {
-  env: { ...process.env, DIAGRAM_WEB_DIR: join(root, "web") },
+  env: { ...process.env, SHAPE_WEB_DIR: join(root, "web") },
   stdio: "ignore",
 });
 const MOD = process.platform === "darwin" ? "Meta" : "Control";

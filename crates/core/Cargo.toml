@@ -1,10 +1,10 @@
 [package]
-name = "diagram-core"
+name = "shape-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Diagram model, DSL / JSON / Mermaid parsing, layout, SVG rendering, review comments and LLM prompts"
+description = "Shape board model, DSL / JSON / Mermaid parsing, layout, SVG rendering, review comments and LLM prompts"
 
 [dependencies]
 serde.workspace = true

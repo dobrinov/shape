@@ -1,5 +1,5 @@
 //! Local HTTP server for the editor: serves the web app, reads and writes the
-//! diagram file, and reports external changes (the editor polls for them).
+//! board file, and reports external changes (the editor polls for them).
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -94,8 +94,8 @@ fn rel_to(root: &Path, p: &Path) -> String {
 /// reached by a link) or the one the server was started with.
 fn target(url: &str, root: &Path) -> Option<Result<(PathBuf, String), String>> {
     let rel = query_param(url, "file").filter(|r| !r.is_empty())?;
-    if !rel.ends_with(".diagram") {
-        return Some(Err(format!("{rel}: only .diagram boards open here")));
+    if !shape_core::model::is_board_file(&rel) {
+        return Some(Err(format!("{rel}: only .shape boards open here")));
     }
     Some(match std::fs::canonicalize(root.join(&rel)) {
         Ok(p) if p.starts_with(root) => Ok((p, rel)),
@@ -121,7 +121,7 @@ fn boards(root: &Path) -> Vec<String> {
             }
             if p.is_dir() {
                 stack.push(p);
-            } else if name.ends_with(".diagram") && out.len() < 500 {
+            } else if shape_core::model::is_board_file(&name) && out.len() < 500 {
                 out.push(rel_to(root, &p));
             }
         }
@@ -205,12 +205,12 @@ pub fn serve(
     } else {
         "Ctrl-C to stop"
     };
-    eprintln!("diagram: editing {display} at {url}  ({stop})");
+    eprintln!("shape: editing {display} at {url}  ({stop})");
     match &ai {
-        Some(c) => eprintln!("diagram: ✦ AI via `{c}`"),
-        None => eprintln!(
-            "diagram: no AI harness (use --ai CMD); ✦ actions will show the prompt to copy"
-        ),
+        Some(c) => eprintln!("shape: ✦ AI via `{c}`"),
+        None => {
+            eprintln!("shape: no AI harness (use --ai CMD); ✦ actions will show the prompt to copy")
+        }
     }
     crate::update::start();
     match show {
@@ -224,13 +224,13 @@ pub fn serve(
             // the window's own lifetime ends the process: no idle timer
             let listener = std::thread::spawn(move || {
                 if let Err(e) = listen(server, file, display, ai, false) {
-                    eprintln!("diagram: {e}");
+                    eprintln!("shape: {e}");
                     std::process::exit(1);
                 }
             });
             // returns only when no window could be made: a tab, then
             if let Err(e) = window.run(&url, &name) {
-                eprintln!("diagram: no window ({e}); opening the browser");
+                eprintln!("shape: no window ({e}); opening the browser");
                 open_browser(&url);
             }
             listener
@@ -248,7 +248,7 @@ fn listen(
     ai: Option<String>,
     idle_exit: bool,
 ) -> Result<(), String> {
-    // started from a double-click (`diagram install-app`): no terminal to stop
+    // started from a double-click (`shape install-app`): no terminal to stop
     // it, so it stops once the editor tabs are gone (they check in every 30s)
     let heard = std::sync::Arc::new(std::sync::Mutex::new(std::time::Instant::now()));
     if idle_exit {
@@ -260,7 +260,7 @@ fn listen(
                 .map(|t| t.elapsed().as_secs() > 180)
                 .unwrap_or(false)
             {
-                eprintln!("diagram: no editor open for 3 minutes; stopping");
+                eprintln!("shape: no editor open for 3 minutes; stopping");
                 std::process::exit(0);
             }
         });
@@ -299,7 +299,7 @@ fn listen(
                     }
                     None => {
                         let text = std::fs::read_to_string(&file).unwrap_or_default();
-                        match diagram_core::merge::split_markers(&text) {
+                        match shape_core::merge::split_markers(&text) {
                             Some((base, ours, theirs)) => {
                                 json!({ "conflict": true, "git": false, "base": base.unwrap_or_default(), "ours": ours, "theirs": theirs })
                             }
@@ -355,7 +355,7 @@ fn listen(
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_default();
                 // a theme file the board names comes along
-                let (doc, _) = diagram_core::dsl::parse_lenient(&source);
+                let (doc, _) = shape_core::dsl::parse_lenient(&source);
                 let themes: serde_json::Map<String, serde_json::Value> =
                     crate::theme_file(&doc, &file.to_string_lossy())
                         .ok()
@@ -404,7 +404,7 @@ fn listen(
                     respond_json(
                         req,
                         200,
-                        json!({ "ok": false, "error": "no AI harness: start with --ai CMD or set DIAGRAM_AI" }),
+                        json!({ "ok": false, "error": "no AI harness: start with --ai CMD or set SHAPE_AI" }),
                     );
                     continue;
                 };
@@ -433,15 +433,15 @@ fn listen(
                 }
                 // DSL files keep the text as typed; JSON / Mermaid files are converted
                 let text = match crate::format_for(&display) {
-                    "dsl" if diagram_core::detect(&body) == diagram_core::Format::Dsl => Ok(body),
-                    fmt => diagram_core::parse(&body)
+                    "dsl" if shape_core::detect(&body) == shape_core::Format::Dsl => Ok(body),
+                    fmt => shape_core::parse(&body)
                         .map_err(|e| {
                             e.iter()
                                 .map(|d| d.to_string())
                                 .collect::<Vec<_>>()
                                 .join("; ")
                         })
-                        .and_then(|d| diagram_core::export(&d, fmt)),
+                        .and_then(|d| shape_core::export(&d, fmt)),
                 };
                 let who = req
                     .headers()
@@ -508,7 +508,7 @@ fn listen(
                     Err(e) => respond_json(req, 200, json!({ "ok": false, "error": e })),
                 }
             }
-            // a team's recipes: `recipes/*.diagram` up to the repository's root
+            // a team's recipes: `recipes/*.shape` up to the repository's root
             (Method::Get, "/api/recipes") => {
                 let files: serde_json::Map<String, Value> = crate::recipe_files(&display)
                     .into_iter()
@@ -552,19 +552,20 @@ fn listen(
 mod tests {
     #[test]
     fn other_boards_stay_under_the_root() {
-        let dir = std::env::temp_dir().join(format!("diagram-srv-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("shape-srv-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("sub")).unwrap();
-        std::fs::write(dir.join("a.diagram"), "a\n").unwrap();
+        std::fs::write(dir.join("a.shape"), "a\n").unwrap();
         std::fs::write(dir.join("sub/b.diagram"), "b\n").unwrap();
         let root = std::fs::canonicalize(&dir).unwrap();
         let t = |q: &str| super::target(&format!("/api/file?file={q}"), &root);
         assert_eq!(t("sub/b.diagram").unwrap().unwrap().1, "sub/b.diagram");
-        assert!(t("sub/../a.diagram").unwrap().is_ok());
-        assert!(t("../x.diagram").unwrap().is_err());
-        assert!(t("sub/missing.diagram").unwrap().is_err());
+        assert!(t("sub/../a.shape").unwrap().is_ok());
+        assert!(t("../x.shape").unwrap().is_err());
+        assert!(t("sub/missing.shape").unwrap().is_err());
         assert!(t("a.json").unwrap().is_err());
         assert!(super::target("/api/file", &root).is_none());
-        assert_eq!(super::boards(&root), ["a.diagram", "sub/b.diagram"]);
+        // a board from before the rename (`.diagram`) is one too
+        assert_eq!(super::boards(&root), ["a.shape", "sub/b.diagram"]);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

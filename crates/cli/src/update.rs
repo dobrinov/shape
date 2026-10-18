@@ -1,20 +1,20 @@
-//! Is there a newer diagram? At most once a day the editor asks GitHub for
+//! Is there a newer Shape? At most once a day the editor asks GitHub for
 //! the latest release (in the background, through `curl`); the answer is
 //! cached, and a failure (offline, rate limit) is quiet.
-//! `DIAGRAM_NO_UPDATE_CHECK=1` turns it off; so does `CI`.
+//! `SHAPE_NO_UPDATE_CHECK=1` turns it off; so does `CI`.
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const REPO: &str = "dobrinov/diagram";
+const REPO: &str = "dobrinov/shape";
 const DAY: u64 = 24 * 60 * 60;
 
 /// A release newer than this binary.
 #[derive(Debug, Clone)]
 pub struct Update {
     pub latest: String,
-    /// How to get it: `brew upgrade diagram`, or where to download it.
+    /// How to get it: `brew upgrade shape`, or where to download it.
     pub how: String,
     /// The release, with its notes.
     pub url: String,
@@ -30,7 +30,7 @@ pub fn start() {
         let found = check();
         if let Some(u) = &found {
             eprintln!(
-                "diagram: {} is out (you have {}): {}",
+                "shape: {} is out (you have {}): {}",
                 u.latest,
                 env!("CARGO_PKG_VERSION"),
                 u.how
@@ -59,7 +59,7 @@ fn check() -> Option<Update> {
 
 fn off() -> bool {
     let set = |k: &str| std::env::var(k).is_ok_and(|v| !v.is_empty() && v != "0");
-    set("DIAGRAM_NO_UPDATE_CHECK") || set("CI")
+    set("SHAPE_NO_UPDATE_CHECK") || set("DIAGRAM_NO_UPDATE_CHECK") || set("CI")
 }
 
 /// The latest release's version: from the cache when it is less than a day old.
@@ -142,7 +142,7 @@ fn cache_file() -> Option<PathBuf> {
             env("HOME").map(|h| h.join(".cache"))
         }
     })?;
-    Some(dir.join("diagram").join("latest-version"))
+    Some(dir.join("shape").join("latest-version"))
 }
 
 /// Whether version `a` comes after `b` (`x.y.z`; a missing part is 0).
@@ -163,7 +163,7 @@ fn how() -> String {
         .and_then(|p| p.canonicalize().ok())
         .is_some_and(|p| p.to_string_lossy().contains("/Cellar/"));
     if brew {
-        "brew upgrade diagram".into()
+        "brew upgrade shape".into()
     } else {
         format!("https://github.com/{REPO}/releases/latest")
     }

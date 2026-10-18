@@ -1,9 +1,9 @@
 //! Recipes: arrangements of ordinary blocks for things a software team keeps
 //! coming back to (incidents, OKRs, a burndown…). They are not blocks of
-//! their own: a recipe is a section written in the `diagram` language. The
+//! their own: a recipe is a section written in the `shape` language. The
 //! AI's prompts list them (one line each: when to use one, and its shape),
 //! so a model reaches for the right shape when what it is told fits; the
-//! editor inserts one on request. A team adds its own as `.diagram` files in
+//! editor inserts one on request. A team adds its own as `.shape` files in
 //! a `recipes/` folder (the first line: `# recipe: Name — when to use it`).
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +15,7 @@ pub struct Recipe {
     pub when: String,
     /// Its shape in a line, for prompts (few tokens).
     pub shape: String,
-    /// The section to insert, in the `diagram` language.
+    /// The section to insert, in the `shape` language.
     pub source: String,
 }
 
@@ -271,7 +271,7 @@ group metrics: Metrics {
     ]
 }
 
-/// A team's recipe from a `.diagram` file: the first line says
+/// A team's recipe from a `.shape` file: the first line says
 /// `# recipe: Name — when to use it`; the rest is the section.
 pub fn from_file(id: &str, text: &str) -> Option<Recipe> {
     let first = text.lines().next()?.trim();
@@ -297,7 +297,7 @@ pub fn from_file(id: &str, text: &str) -> Option<Recipe> {
         name: name.trim().into(),
         when: when.trim().into(),
         // a team's own are short: the model reads them whole
-        shape: format!("this shape:\n```diagram\n{source}```"),
+        shape: format!("this shape:\n```shape\n{source}```"),
         source,
     })
 }

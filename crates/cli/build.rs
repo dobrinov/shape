@@ -1,6 +1,6 @@
 //! Builds the WASM bundle (web/pkg) with wasm-pack when it is missing or
 //! older than the Rust sources, so `cargo build` / `cargo install` just work.
-//! Set DIAGRAM_SKIP_WASM=1 to skip (the bundle must then already exist).
+//! Set SHAPE_SKIP_WASM=1 to skip (the bundle must then already exist).
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
@@ -27,7 +27,7 @@ fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let root = manifest.join("../..").canonicalize().unwrap();
     let pkg = root.join("web/pkg");
-    let wasm = pkg.join("diagram_wasm_bg.wasm");
+    let wasm = pkg.join("shape_wasm_bg.wasm");
     for p in [
         "web",
         "crates/core/src",
@@ -37,12 +37,16 @@ fn main() {
     ] {
         println!("cargo:rerun-if-changed={}", root.join(p).display());
     }
+    println!("cargo:rerun-if-env-changed=SHAPE_SKIP_WASM");
     println!("cargo:rerun-if-env-changed=DIAGRAM_SKIP_WASM");
 
     let src_time = newest(&root.join("crates/core/src")).max(newest(&root.join("crates/wasm/src")));
     let wasm_time = std::fs::metadata(&wasm).and_then(|m| m.modified()).ok();
     let stale = wasm_time.is_none_or(|t| t < src_time);
-    if !stale || std::env::var_os("DIAGRAM_SKIP_WASM").is_some() {
+    if !stale
+        || std::env::var_os("SHAPE_SKIP_WASM").is_some()
+        || std::env::var_os("DIAGRAM_SKIP_WASM").is_some()
+    {
         if !wasm.exists() {
             panic!("web/pkg is missing; run `make wasm` (wasm-pack build crates/wasm --target no-modules --out-dir ../../web/pkg)");
         }

@@ -1,17 +1,19 @@
-/* diagram browser library (part of diagram.embed.js, which also inlines the
- * WASM module and the editor).
+/* Shape browser library (part of shape.embed.js, which also inlines the
+ * WASM module and the editor). `Diagram` is the same object, from before the
+ * rename to Shape.
  *
- *   await Diagram.ready()
- *   Diagram.render(src, {theme, comments, title, transparent}) -> Promise<svg string>
- *   Diagram.convert(src, "dsl"|"json"|"mermaid"|"brief") -> Promise<string>
- *   Diagram.prompt(src, {target, reply, comments, include_resolved, instructions}) -> Promise<string>
- *   Diagram.apply(src, ops) -> Promise<new DSL source>
- *   Diagram.parse(src) -> Promise<{ok, document, errors}>
- *   Diagram.mount(element, {source, base, mode: "view"|"edit", ...DiagramEditor options}) -> Promise<editor>
- *   Diagram.renderAll(selector = "pre > code.language-diagram, .diagram") -> Promise
- *   Diagram.spec() / Diagram.schema() -> Promise<string>
+ *   await Shape.ready()
+ *   Shape.render(src, {theme, comments, title, transparent}) -> Promise<svg string>
+ *   Shape.convert(src, "dsl"|"json"|"mermaid"|"brief") -> Promise<string>
+ *   Shape.prompt(src, {target, reply, comments, include_resolved, instructions}) -> Promise<string>
+ *   Shape.apply(src, ops) -> Promise<new source>
+ *   Shape.parse(src) -> Promise<{ok, document, errors}>
+ *   Shape.mount(element, {source, base, mode: "view"|"edit", ...DiagramEditor options}) -> Promise<editor>
+ *   Shape.renderAll(selector = Markdown ```shape fences and .shape elements) -> Promise
+ *   Shape.spec() / Shape.schema() -> Promise<string>
  *
- * Declaratively: <div data-diagram data-mode="view" style="height:400px"><script type="text/plain">a -> b</script></div>
+ * Declaratively: <div data-shape data-mode="view" style="height:400px"><script type="text/plain">a -> b</script></div>
+ * (`data-diagram` works too.)
  */
 (function (root) {
   "use strict";
@@ -19,10 +21,10 @@
   var cssDone = false;
 
   function injectCss() {
-    if (cssDone || typeof DIAGRAM_CSS === "undefined" || !DIAGRAM_CSS || typeof document === "undefined") return;
+    if (cssDone || typeof SHAPE_CSS === "undefined" || !SHAPE_CSS || typeof document === "undefined") return;
     var s = document.createElement("style");
     s.setAttribute("data-diagram-css", "");
-    s.textContent = DIAGRAM_CSS;
+    s.textContent = SHAPE_CSS;
     document.head.appendChild(s);
     cssDone = true;
   }
@@ -35,9 +37,9 @@
 
   function wasm() {
     if (!ready) {
-      if (typeof DIAGRAM_WASM_B64 !== "undefined" && DIAGRAM_WASM_B64) ready = DIAGRAM_WASM_INIT(b64ToBytes(DIAGRAM_WASM_B64));
-      else if (root.wasm_bindgen) ready = root.wasm_bindgen({ module_or_path: (root.DIAGRAM_WASM_URL || "pkg/diagram_wasm_bg.wasm") }).then(function () { return root.wasm_bindgen; });
-      else ready = Promise.reject(new Error("diagram: no WASM module available"));
+      if (typeof SHAPE_WASM_B64 !== "undefined" && SHAPE_WASM_B64) ready = SHAPE_WASM_INIT(b64ToBytes(SHAPE_WASM_B64));
+      else if (root.wasm_bindgen) ready = root.wasm_bindgen({ module_or_path: (root.SHAPE_WASM_URL || "pkg/shape_wasm_bg.wasm") }).then(function () { return root.wasm_bindgen; });
+      else ready = Promise.reject(new Error("shape: no WASM module available"));
     }
     return ready;
   }
@@ -56,7 +58,7 @@
   }
 
   function textOf(el) {
-    var s = el.querySelector('script[type="text/plain"], script[type="text/x-diagram"], script[type="application/json"]');
+    var s = el.querySelector('script[type="text/plain"], script[type="text/x-shape"], script[type="text/x-diagram"], script[type="application/json"]');
     return (s ? s.textContent : el.textContent).replace(/^\n/, "");
   }
 
@@ -101,9 +103,9 @@
         return root.DiagramEditor.create(el, Object.assign({}, opts, { wasm: w, source: source }));
       });
     },
-    /* Replace code blocks (e.g. Markdown ```diagram fences) with rendered SVGs. */
+    /* Replace code blocks (e.g. Markdown ```shape fences) with rendered SVGs. */
     renderAll: function (selector, opts) {
-      selector = selector || "pre > code.language-diagram, .diagram";
+      selector = selector || "pre > code.language-shape, pre > code.language-diagram, .shape, .diagram";
       var els = Array.prototype.slice.call(document.querySelectorAll(selector));
       return Promise.all(els.map(function (el) {
         var src = el.textContent;
@@ -124,12 +126,12 @@
     }
   };
 
-  root.Diagram = Diagram;
+  root.Shape = root.Diagram = Diagram;
 
-  // <div data-diagram> elements mount themselves
+  // <div data-shape> (or data-diagram) elements mount themselves
   if (typeof document !== "undefined") {
     var auto = function () {
-      document.querySelectorAll("div[data-diagram]:not([data-diagram-mounted])").forEach(function (el) {
+      document.querySelectorAll("div[data-shape]:not([data-diagram-mounted]), div[data-diagram]:not([data-diagram-mounted])").forEach(function (el) {
         el.setAttribute("data-diagram-mounted", "");
         Diagram.mount(el, { mode: el.getAttribute("data-mode") || "view", theme: el.getAttribute("data-theme") || null });
       });

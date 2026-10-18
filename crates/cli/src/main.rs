@@ -14,98 +14,99 @@ use std::io::{IsTerminal, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-use diagram_core::model::{Status, Theme};
-use diagram_core::ops::Op;
-use diagram_core::prompt::{PromptOptions, Reply, Target};
-use diagram_core::render::CommentMode;
-use diagram_core::{Document, RenderOptions};
+use shape_core::model::{Status, Theme};
+use shape_core::ops::Op;
+use shape_core::prompt::{PromptOptions, Reply, Target};
+use shape_core::render::CommentMode;
+use shape_core::{Document, RenderOptions};
 
-pub const HELP: &str = r#"Shape (the `diagram` command) — one board for the whole project, as text, with your AI
+pub const HELP: &str = r#"Shape — one board for the whole project, as text, with your AI
 
 USAGE
-  diagram [FILE]                     open FILE in the editor, in its own window (created if
+  shape [FILE]                       open FILE in the editor, in its own window (created if
                                      missing; no FILE asks where to save a new board)
-  diagram new FILE [--template flow|architecture|board|product|project]   start a diagram from a template
+  shape new FILE [--template flow|architecture|board|product|project]   start a board from a template
                                      (product and project boards come with perspectives)
   --canvas ID[/ID…]                  with any command: work on that canvas inside the board
                                      (`canvas id: Title { … }`), e.g. brief, apply, svg
 
 EXPORT
-  diagram svg  FILE [-o out.svg]     static SVG
-  diagram png  FILE [-o out.png]     PNG image (--scale N, default 2)
-  diagram html FILE [-o out.html]    self-contained interactive page (viewer + WASM)
+  shape svg  FILE [-o out.svg]       static SVG
+  shape png  FILE [-o out.png]       PNG image (--scale N, default 2)
+  shape html FILE [-o out.html]      self-contained interactive page (viewer + WASM)
     render options: --dark --transparent --title --comments open|all|none
                     --today | --as-of YYYY-MM-DD   mark that day on gantt charts and show the forecast
                     --focus ID,ID   crop to these elements (look at one block)
                     --base FILE|GIT_REF   highlight what changed since then
-  diagram convert FILE --to dsl|json|mermaid|brief [-o OUT]
+  shape convert FILE --to dsl|json|mermaid|brief [-o OUT]
                                      FILE may be DSL, JSON or Mermaid (detected)
-  diagram brief FILE [--today|--as-of DATE]   Markdown description for LLM context
+  shape brief FILE [--today|--as-of DATE]     Markdown description for LLM context
                                      (with a date: gantt forecasts, late and behind tasks)
 
 MINDMAPS
-  diagram outline FILE [ID] [--md]   a mindmap as an indented outline (--md: Markdown, ready as a prompt)
-  diagram expand  FILE ID [--ask TEXT] [--count N] [--levels N] [--print]
+  shape outline FILE [ID] [--md]     a mindmap as an indented outline (--md: Markdown, ready as a prompt)
+  shape expand  FILE ID [--ask TEXT] [--count N] [--levels N] [--print]
                                      grow topic ID with AI (prints the prompt with --print or without a harness)
-  diagram expand  FILE --new TOPIC [--ask TEXT] [--in SECTION]   a new mindmap about TOPIC
-    AI: --ai claude | claude:MODEL | codex | gemini | CMD, or $DIAGRAM_AI (any command
+  shape expand  FILE --new TOPIC [--ask TEXT] [--in SECTION]     a new mindmap about TOPIC
+    AI: --ai claude | claude:MODEL | codex | gemini | CMD, or $SHAPE_AI (any command
         reading the prompt on stdin); default: the first of claude, codex, gemini installed
 
 REVIEW
-  diagram comments FILE [--all] [--json]          list comment threads
-  diagram comment  FILE [--on ID] [--by NAME] TEXT  add a comment
-  diagram reply    FILE COMMENT_ID [--by NAME] TEXT
-  diagram resolve  FILE COMMENT_ID [--note TEXT]
-  diagram prompt   FILE [--target build|diagram|code|discuss] [--reply ops|dsl]
-                   [--comment c1,c2] [--all] [--instructions TEXT]
-                   [--context auto|near|section|all]   how much of the board to show
-                   (auto: all of a small board, else the commented sections)
+  shape comments FILE [--all] [--json]              list comment threads
+  shape comment  FILE [--on ID] [--by NAME] TEXT    add a comment
+  shape reply    FILE COMMENT_ID [--by NAME] TEXT
+  shape resolve  FILE COMMENT_ID [--note TEXT]
+  shape prompt   FILE [--target build|diagram|code|discuss] [--reply ops|dsl]
+                 [--comment c1,c2] [--all] [--instructions TEXT]
+                 [--context auto|near|section|all]   how much of the board to show
+                 (auto: all of a small board, else the commented sections)
                                      turn open comments into a prompt for an agent
-  diagram apply    FILE [PATCH|-|'{"op":…}'] [--dry-run]   apply ops JSON (a file, stdin, inline,
+                                     (--target build: the whole board as a spec to build from)
+  shape apply    FILE [PATCH|-|'{"op":…}'] [--dry-run]   apply ops JSON (a file, stdin, inline,
                                      or an LLM reply containing it)
 
 PLANNING
-  diagram schedule FILE [CHART] [--as-of DATE] [--json]   gantt tasks planned vs forecast as of
+  shape schedule FILE [CHART] [--as-of DATE] [--json]     gantt tasks planned vs forecast as of
                                      today (or DATE): late, behind, pushed back, how many days
 
 AI (your subscription's CLI: Claude Code, Codex, Gemini CLI)
-  diagram ask FILE "what to change" [--on ID,ID] [--dry-run] [--print]
+  shape ask FILE "what to change" [--on ID,ID] [--dry-run] [--print]
                                      the model changes the board (ops; a reply that does not apply
                                      is sent back with its error, twice at most); --print: the prompt
-    --ai claude | claude:sonnet | codex | gemini | CMD   (or $DIAGRAM_AI; default: the first installed)
+    --ai claude | claude:sonnet | codex | gemini | CMD   (or $SHAPE_AI; default: the first installed)
 
 FOR AGENTS
-  diagram query FILE SELECTOR...     just part of the board, as diagram language (--ids: ids only)
+  shape query FILE SELECTOR...       just part of the board, as Shape language (--ids: ids only)
                                      ID · group:ID · chart:ID · map:ID · near:ID · label~TEXT
                                      kind:box|topic|task|milestone|sticky|decision|group|edge|comment
                                      owner:NAME · tag:NAME · color:NAME · comments:open
-  diagram add   FILE [DSL|-] [--dry-run]   add statements (new elements; one written again by its
+  shape add   FILE [DSL|-] [--dry-run]   add statements (new elements; one written again by its
                                      id gets the attributes given: `api [red]`)
 
 CHECK
-  diagram check FILE...              validate (exit 1 on errors)
-  diagram fmt   FILE... [--check]    rewrite in canonical form
-  diagram diff  OLD NEW [--json]     what changed (NEW may be a git ref: diagram diff FILE HEAD~1)
-  diagram merge BASE OURS THEIRS [-o OUT]   merge two versions element by element; lists conflicts
-  diagram merge --install            in this repository: git merges .diagram files with `diagram merge`
+  shape check FILE...                validate (exit 1 on errors)
+  shape fmt   FILE... [--check]      rewrite in canonical form
+  shape diff  OLD NEW [--json]       what changed (NEW may be a git ref: shape diff FILE HEAD~1)
+  shape merge BASE OURS THEIRS [-o OUT]     merge two versions element by element; lists conflicts
+  shape merge --install              in this repository: git merges .shape (and .diagram) files with `shape merge`
                                      (a clash keeps yours and is marked; open the board to choose)
 
 MORE
-  diagram spec [--json-schema]       the language reference (for people and LLMs)
-  diagram embed [-o diagram.embed.js]   browser library bundle (JS + inlined WASM)
-  diagram skills list | show NAME | install [--global] [--dir PATH]   agent skills
-  diagram install-app [--remove]     give .diagram files their own icon and open them in the
+  shape spec [--json-schema]         the language reference (for people and LLMs)
+  shape embed [-o shape.embed.js]    browser library bundle (JS + inlined WASM)
+  shape skills list | show NAME | install [--global] [--dir PATH]     agent skills
+  shape install-app [--remove]       give .shape files their own icon and open them in the
                                      editor on a double-click (macOS, Linux, Windows)
-  diagram version
+  shape version
 
 SERVER OPTIONS
   --port N  --ai CMD
   --browser                          open the editor in a browser tab instead of a window
-  --no-open                          neither: just the server (no FILE then makes untitled.diagram)
+  --no-open                          neither: just the server (no FILE then makes untitled.shape)
   --idle-exit                        stop once no editor tab has been heard from for 3 minutes
 
-FILE may be `-` for stdin. Formats are chosen by extension: .diagram (DSL),
-.json, .mmd (Mermaid). See https://github.com/dobrinov/diagram
+FILE may be `-` for stdin. Formats are chosen by extension: .shape or .diagram (DSL),
+.json, .mmd (Mermaid). See https://github.com/dobrinov/shape
 "#;
 
 const VALUE_FLAGS: &[&str] = &[
@@ -193,16 +194,16 @@ impl Args {
         self.pos
             .get(i)
             .map(|s| s.as_str())
-            .ok_or_else(|| format!("missing FILE (try `diagram {} FILE`)", self.cmd))
+            .ok_or_else(|| format!("missing FILE (try `shape {} FILE`)", self.cmd))
     }
 }
 
-/// The first free `untitled.diagram`, `untitled-2.diagram`, … in the current directory.
+/// The first free `untitled.shape`, `untitled-2.shape`, … in the current directory.
 fn untitled() -> String {
     (1..)
         .map(|n| match n {
-            1 => "untitled.diagram".to_string(),
-            n => format!("untitled-{n}.diagram"),
+            1 => "untitled.shape".to_string(),
+            n => format!("untitled-{n}.shape"),
         })
         .find(|f| !Path::new(f).exists())
         .unwrap()
@@ -210,7 +211,7 @@ fn untitled() -> String {
 
 /// The first mindmap's centre.
 fn first_map(doc: &Document) -> Result<String, String> {
-    let f = diagram_core::mindmap::Forest::new(doc);
+    let f = shape_core::mindmap::Forest::new(doc);
     (0..doc.nodes.len())
         .find(|&i| f.root[i] == Some(i))
         .map(|i| doc.nodes[i].id.clone())
@@ -222,12 +223,12 @@ fn main() -> ExitCode {
     let args = match Args::parse(raw) {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("diagram: {e}");
+            eprintln!("shape: {e}");
             return ExitCode::from(2);
         }
     };
     if args.flag("-V") || args.flag("--version") {
-        println!("diagram {}", env!("CARGO_PKG_VERSION"));
+        println!("shape {}", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;
     }
     if args.flag("-h") || args.flag("--help") {
@@ -240,7 +241,7 @@ fn main() -> ExitCode {
     match run(args) {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("diagram: {e}");
+            eprintln!("shape: {e}");
             ExitCode::FAILURE
         }
     }
@@ -297,13 +298,13 @@ fn git_show(reference: &str, file: &str) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-/// Links to other boards (`delivery.diagram#m1`) that lead nowhere: the board
+/// Links to other boards (`delivery.shape#m1`) that lead nowhere: the board
 /// is missing, or has no such element.
 fn board_link_problems(doc: &Document, file: &str) -> Vec<String> {
     let dir = Path::new(file).parent().unwrap_or(Path::new(""));
     let mut out = Vec::new();
     for n in &doc.nodes {
-        let Some((path, id)) = n.link.as_deref().and_then(diagram_core::model::board_link) else {
+        let Some((path, id)) = n.link.as_deref().and_then(shape_core::model::board_link) else {
             continue;
         };
         let Ok(src) = std::fs::read_to_string(dir.join(path)) else {
@@ -311,7 +312,7 @@ fn board_link_problems(doc: &Document, file: &str) -> Vec<String> {
             continue;
         };
         if let Some(id) = id {
-            let (other, _) = diagram_core::dsl::parse_lenient(&src);
+            let (other, _) = shape_core::dsl::parse_lenient(&src);
             if other.node(id).is_none() && other.group(id).is_none() {
                 out.push(format!(
                     "`{}` links to `{id}` on {path}, which has no `{id}`",
@@ -327,16 +328,16 @@ pub fn git_show_pub(reference: &str, file: &str) -> Result<String, String> {
     git_show(reference, file)
 }
 
-/// A team's recipes: `recipes/*.diagram` in the board's repository (or
+/// A team's recipes: `recipes/*.shape` (or `.diagram`) in the board's repository (or
 /// beside it), each starting `# recipe: Name — when to use it`.
-pub fn team_recipes(file: &str) -> Vec<diagram_core::recipes::Recipe> {
+pub fn team_recipes(file: &str) -> Vec<shape_core::recipes::Recipe> {
     recipe_files(file)
         .iter()
-        .filter_map(|(id, text)| diagram_core::recipes::from_file(id, text))
+        .filter_map(|(id, text)| shape_core::recipes::from_file(id, text))
         .collect()
 }
 
-/// The `recipes/*.diagram` files for a board: `(id, text)`.
+/// The `recipes/*.shape` files for a board: `(id, text)`.
 pub fn recipe_files(file: &str) -> Vec<(String, String)> {
     let start = std::fs::canonicalize(file)
         .ok()
@@ -350,7 +351,10 @@ pub fn recipe_files(file: &str) -> Vec<(String, String)> {
             let mut files: Vec<_> = entries
                 .flatten()
                 .map(|e| e.path())
-                .filter(|p| p.extension().is_some_and(|x| x == "diagram"))
+                .filter(|p| {
+                    p.extension()
+                        .is_some_and(|x| x == "shape" || x == "diagram")
+                })
                 .collect();
             files.sort();
             for f in files {
@@ -432,7 +436,7 @@ pub fn git_since_on(file: &str) -> Option<(String, String, String, String)> {
 }
 
 fn parse_doc(src: &str, what: &str) -> Result<Document, String> {
-    diagram_core::parse(src).map_err(|errs| {
+    shape_core::parse(src).map_err(|errs| {
         format!(
             "{what}:\n{}",
             errs.iter()
@@ -443,7 +447,7 @@ fn parse_doc(src: &str, what: &str) -> Result<Document, String> {
     })
 }
 
-/// `diagram merge`: a three-way merge of boards. As git's merge driver
+/// `shape merge`: a three-way merge of boards. As git's merge driver
 /// (`--driver`, `%O %A %B`) it writes the result over OURS and fails when
 /// something clashed, so git leaves the file unmerged for the editor.
 fn merge_cmd(args: &Args) -> Result<ExitCode, String> {
@@ -461,13 +465,13 @@ fn merge_cmd(args: &Args) -> Result<ExitCode, String> {
         };
         git(&[
             "config",
-            "merge.diagram.name",
-            "diagram boards, element by element",
+            "merge.shape.name",
+            "Shape boards, element by element",
         ])?;
         git(&[
             "config",
-            "merge.diagram.driver",
-            "diagram merge %O %A %B --driver",
+            "merge.shape.driver",
+            "shape merge %O %A %B --driver",
         ])?;
         let top = Command::new("git")
             .args(["rev-parse", "--show-toplevel"])
@@ -476,26 +480,37 @@ fn merge_cmd(args: &Args) -> Result<ExitCode, String> {
         let top = String::from_utf8_lossy(&top.stdout).trim().to_string();
         let attrs = Path::new(&top).join(".gitattributes");
         let have = std::fs::read_to_string(&attrs).unwrap_or_default();
-        if !have.lines().any(|l| l.trim() == "*.diagram merge=diagram") {
-            let sep = if have.is_empty() || have.ends_with('\n') {
-                ""
-            } else {
-                "\n"
-            };
-            std::fs::write(&attrs, format!("{have}{sep}*.diagram merge=diagram\n"))
-                .map_err(|e| format!("{}: {e}", attrs.display()))?;
+        // both extensions: `.diagram` boards from before the rename too
+        let mut text = have.clone();
+        for line in ["*.shape merge=shape", "*.diagram merge=shape"] {
+            if !text.lines().any(|l| l.trim() == line) {
+                if !text.is_empty() && !text.ends_with('\n') {
+                    text.push('\n');
+                }
+                text.push_str(line);
+                text.push('\n');
+            }
         }
-        eprintln!("git now merges .diagram files with `diagram merge` (commit .gitattributes so others get it; each clone runs `diagram merge --install` once)");
+        // the old driver's line gives way to the new one
+        let text: String = text
+            .lines()
+            .filter(|l| l.trim() != "*.diagram merge=diagram")
+            .map(|l| format!("{l}\n"))
+            .collect();
+        if text != have {
+            std::fs::write(&attrs, text).map_err(|e| format!("{}: {e}", attrs.display()))?;
+        }
+        eprintln!("git now merges .shape and .diagram files with `shape merge` (commit .gitattributes so others get it; each clone runs `shape merge --install` once)");
         return Ok(ExitCode::SUCCESS);
     }
     let [base, ours, theirs] = [0, 1, 2].map(|i| args.pos.get(i).cloned());
     let (Some(base), Some(ours), Some(theirs)) = (base, ours, theirs) else {
-        return Err("usage: diagram merge BASE OURS THEIRS [-o OUT] (or --install)".into());
+        return Err("usage: shape merge BASE OURS THEIRS [-o OUT] (or --install)".into());
     };
     let texts = [&base, &ours, &theirs].map(|f| read_text(f).unwrap_or_default());
     let docs: Vec<Option<Document>> = texts
         .iter()
-        .map(|t| diagram_core::dsl::parse(t).ok())
+        .map(|t| shape_core::dsl::parse(t).ok())
         .collect();
     let driver = args.flag("--driver");
     let (Some(b), Some(o), Some(t)) = (&docs[0], &docs[1], &docs[2]) else {
@@ -513,18 +528,18 @@ fn merge_cmd(args: &Args) -> Result<ExitCode, String> {
         }
         return Err("BASE, OURS and THEIRS have to be readable boards".into());
     };
-    let m = diagram_core::merge::merge3(b, o, t);
-    let mut text = diagram_core::patch::patch(&texts[1], o, &m.doc);
+    let m = shape_core::merge::merge3(b, o, t);
+    let mut text = shape_core::patch::patch(&texts[1], o, &m.doc);
     if !m.conflicts.is_empty() {
         let what: Vec<String> = m.conflicts.iter().map(|c| c.key()).collect();
         text = format!(
-            "# merge: {} conflict{} kept as yours ({}); open the board in the editor (`diagram FILE`) to choose\n{text}",
+            "# merge: {} conflict{} kept as yours ({}); open the board in the editor (`shape FILE`) to choose\n{text}",
             m.conflicts.len(),
             if m.conflicts.len() == 1 { "" } else { "s" },
             what.join(", ")
         );
         for c in &m.conflicts {
-            eprintln!("conflict: {}", diagram_core::merge::describe(c));
+            eprintln!("conflict: {}", shape_core::merge::describe(c));
         }
     }
     let out = if driver {
@@ -595,12 +610,12 @@ fn save(path: &str, doc: &Document) -> Result<(), String> {
         &whole
     };
     let format = format_for(path);
-    let mut text = diagram_core::export(doc, format)?;
+    let mut text = shape_core::export(doc, format)?;
     if format == "dsl" && path != "-" {
         // keep the file as it is written: rewrite only what changed
         if let Ok(src) = std::fs::read_to_string(path) {
-            if let Ok(old) = diagram_core::dsl::parse(&src) {
-                text = diagram_core::patch::patch(&src, &old, doc);
+            if let Ok(old) = shape_core::dsl::parse(&src) {
+                text = shape_core::patch::patch(&src, &old, doc);
             }
         }
     }
@@ -645,7 +660,7 @@ fn author(args: &Args) -> Option<String> {
 /// charts mark and forecast from (days since 1970).
 fn today(args: &Args) -> Result<Option<i64>, String> {
     if let Some(d) = args.val("--as-of") {
-        return diagram_core::gantt::parse_date(d)
+        return shape_core::gantt::parse_date(d)
             .map(Some)
             .ok_or_else(|| format!("--as-of: `{d}` is not a date (YYYY-MM-DD)"));
     }
@@ -659,7 +674,7 @@ fn today(args: &Args) -> Result<Option<i64>, String> {
 fn dated(prompt: &str) -> String {
     format!(
         "Today is {}.\n\n{prompt}",
-        diagram_core::gantt::format_date(today_utc())
+        shape_core::gantt::format_date(today_utc())
     )
 }
 
@@ -681,7 +696,7 @@ fn render_opts(args: &Args) -> Result<RenderOptions, String> {
         o.theme = Some(Theme::parse(t).ok_or_else(|| format!("unknown theme {t}"))?);
     }
     o.transparent = args.flag("--transparent");
-    o.today = today(args)?.map(diagram_core::gantt::format_date);
+    o.today = today(args)?.map(shape_core::gantt::format_date);
     if args.flag("--title") {
         o.title = Some(true);
     }
@@ -706,7 +721,7 @@ pub fn theme_file(doc: &Document, file: &str) -> Result<Option<(String, String)>
     let Some(name) = doc.settings.palette.as_deref() else {
         return Ok(None);
     };
-    if !diagram_core::theme::is_file(name) || doc.themes.iter().any(|t| t.id == name) {
+    if !shape_core::theme::is_file(name) || doc.themes.iter().any(|t| t.id == name) {
         return Ok(None);
     }
     let dir = Path::new(file).parent().unwrap_or(Path::new("."));
@@ -717,20 +732,20 @@ pub fn theme_file(doc: &Document, file: &str) -> Result<Option<(String, String)>
 }
 
 /// The board's theme from its file, as a render option.
-fn file_themes(doc: &Document, file: &str) -> Result<Vec<diagram_core::model::ThemeDef>, String> {
+fn file_themes(doc: &Document, file: &str) -> Result<Vec<shape_core::model::ThemeDef>, String> {
     Ok(match theme_file(doc, file)? {
-        Some((name, src)) => vec![diagram_core::theme::from_file(&name, &src)?],
+        Some((name, src)) => vec![shape_core::theme::from_file(&name, &src)?],
         None => Vec::new(),
     })
 }
 
-fn rendered(args: &Args, file: &str) -> Result<(Document, diagram_core::Rendered), String> {
+fn rendered(args: &Args, file: &str) -> Result<(Document, shape_core::Rendered), String> {
     let doc = load(file)?;
     let mut opts = render_opts(args)?;
     opts.themes = file_themes(&doc, file)?;
     let r = match args.val("--base") {
-        Some(b) => diagram_core::render_diff(&load_base(b, file)?, &doc, &opts),
-        None => diagram_core::render::render(&doc, &opts),
+        Some(b) => shape_core::render_diff(&load_base(b, file)?, &doc, &opts),
+        None => shape_core::render::render(&doc, &opts),
     };
     Ok((doc, r))
 }
@@ -749,15 +764,15 @@ fn default_out(file: &str, ext: &str) -> Option<String> {
 }
 
 pub const TEMPLATES: &[(&str, &str)] = &[
-    ("flow", include_str!("../templates/flow.diagram")),
+    ("flow", include_str!("../templates/flow.shape")),
     (
         "architecture",
-        include_str!("../templates/architecture.diagram"),
+        include_str!("../templates/architecture.shape"),
     ),
-    ("board", include_str!("../templates/board.diagram")),
+    ("board", include_str!("../templates/board.shape")),
     // boards with a type, and so with perspectives
-    ("product", include_str!("../templates/product.diagram")),
-    ("project", include_str!("../templates/project.diagram")),
+    ("product", include_str!("../templates/product.shape")),
+    ("project", include_str!("../templates/project.shape")),
 ];
 
 fn run(args: Args) -> Result<ExitCode, String> {
@@ -768,7 +783,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             ok
         }
         "version" => {
-            println!("diagram {}", env!("CARGO_PKG_VERSION"));
+            println!("shape {}", env!("CARGO_PKG_VERSION"));
             ok
         }
         "open" => {
@@ -816,7 +831,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 (Open::Window, Some(n)) => server::Show::Window(n),
                 (Open::Window, None) => {
                     if cfg!(feature = "window") {
-                        eprintln!("diagram: no window here (no display?); opening the browser");
+                        eprintln!("shape: no window here (no display?); opening the browser");
                     }
                     server::Show::Browser
                 }
@@ -841,7 +856,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             })?;
             let doc = parse_doc(body, name)?;
             save(file, &doc)?;
-            eprintln!("created {file} from the {name} template — open it with `diagram {file}`");
+            eprintln!("created {file} from the {name} template — open it with `shape {file}`");
             ok
         }
         "svg" => {
@@ -874,7 +889,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             if let Some(mut t) = file_themes(&doc, file)?.pop() {
                 let id = Path::new(&t.id)
                     .file_stem()
-                    .map(|s| diagram_core::model::slug(&s.to_string_lossy()))
+                    .map(|s| shape_core::model::slug(&s.to_string_lossy()))
                     .unwrap_or_else(|| "theme".into());
                 t.id = id.clone();
                 doc.themes.push(t);
@@ -899,8 +914,8 @@ fn run(args: Args) -> Result<ExitCode, String> {
                     .ok_or("--to dsl|json|mermaid|brief is required")?
             };
             let text = match today(&args)? {
-                Some(t) if to == "brief" => diagram_core::prompt::brief_at(&doc, Some(t)),
-                _ => diagram_core::export(&doc, to)?,
+                Some(t) if to == "brief" => shape_core::prompt::brief_at(&doc, Some(t)),
+                _ => shape_core::export(&doc, to)?,
             };
             write_out(args.val("-o"), text.as_bytes(), to)?;
             ok
@@ -925,7 +940,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             }
             let all: Vec<_> = charts
                 .iter()
-                .map(|g| (g, diagram_core::gantt::track(&doc, &g.id, now)))
+                .map(|g| (g, shape_core::gantt::track(&doc, &g.id, now)))
                 .collect();
             if args.flag("--json") {
                 let v: Vec<_> = all
@@ -935,7 +950,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 println!(
                     "{}",
                     serde_json::to_string_pretty(&serde_json::json!({
-                        "today": diagram_core::gantt::format_date(now),
+                        "today": shape_core::gantt::format_date(now),
                         "charts": v
                     }))
                     .unwrap()
@@ -947,7 +962,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                     "{} ({}), as of {}",
                     g.display(),
                     g.id,
-                    diagram_core::gantt::format_date(now)
+                    shape_core::gantt::format_date(now)
                 );
                 let w = tasks
                     .iter()
@@ -1041,7 +1056,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 "comment" => {
                     let text = args.pos[1..].join(" ");
                     if text.trim().is_empty() {
-                        return Err("usage: diagram comment FILE [--on ID] TEXT".into());
+                        return Err("usage: shape comment FILE [--on ID] TEXT".into());
                     }
                     Op::AddComment {
                         id: None,
@@ -1056,7 +1071,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                     let id = args
                         .pos
                         .get(1)
-                        .ok_or("usage: diagram reply FILE COMMENT_ID TEXT")?
+                        .ok_or("usage: shape reply FILE COMMENT_ID TEXT")?
                         .clone();
                     let text = args.pos[2..].join(" ");
                     Op::Reply {
@@ -1069,7 +1084,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                     let id = args
                         .pos
                         .get(1)
-                        .ok_or("usage: diagram resolve FILE COMMENT_ID [--note TEXT]")?
+                        .ok_or("usage: shape resolve FILE COMMENT_ID [--note TEXT]")?
                         .clone();
                     Op::ResolveComment {
                         id,
@@ -1077,7 +1092,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                     }
                 }
             };
-            let r = diagram_core::ops::apply(&mut doc, &[op]).map_err(|e| e.message)?;
+            let r = shape_core::ops::apply(&mut doc, &[op]).map_err(|e| e.message)?;
             save(file, &doc)?;
             if let Some(id) = r.created.first() {
                 println!("{id}");
@@ -1091,7 +1106,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             if args.val("--target") == Some("build") {
                 print!(
                     "{}",
-                    diagram_core::prompt::build(&doc, today(&args)?.or(Some(today_utc())))
+                    shape_core::prompt::build(&doc, today(&args)?.or(Some(today_utc())))
                 );
                 return Ok(ExitCode::SUCCESS);
             }
@@ -1132,10 +1147,10 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 instructions: args.val("--instructions").map(String::from),
                 file: (file != "-").then(|| file.to_string()),
                 context: match args.val("--context").unwrap_or("auto") {
-                    "auto" => diagram_core::prompt::Context::Auto,
-                    "near" => diagram_core::prompt::Context::Near,
-                    "section" => diagram_core::prompt::Context::Section,
-                    "all" => diagram_core::prompt::Context::All,
+                    "auto" => shape_core::prompt::Context::Auto,
+                    "near" => shape_core::prompt::Context::Near,
+                    "section" => shape_core::prompt::Context::Section,
+                    "all" => shape_core::prompt::Context::All,
                     c => {
                         return Err(format!(
                             "--context must be auto, near, section or all (got {c})"
@@ -1143,7 +1158,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                     }
                 },
             };
-            print!("{}", diagram_core::prompt::prompt(&doc, &opts));
+            print!("{}", shape_core::prompt::prompt(&doc, &opts));
             ok
         }
         "outline" => {
@@ -1159,10 +1174,10 @@ fn run(args: Args) -> Result<ExitCode, String> {
             if args.flag("--md") {
                 print!(
                     "{}",
-                    diagram_core::prompt::selection_at(&doc, &[id], today(&args)?)
+                    shape_core::prompt::selection_at(&doc, &[id], today(&args)?)
                 );
             } else {
-                print!("{}", diagram_core::mindmap::outline(&doc, &id, true));
+                print!("{}", shape_core::mindmap::outline(&doc, &id, true));
             }
             ok
         }
@@ -1171,7 +1186,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             let mut doc = load(file)?;
             let request = args.pos[1..].join(" ");
             if request.trim().is_empty() {
-                return Err("usage: diagram ask FILE \"what to change\" [--on ID,ID] [--dry-run] [--print] [--ai claude|codex|gemini|CMD]".into());
+                return Err("usage: shape ask FILE \"what to change\" [--on ID,ID] [--dry-run] [--print] [--ai claude|codex|gemini|CMD]".into());
             }
             let ids: Vec<String> = args
                 .val("--on")
@@ -1182,11 +1197,11 @@ fn run(args: Args) -> Result<ExitCode, String> {
                         .collect()
                 })
                 .unwrap_or_default();
-            let mut prompt = diagram_core::prompt::ask(&doc, &ids, &request, &team_recipes(&file));
+            let mut prompt = shape_core::prompt::ask(&doc, &ids, &request, &team_recipes(&file));
             let cmd = match ai::command(args.val("--ai")) {
                 Some(c) if !args.flag("--print") => c,
                 _ => {
-                    // no harness: the prompt, for any chat; `diagram apply` takes the reply
+                    // no harness: the prompt, for any chat; `shape apply` takes the reply
                     print!("{prompt}");
                     return ok;
                 }
@@ -1197,11 +1212,11 @@ fn run(args: Args) -> Result<ExitCode, String> {
             let r = loop {
                 eprintln!("asking `{cmd}`…");
                 let reply = ai::run(&cmd, &dated(&prompt))?;
-                let applied = diagram_core::ops::parse_ops(&reply)
+                let applied = shape_core::ops::parse_ops(&reply)
                     .map_err(|e| e.to_string())
                     .and_then(|ops| {
                         let mut d = before.clone();
-                        diagram_core::ops::apply(&mut d, &ops)
+                        shape_core::ops::apply(&mut d, &ops)
                             .map(|r| (d, r))
                             .map_err(|e| e.to_string())
                     });
@@ -1213,18 +1228,14 @@ fn run(args: Args) -> Result<ExitCode, String> {
                     Err(e) if tries < 2 => {
                         tries += 1;
                         eprintln!("the reply did not apply ({e}); asking again");
-                        prompt = diagram_core::prompt::ask_again(&prompt, &reply, &e);
+                        prompt = shape_core::prompt::ask_again(&prompt, &reply, &e);
                     }
                     Err(e) => return Err(format!("the model's reply did not apply: {e}")),
                 }
             };
             print!(
                 "{}",
-                diagram_core::diff::markdown(
-                    &diagram_core::diff::diff(&before, &doc),
-                    &before,
-                    &doc
-                )
+                shape_core::diff::markdown(&shape_core::diff::diff(&before, &doc), &before, &doc)
             );
             if args.flag("--dry-run") {
                 eprintln!("dry run: {} ops ok, {file} not changed", r.count);
@@ -1237,20 +1248,20 @@ fn run(args: Args) -> Result<ExitCode, String> {
         "expand" => {
             let file = args.file(0)?;
             let mut doc = load(file)?;
-            let o = diagram_core::mindmap::ExpandOptions {
+            let o = shape_core::mindmap::ExpandOptions {
                 instructions: args.val("--ask").map(String::from),
                 count: args.val("--count").and_then(|c| c.parse().ok()),
                 levels: args.val("--levels").and_then(|c| c.parse().ok()),
             };
             let (prompt, parent) = match args.val("--new") {
-                Some(topic) => (diagram_core::mindmap::generate_prompt(topic, &o), None),
+                Some(topic) => (shape_core::mindmap::generate_prompt(topic, &o), None),
                 None => {
                     let id = args
                         .pos
                         .get(1)
-                        .ok_or("usage: diagram expand FILE ID (or --new TOPIC)")?;
+                        .ok_or("usage: shape expand FILE ID (or --new TOPIC)")?;
                     (
-                        diagram_core::mindmap::expand_prompt(&doc, id, &o)?,
+                        shape_core::mindmap::expand_prompt(&doc, id, &o)?,
                         Some(id.clone()),
                     )
                 }
@@ -1260,18 +1271,18 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 print!("{prompt}");
                 if !args.flag("--print") {
                     eprintln!(
-                        "no AI harness found: pass --ai CMD or set DIAGRAM_AI; the prompt is above"
+                        "no AI harness found: pass --ai CMD or set SHAPE_AI; the prompt is above"
                     );
                 }
                 return ok;
             };
             eprintln!("asking `{cmd}`…");
             let reply = ai::run(&cmd, &dated(&prompt))?;
-            let outline: String = diagram_core::mindmap::parse_reply(&reply)
+            let outline: String = shape_core::mindmap::parse_reply(&reply)
                 .iter()
                 .map(|l| format!("{}{}\n", "  ".repeat(l.depth), l.text))
                 .collect();
-            let r = diagram_core::ops::apply(
+            let r = shape_core::ops::apply(
                 &mut doc,
                 &[Op::AddOutline {
                     parent,
@@ -1296,21 +1307,25 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 inline if inline.trim_start().starts_with(['{', '[']) => inline.to_string(),
                 path => read_text(path)?,
             };
-            // a reply may also be a whole new diagram in a ```diagram block
-            let ops = match diagram_core::ops::parse_ops(&patch) {
+            // a reply may also be a whole new board in a ```shape block
+            // (```diagram, its name before the rename, too)
+            let fenced = ["```shape", "```diagram"]
+                .iter()
+                .find_map(|f| patch.find(f).map(|i| i + f.len()));
+            let ops = match shape_core::ops::parse_ops(&patch) {
                 Ok(ops) => ops,
-                Err(e) => match patch.find("```diagram") {
+                Err(e) => match fenced {
                     Some(start) => {
-                        let body = &patch[start + 10..];
+                        let body = &patch[start..];
                         let body = &body[..body.find("```").unwrap_or(body.len())];
-                        let mut new = parse_doc(body, "the ```diagram block")?;
+                        let mut new = parse_doc(body, "the ```shape block")?;
                         // prompts leave the images' data out: keep the board's
                         new.adopt_hidden(&doc);
                         if args.flag("--dry-run") {
                             print!(
                                 "{}",
-                                diagram_core::diff::markdown(
-                                    &diagram_core::diff::diff(&doc, &new),
+                                shape_core::diff::markdown(
+                                    &shape_core::diff::diff(&doc, &new),
                                     &doc,
                                     &new
                                 )
@@ -1325,9 +1340,9 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 },
             };
             let before = doc.clone();
-            let r = diagram_core::ops::apply(&mut doc, &ops).map_err(|e| e.to_string())?;
-            let d = diagram_core::diff::diff(&before, &doc);
-            print!("{}", diagram_core::diff::markdown(&d, &before, &doc));
+            let r = shape_core::ops::apply(&mut doc, &ops).map_err(|e| e.to_string())?;
+            let d = shape_core::diff::diff(&before, &doc);
+            print!("{}", shape_core::diff::markdown(&d, &before, &doc));
             if args.flag("--dry-run") {
                 eprintln!("dry run: {} ops ok, {file} not changed", r.count);
             } else {
@@ -1341,14 +1356,14 @@ fn run(args: Args) -> Result<ExitCode, String> {
             let doc = load(file)?;
             let sels: Vec<&str> = args.pos[1..].iter().map(|s| s.as_str()).collect();
             if sels.is_empty() {
-                return Err("usage: diagram query FILE SELECTOR... (see `diagram help`)".into());
+                return Err("usage: shape query FILE SELECTOR... (see `shape help`)".into());
             }
             if args.flag("--ids") {
-                for id in diagram_core::query::select(&doc, &sels)? {
+                for id in shape_core::query::select(&doc, &sels)? {
                     println!("{id}");
                 }
             } else {
-                print!("{}", diagram_core::query::query(&doc, &sels)?);
+                print!("{}", shape_core::query::query(&doc, &sels)?);
             }
             ok
         }
@@ -1361,14 +1376,10 @@ fn run(args: Args) -> Result<ExitCode, String> {
             };
             let before = doc.clone();
             let r =
-                diagram_core::ops::apply(&mut doc, &[Op::Merge { dsl }]).map_err(|e| e.message)?;
+                shape_core::ops::apply(&mut doc, &[Op::Merge { dsl }]).map_err(|e| e.message)?;
             print!(
                 "{}",
-                diagram_core::diff::markdown(
-                    &diagram_core::diff::diff(&before, &doc),
-                    &before,
-                    &doc
-                )
+                shape_core::diff::markdown(&shape_core::diff::diff(&before, &doc), &before, &doc)
             );
             if args.flag("--dry-run") {
                 eprintln!("dry run: {file} not changed");
@@ -1381,17 +1392,17 @@ fn run(args: Args) -> Result<ExitCode, String> {
         "check" => {
             let mut failed = false;
             if args.pos.is_empty() {
-                return Err("usage: diagram check FILE...".into());
+                return Err("usage: shape check FILE...".into());
             }
             for f in &args.pos {
                 let src = read_text(f)?;
-                match diagram_core::parse(&src) {
+                match shape_core::parse(&src) {
                     Ok(doc) => {
                         let mut problems = doc.check();
                         problems.extend(
                             board_link_problems(&doc, f)
                                 .into_iter()
-                                .map(|m| diagram_core::model::Diagnostic::new(0, m)),
+                                .map(|m| shape_core::model::Diagnostic::new(0, m)),
                         );
                         if problems.is_empty() {
                             let open = doc
@@ -1430,7 +1441,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             for f in &args.pos {
                 let src = read_text(f)?;
                 let doc = parse_doc(&src, f)?;
-                let out = diagram_core::export(&doc, format_for(f))?;
+                let out = shape_core::export(&doc, format_for(f))?;
                 if out != src {
                     dirty = true;
                     if args.flag("--check") {
@@ -1457,18 +1468,18 @@ fn run(args: Args) -> Result<ExitCode, String> {
             let b = args
                 .pos
                 .get(1)
-                .ok_or("usage: diagram diff OLD NEW  or  diagram diff FILE GIT_REF")?;
-            // `diagram diff FILE REF` compares the file at REF (old) with the working copy (new)
+                .ok_or("usage: shape diff OLD NEW  or  shape diff FILE GIT_REF")?;
+            // `shape diff FILE REF` compares the file at REF (old) with the working copy (new)
             let (old, new) = if Path::new(b).exists() {
                 (load(a)?, load(b)?)
             } else {
                 (load_base(b, a)?, load(a)?)
             };
-            let d = diagram_core::diff::diff(&old, &new);
+            let d = shape_core::diff::diff(&old, &new);
             if args.flag("--json") {
                 println!("{}", serde_json::to_string_pretty(&d).unwrap());
             } else {
-                print!("{}", diagram_core::diff::markdown(&d, &old, &new));
+                print!("{}", shape_core::diff::markdown(&d, &old, &new));
             }
             ok
         }
@@ -1476,15 +1487,15 @@ fn run(args: Args) -> Result<ExitCode, String> {
             if args.flag("--json-schema") {
                 println!(
                     "{}",
-                    serde_json::to_string_pretty(&diagram_core::json_schema()).unwrap()
+                    serde_json::to_string_pretty(&shape_core::json_schema()).unwrap()
                 );
             } else {
-                print!("{}", diagram_core::spec());
+                print!("{}", shape_core::spec());
             }
             ok
         }
         "embed" => {
-            let out = args.val("-o").unwrap_or("diagram.embed.js");
+            let out = args.val("-o").unwrap_or("shape.embed.js");
             write_out(
                 Some(out),
                 export::embed_bundle().as_bytes(),

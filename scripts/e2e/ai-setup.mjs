@@ -12,10 +12,10 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const bin = join(root, "target", "debug", "diagram");
+const bin = join(root, "target", "debug", "shape");
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const dir = mkdtempSync(join(tmpdir(), "diagram-e2e-"));
-const file = join(dir, "board.diagram");
+const file = join(dir, "board.shape");
 writeFileSync(file, "title: AI\n\napi: Orders API\n");
 // a harness that is not signed in
 const broken = join(dir, "not-signed-in.sh");
@@ -23,7 +23,7 @@ writeFileSync(broken, "#!/bin/sh\necho 'Invalid API key · Please run /login' >&
 chmodSync(broken, 0o755);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const start = (port, ai) => spawn(bin, [file, "--no-open", "--port", String(port)].concat(ai ? ["--ai", ai] : []), {
-  env: { ...process.env, DIAGRAM_WEB_DIR: join(root, "web"), DIAGRAM_NO_UPDATE_CHECK: "1", DIAGRAM_AI: "" },
+  env: { ...process.env, SHAPE_WEB_DIR: join(root, "web"), SHAPE_NO_UPDATE_CHECK: "1", SHAPE_AI: "" },
   stdio: "ignore",
 });
 const servers = [];
@@ -38,7 +38,7 @@ try {
     const p = await browser.newPage({ viewport: { width: 1300, height: 860 }, colorScheme: scheme });
     const errors = [];
     p.on("pageerror", (e) => errors.push(e.message));
-    await p.goto(`http://127.0.0.1:${port}/`);
+    await p.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded" });
     await p.waitForSelector(".dge-canvas svg"); await sleep(300);
     await p.locator(".dge-ai-fab").click();
     await p.locator(".dge-ai-menu .dge-ai-item", { hasText: "Connect your AI" }).click(); await sleep(500);
@@ -54,7 +54,7 @@ try {
     await sleep(600);
     const q = await browser.newPage({ viewport: { width: 1300, height: 860 }, colorScheme: scheme });
     q.on("pageerror", (e) => errors.push(e.message));
-    await q.goto(`http://127.0.0.1:${port2}/`);
+    await q.goto(`http://127.0.0.1:${port2}/`, { waitUntil: "domcontentloaded" });
     await q.waitForSelector(".dge-canvas svg"); await sleep(300);
     await q.locator(".dge-ai-fab").click();
     await q.locator(".dge-ai-menu .dge-ai-item", { hasText: "Rethink" }).click();

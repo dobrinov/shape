@@ -11,24 +11,24 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const bin = join(root, "target", "debug", "diagram");
+const bin = join(root, "target", "debug", "shape");
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const dir = mkdtempSync(join(tmpdir(), "diagram-e2e-"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const servers = [];
 function serve(file) {
   const port = 6190 + Math.floor(Math.random() * 200);
-  servers.push(spawn(bin, [file, "--no-open", "--port", String(port)], { env: { ...process.env, DIAGRAM_WEB_DIR: join(root, "web") }, stdio: "ignore" }));
+  servers.push(spawn(bin, [file, "--no-open", "--port", String(port)], { env: { ...process.env, SHAPE_WEB_DIR: join(root, "web") }, stdio: "ignore" }));
   return port;
 }
 const canvasBg = (p) => p.evaluate(() => document.querySelector(".dge-canvas").style.getPropertyValue("--canvas"));
 let failed = false;
-const file = join(dir, "board.diagram");
+const file = join(dir, "board.shape");
 try {
   writeFileSync(file, "title: Themed\napi: Orders API [blue]\n");
   writeFileSync(join(dir, "brand.theme"), "theme brand {\n  blue: #3b6fd8\n  light {\n    background: #faf9f6\n  }\n  dark {\n    background: #101418\n  }\n}\n");
-  writeFileSync(join(dir, "branded.diagram"), "theme: ./brand.theme\napi: Orders API [blue]\n");
-  const port = serve(file), port2 = serve(join(dir, "branded.diagram"));
+  writeFileSync(join(dir, "branded.shape"), "theme: ./brand.theme\napi: Orders API [blue]\n");
+  const port = serve(file), port2 = serve(join(dir, "branded.shape"));
   await sleep(700);
   const browser = await chromium.launch(existsSync(chrome) ? { executablePath: chrome } : {});
   const p = await browser.newPage({ viewport: { width: 1200, height: 700 }, colorScheme: "light" });

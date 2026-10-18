@@ -1,14 +1,14 @@
-/* The diagram app shell.
+/* The Shape app shell.
  *
- * Served by `diagram FILE`: loads the file from the local server, saves on
+ * Served by `shape FILE`: loads the file from the local server, saves on
  * every change and picks up edits made in other tools (your $EDITOR, an agent).
- * Static (window.DIAGRAM_STATIC, the GitHub Pages playground): examples, local
+ * Static (window.SHAPE_STATIC, the GitHub Pages playground): examples, local
  * drafts, opening files and share links that carry the diagram in the URL.
  */
 (function () {
   "use strict";
-  var STATIC = window.DIAGRAM_STATIC || null;
-  var SHARE_URL = (STATIC && STATIC.shareUrl) || "https://dobrinov.github.io/diagram/app/";
+  var STATIC = window.SHAPE_STATIC || null;
+  var SHARE_URL = (STATIC && STATIC.shareUrl) || "https://dobrinov.github.io/shape/app/";
   var statusEl = document.getElementById("status");
   var fileEl = document.getElementById("file");
   var actions = document.getElementById("app-actions");
@@ -22,7 +22,7 @@
   }
 
   function boot() {
-    return wasm_bindgen({ module_or_path: "pkg/diagram_wasm_bg.wasm" }).then(function () { return wasm_bindgen; });
+    return wasm_bindgen({ module_or_path: "pkg/shape_wasm_bg.wasm" }).then(function () { return wasm_bindgen; });
   }
 
   function mount(wasm, source, extra) {
@@ -35,17 +35,17 @@
     editor = DiagramEditor.create(host, Object.assign({ wasm: wasm, source: source, shareUrl: SHARE_URL, code: sidebars, panel: sidebars, lead: lead, status: stat }, extra));
     var bar = document.querySelector(".app-bar");
     if (bar) bar.remove();
-    window.diagramEditor = editor; // handy from the console
+    window.shapeEditor = window.diagramEditor = editor; // handy from the console
     return editor;
   }
 
   // ------------------------------------------------------------ server mode
-  // `?file=plans/q3.diagram` opens another board under the same root (links
+  // `?file=plans/q3.shape` opens another board under the same root (links
   // between boards); `&focus=id` goes to an element on it.
   var PARAMS = new URLSearchParams(location.search);
   var FILE = PARAMS.get("file");
   function api(p) { return FILE ? p + "?file=" + encodeURIComponent(FILE) : p; }
-  /* `a/b.diagram` + `../c/d.diagram` → `c/d.diagram` (null when it leaves the root). */
+  /* `a/b.shape` + `../c/d.shape` → `c/d.shape` (null when it leaves the root). */
   function joinPath(from, link) {
     var parts = from.split("/").slice(0, -1);
     for (var seg of link.split("/")) {
@@ -104,7 +104,7 @@
         var a = document.getElementById("update");
         a.textContent = "New: " + u.latest + " ↗";
         a.href = u.url;
-        a.title = "diagram " + u.latest + " is out (you have " + u.current + "). " + (/^https?:/.test(u.how) ? "Download it from " + u.how : "Upgrade: " + u.how) + ". Click for what's new.";
+        a.title = "Shape " + u.latest + " is out (you have " + u.current + "). " + (/^https?:/.test(u.how) ? "Download it from " + u.how : "Upgrade: " + u.how) + ". Click for what's new.";
         a.hidden = false;
       }).catch(function () { /* no server check: nothing to show */ });
     }
@@ -149,7 +149,7 @@
             });
           }
         },
-        // a team's recipes (recipes/*.diagram), for the AI and Insert recipe…
+        // a team's recipes (recipes/*.shape), for the AI and Insert recipe…
         recipes: function () {
           return fetch(api("api/recipes")).then(function (r) { return r.json(); }).then(function (v) { return v.ok ? v.recipes : {}; });
         },
@@ -233,7 +233,7 @@
     return DiagramEditor.decodeShare(location.hash).catch(function () { return null; }).then(function (shared) {
       var start = shared ? Promise.resolve(shared) : draft() ? Promise.resolve(draft()) : examples.length ? fetchText(examples[0].url) : Promise.resolve("a -> b");
       return start.then(function (src) {
-        fileEl.textContent = shared ? "shared diagram" : "playground";
+        fileEl.textContent = shared ? "shared board" : "playground";
         mount(wasm, src, {
           onChange: function (text) {
             try { localStorage.setItem(DRAFT, text); } catch (e) { /* private mode */ }
@@ -254,7 +254,7 @@
         open.textContent = "Open…";
         var input = document.createElement("input");
         input.type = "file";
-        input.accept = ".diagram,.json,.mmd,.txt,.md";
+        input.accept = ".shape,.diagram,.json,.mmd,.txt,.md";
         input.hidden = true;
         input.onchange = function () {
           var f = input.files[0];
