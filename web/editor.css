@@ -434,3 +434,9 @@
 .dge-ai-error { max-height: 160px; overflow: auto; margin: 0; padding: 10px; border-radius: 6px; background: var(--bg2); font: 12px/1.5 var(--mono); white-space: pre-wrap; }
 .dge-ok { color: #1a7f37; }
 .dge .dge-ai-menu .dge-ai-foot { width: 100%; height: 30px; min-height: 0; margin-top: 4px; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; color: var(--muted); font-size: 12px; }
+/* opening a board: pick a perspective */
+.dge-persp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 8px; }
+.dge .dge-persp-cards .dge-persp-card { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; height: auto; min-height: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); text-align: left; }
+.dge .dge-persp-cards .dge-persp-card:hover { border-color: var(--accent); }
+.dge .dge-persp-cards .dge-persp-card.on { border-color: var(--accent); background: var(--bg2); }
+.dge-persp-card span { color: var(--muted); font-size: 12px; font-weight: 400; }

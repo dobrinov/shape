@@ -525,6 +525,18 @@ pub fn answer_parts(reply: &str) -> String {
     }
 }
 
+/// The names of the perspectives a board of type `kind` comes with (JSON).
+#[wasm_bindgen]
+pub fn builtin_perspectives(kind: &str) -> String {
+    let kind = diagram_core::model::BoardKind::parse(kind).unwrap_or_default();
+    to_json(
+        &diagram_core::perspectives::builtins(kind)
+            .into_iter()
+            .map(|p| p.label)
+            .collect::<Vec<_>>(),
+    )
+}
+
 /// What Rethink does unless told otherwise (its editable instructions).
 #[wasm_bindgen]
 pub fn rethink_default() -> String {

@@ -369,6 +369,50 @@
       if (id) st.perspective = (st.perspectives || []).find(function (p) { return p.id === id; }) || null;
       fillPerspectives();
     }
+    /* A new type brings other perspectives: the board is rethought so each
+       shows what its audience needs (after a warning). */
+    var TYPE_NAMES = { sketch: "Sketch", product: "Product", project: "Project" };
+    function changeType(kind) {
+      var before = (st.answer ? st.answer.main.session : st.session).board_type();
+      var set = function () { applyOps([{ op: "set", key: "type", value: kind }], false, true); fillPerspectives(); };
+      if (kind === "sketch") return set(); // a sketch has no perspectives to fill
+      boardMenu.hidden = true;
+      if (toolbar.kind) toolbar.kind.value = before; // until confirmed
+      var names = JSON.parse(wasm.builtin_perspectives(kind));
+      showModal("Make this a " + TYPE_NAMES[kind] + " board?", h("div", { class: "dge-ai-setup" }, [
+        h("p", {}, ["A " + TYPE_NAMES[kind].toLowerCase() + " board is seen by " + (names.length ? names.join(", ") : "its own audiences") + ". Each of these perspectives shows only what is tagged for it, so the board needs sorting for them."]),
+        h("p", {}, [h("b", {}, ["The AI will rethink the board"]), " for its new perspectives: it tags every element for the audiences it matters to, and may reorganise sections. You see the changes before keeping them."])
+      ]), [
+        h("button", { onclick: closeModal }, ["Cancel"]),
+        h("button", { title: "Change the type and leave the board as it is", onclick: function () { closeModal(); set(); } }, ["Only change the type"]),
+        h("button", { class: "primary", onclick: function () {
+          closeModal();
+          set();
+          if (st.preview) return flash("Keep or discard the AI's changes first, then Rethink", true);
+          runRethink();
+        } }, ["Change and rethink"])
+      ]);
+    }
+    /* Opening a board with perspectives: whose eyes to look through. */
+    function askPerspective() {
+      var list = st.perspectives || [];
+      if (!list.length || view || !modal.hidden) return;
+      var last = null;
+      try { last = localStorage.getItem(perspectiveKey()); } catch (e) { /* fine */ }
+      var pick = function (id) { closeModal(); toolbar.persp.value = id; pickPerspective(id); };
+      var card = function (id, label, more) {
+        return h("button", { class: "dge-persp-card" + ((last || "") === id ? " on" : ""), onclick: function () { pick(id); } }, [
+          h("b", {}, [label]), h("span", {}, [more + ((last || "") === id ? " · last time" : "")])
+        ]);
+      };
+      showModal("How would you like to view this board?", h("div", {}, [
+        h("p", { class: "dge-muted" }, ["Each perspective shows the part of the board one audience needs. Switch any time from the top bar."]),
+        h("div", { class: "dge-persp-cards" }, [card("", "Everyone", "The whole board")].concat(list.map(function (p) {
+          var show = p.show || [], tags = p.tags || [];
+          return card(p.id, p.label, show.length ? "What is tagged " + (tags[0] || p.id) + ", and " + show.map(function (k) { return (KIND_NAMES[k] || k).toLowerCase(); }).join(", ") : "What is tagged " + (tags[0] || p.id));
+        })))
+      ]), []);
+    }
     var KIND_NAMES = { mindmap: "Mindmaps", timeline: "Timelines", adr: "Decision records", risks: "Risk matrices", kanban: "Kanban boards", gantt: "Gantt charts", table: "Tables", chart: "Charts", entity: "Database tables", sequence: "Sequence diagrams", lanes: "Swimlanes", sticky: "Stickies" };
     function newPerspective() {
       var name = h("input", { class: "dge-input", placeholder: "e.g. Legal, Support, Investors" });
@@ -512,7 +556,7 @@
         toolbar.theme = themeSel;
         if (boardMenu) boardMenu.remove();
         var row = function (label, ctl) { return h("label", { class: "dge-board-row" }, [h("span", {}, [label]), ctl]); };
-        var kindSel = h("select", { title: "What the board is for: it decides the built-in perspectives", class: "dge-select", onchange: function (e) { applyOps([{ op: "set", key: "type", value: e.target.value }], false, true); fillPerspectives(); } });
+        var kindSel = h("select", { title: "What the board is for: it decides the built-in perspectives", class: "dge-select", onchange: function (e) { changeType(e.target.value); } });
         [["sketch", "Sketch: just a diagram"], ["product", "Product: understand it"], ["project", "Project: run it"]].forEach(function (d) { kindSel.appendChild(h("option", { value: d[0] }, [d[1]])); });
         toolbar.kind = kindSel;
         boardMenu = h("div", { class: "dge-board-menu", role: "dialog", "aria-label": "Board", hidden: true }, [
@@ -4591,7 +4635,11 @@
     if (opts.base != null) setBase(opts.base, opts.baseLabel);
     restorePerspective();
     if (st.perspective) render();
-    if (opts.requireName && !st.author && !view) setTimeout(function () { askName(); }, 300);
+    // who you are (when git does not know), then whose eyes to look through
+    setTimeout(function () {
+      var then = function () { if (opts.askPerspective) askPerspective(); };
+      if (opts.requireName && !st.author && !view) askName(then); else then();
+    }, 300);
     // a team's recipes reach the AI's prompts and Insert recipe…
     if (opts.recipes) Promise.resolve(opts.recipes()).then(function (files) { if (files && st.session.set_recipes) st.session.set_recipes(JSON.stringify(files)); }).catch(function () {});
     return api;

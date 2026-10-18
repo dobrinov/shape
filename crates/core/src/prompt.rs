@@ -391,12 +391,38 @@ pub fn rethink(
         .filter(|i| !i.is_empty())
         .unwrap_or(RETHINK_DEFAULT);
     s.push_str(&format!("## What to do\n\n{what}\n\n"));
+    s.push_str(&perspectives_section(root));
     s.push_str("How to change the board:\n- Keep ids; to merge, keep one item and remove the others only after moving what they said into it.\n- Ops apply to the top board. For anything inside a canvas, wrap them in an `in` op with the canvas path: `{\"op\": \"in\", \"canvas\": \"plan\", \"ops\": [...]}` (`plan/details` for a canvas inside `plan`). A comment's own ops (`resolve_comment`, `reply`) go in the `in` of the canvas it is in.\n- A box's `detail` holds the context its title leaves out; on a kanban card it shows on hover.\n- Do not set `x`/`y` or move things: the layout follows the structure.\n- Leave the data inside blocks (gantt dates, table cells, chart values, columns) as it is unless the instructions or the information say otherwise.\n- If nothing needs to change, change nothing and say so in the note.\n\n");
     s.push_str(&crate::recipes::prompt_section(recipes));
     s.push('\n');
     s.push_str("## How to respond\n\nReply with a single ```json code block: a short note for the people on the board (one to three sentences: what you changed and why) and the operations, for example:\n\n```json\n{\"note\": \"Split the cards into virtual and personalised spend cards as the comment says, priced per card, and grouped the interview findings by theme.\", \"ops\": [\n  {\"op\": \"add_group\", \"id\": \"pricing\", \"label\": \"Pricing\", \"members\": [\"n3\", \"n7\"]},\n  {\"op\": \"remove\", \"id\": \"n7\"},\n  {\"op\": \"in\", \"canvas\": \"status\", \"ops\": [\n    {\"op\": \"update_node\", \"id\": \"scope\", \"label\": \"Two card products: virtual cards and personalised spend cards\"},\n    {\"op\": \"resolve_comment\", \"id\": \"c1\", \"resolution\": \"Scope now lists both card products\"}\n  ]}\n]}\n```\n\n");
     s.push_str(OPS_REFERENCE);
     s.push_str("\n\nThe batch is applied all at once or not at all, so it must be valid as a whole. No explanation is needed outside the code block.\n");
+    s
+}
+
+/// The board's perspectives, for Rethink: each audience sees what is
+/// tagged for it, so a rethought board keeps every perspective filled.
+fn perspectives_section(root: &Document) -> String {
+    let all = crate::perspectives::all(root);
+    if all.is_empty() {
+        return String::new();
+    }
+    let mut s = String::from("## Perspectives\n\nThe board is seen by these audiences. Each sees the elements tagged for it (and blocks of the kinds it shows whole):\n\n");
+    for p in &all {
+        let tag = p.tags.first().cloned().unwrap_or_else(|| p.id.clone());
+        let shown = crate::perspectives::view(root, p).nodes.len();
+        let whole = if p.show.is_empty() {
+            String::new()
+        } else {
+            format!(", shows {} blocks whole", p.show.join(", "))
+        };
+        s.push_str(&format!(
+            "- {}: tag `{tag}`{whole}; now shows {shown} elements on the top board\n",
+            p.label
+        ));
+    }
+    s.push_str("\nKeep them up to date: give each box the tags of every perspective it matters to (`update_node` with its existing `tags` plus the new ones; a box can belong to several, in canvases too). Tag mindmap centres, not their topics. Every perspective should show what that audience needs, so none is empty.\n\n");
     s
 }
 

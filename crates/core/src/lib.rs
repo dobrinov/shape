@@ -673,6 +673,18 @@ mod tests {
             .rethink_prompt(None, "", Some("  "))
             .unwrap()
             .contains(prompt::RETHINK_DEFAULT));
+        // a board with perspectives: Rethink keeps each one filled
+        assert!(!own.contains("## Perspectives"), "a sketch has none");
+        let mut typed = Session::new();
+        typed.set_source("type: project\n\napi: Orders API [tags: tech]\nbeta: Open beta\n");
+        let p = typed.rethink_prompt(None, "", None).unwrap();
+        assert!(
+            p.contains("## Perspectives")
+                && p.contains("- Technical: tag `tech`, shows entity, sequence, lanes, adr blocks whole; now shows 1 elements")
+                && p.contains("- Senior management: tag `exec`")
+                && p.contains("none is empty"),
+            "{p}"
+        );
         // a resolved comment is not asked about
         let mut done = Session::new();
         done.set_source("a: A\ncomment on a: fine [resolved]\n");

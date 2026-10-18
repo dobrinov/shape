@@ -24,6 +24,8 @@ try {
     const p = await browser.newPage({ viewport: { width: 1300, height: 860 }, colorScheme: scheme });
     const errors = []; p.on("pageerror", (e) => errors.push(e.message));
     await p.goto(`http://127.0.0.1:${port}/`); await p.waitForSelector(".dge-canvas svg"); await sleep(400);
+    // a product board asks for a perspective first
+    await p.locator(".dge-persp-card", { hasText: "Everyone" }).click(); await sleep(200);
     await p.locator('[data-act="board"]').click(); await p.locator('[data-act="prompts"]').click(); await sleep(400);
     const t = await p.locator('textarea[aria-label="Prompt"]').inputValue();
     assert.match(t, /^Today is \d{4}-\d\d-\d\d\./); assert.match(t, /why Rust/);
@@ -36,4 +38,4 @@ try {
     assert.deepEqual(errors, []); await p.close();
   }
   await browser.close(); console.log("prompts ok");
-} catch (e) { console.error(e); process.exitCode = 1; } finally { server.kill(); }
+} catch (e) { console.error(e); process.exitCode = 1; } finally { server.kill(); process.exit(); }

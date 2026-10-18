@@ -35,6 +35,11 @@ try {
   await p.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded" });
   await p.waitForSelector(".dge-canvas svg"); await sleep(300);
 
+  // opening asks whose eyes to look through
+  await p.waitForSelector(".dge-persp-card");
+  assert.deepEqual((await p.locator(".dge-persp-card b").allTextContents()).slice(0, 3), ["Everyone", "Senior management", "Team"]);
+  await p.locator(".dge-persp-card", { hasText: "Everyone" }).click(); await sleep(300);
+
   // a project board's built-in perspectives
   const names = await p.locator(".dge-persp option").allTextContents();
   assert.deepEqual(names.slice(0, 5), ["Everyone", "Senior management", "Team", "Product", "Technical"]);
@@ -53,6 +58,10 @@ try {
   assert.match(saved(), /\nperspective support: Support \[tags: support\]\n/);
   assert.equal(await p.locator(".dge-persp").inputValue(), "support");
   await p.reload(); await p.waitForSelector(".dge-canvas svg"); await sleep(500);
+  // the one picked last time is marked
+  await p.waitForSelector(".dge-persp-card.on");
+  assert.match(await p.locator(".dge-persp-card.on").innerText(), /Support[\s\S]*last time/);
+  await p.locator(".dge-persp-card.on").click(); await sleep(300);
   assert.equal(await p.locator(".dge-persp").inputValue(), "support");
   assert.equal(await shown(p), "");
 
@@ -62,6 +71,18 @@ try {
   await p.keyboard.type("Terms"); await p.keyboard.press("Enter"); await sleep(600);
   assert.match(saved(), /: Terms \[tags: support[,\]]/);
   assert.equal((await shown(p)).split(",").length, 1);
+
+  // a new type: warned that the AI will rethink the board
+  await p.locator('[data-act="board"]').click();
+  await p.locator(".dge-board-menu select").first().selectOption("product"); await sleep(300);
+  assert.match(await p.locator(".dge-modal").innerText(), /Make this a Product board\?[\s\S]*Product, Technical, User[\s\S]*rethink/);
+  if (process.env.SHOTS) await p.screenshot({ path: process.env.SHOTS + "/type-change.png" });
+  await p.getByRole("button", { name: "Cancel" }).click(); await sleep(200);
+  assert.match(saved(), /type: project/);
+  await p.locator('[data-act="board"]').click();
+  await p.locator(".dge-board-menu select").first().selectOption("product"); await sleep(300);
+  await p.getByRole("button", { name: "Only change the type" }).click(); await sleep(600);
+  assert.match(saved(), /type: product/);
   assert.deepEqual(errors, []);
   await browser.close();
   console.log("ok — perspectives e2e passed");

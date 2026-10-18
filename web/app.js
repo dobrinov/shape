@@ -131,6 +131,8 @@
         },
         // without a name from git, the editor asks who you are before you edit
         requireName: !f.author,
+        // a board with perspectives asks whose eyes to look through
+        askPerspective: true,
         // the board's versions: commits, or snapshots when git does not track it
         history: {
           list: function () { return fetch(api("api/history")).then(function (r) { return r.json(); }); },

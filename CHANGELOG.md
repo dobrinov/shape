@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.47.0 — 2026-10-18
+
+- **Rethink fills the perspectives:** on a product or project board (or one with perspectives of its own), Rethink now gets the perspectives and how many elements each shows, and tags every element for the audiences it matters to, so none stays empty. Before, perspectives showed only what someone had tagged by hand.
+- **Changing the board's type warns you:** it names the perspectives the new type brings and offers *Change and rethink* (the AI sorts the board for them; you see the changes before keeping them), *Only change the type*, or Cancel. Back to a sketch changes it directly.
+- **Opening a board asks how to view it:** a board with perspectives opens with a choice of Everyone or one of them; the one picked last time is marked. Switch any time from the top bar.
+- WASM `builtin_perspectives(kind)`.
+
 ## 0.46.1 — 2026-10-18
 
 - **Arrow labels no longer cover each other:** a label that would sit on another label, or on a box, moves along its arrow (or just beside it) to a free spot.
