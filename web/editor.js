@@ -1234,43 +1234,11 @@
        Where the host knows an earlier version (`since()`: in git, where the
        branch left main, or the last commit), what changed since is the new
        information to revise the rest around. */
-    /* Rethink's instructions: the default, or what the person last wrote
-       (kept in this browser). The examples are starting points. */
-    var RETHINK_EXAMPLES = [
-      ["Default", null],
-      ["For senior management", "Adapt this canvas for senior management.\n\nLead with what matters to them: the decision or status, what is at risk, and what you need from them. Use a few clearly named sections with short, plain titles. Move technical detail, names of systems and long explanations into the items' details (shown on hover) instead of their titles. Merge small items into the bigger point they support. Keep every fact on the board, but out of the way when it is not needed."],
-      ["Shorter, clearer titles", "Rewrite the titles on this canvas to be short and specific (under eight words where you can), and move what you take out into each item's details. Change nothing else."]
-    ];
-    function rethinkInstructions() {
-      try { return localStorage.getItem("diagram.rethink") || wasm.rethink_default(); } catch (e) { return wasm.rethink_default(); }
-    }
+    /* Rethink: runs at once with its default instructions (the core's). */
     function rethink() {
       if (st.preview) return flash("Keep or discard the AI's changes first", true);
       closeAiMenu();
-      var input = h("textarea", { class: "dge-chart-data dge-rethink-text", rows: "12", spellcheck: "true" });
-      input.value = rethinkInstructions();
-      var go = function () {
-        var text = input.value.trim();
-        try {
-          if (!text || text === wasm.rethink_default()) localStorage.removeItem("diagram.rethink");
-          else localStorage.setItem("diagram.rethink", text);
-        } catch (e) { /* no storage: fine */ }
-        closeModal();
-        runRethink(text);
-      };
-      input.addEventListener("keydown", function (e) { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") go(); });
-      var examples = h("div", { class: "dge-rethink-examples" }, [h("span", { class: "dge-muted" }, ["Start from:"])].concat(RETHINK_EXAMPLES.map(function (x) {
-        return h("button", { title: x[1] ? x[1].split("\n")[0] : "The usual: act on the open comments, take in what is new, organise", onclick: function () { input.value = x[1] || wasm.rethink_default(); input.focus(); } }, [x[0]]);
-      })));
-      showModal("✦ Rethink", h("div", {}, [
-        h("p", { class: "dge-muted" }, ["The AI reads the whole board (every canvas" + (opts.since ? "; in git, what changed on this branch too" : "") + ") and does what you write here. You see its changes before keeping them."]),
-        examples,
-        input
-      ]), [
-        h("button", { onclick: closeModal }, ["Cancel"]),
-        h("button", { class: "primary", onclick: go }, ["Rethink (" + MOD + "↵)"])
-      ]);
-      setTimeout(function () { input.focus(); input.setSelectionRange(0, 0); input.scrollTop = 0; }, 0);
+      runRethink();
     }
     function runRethink(instructions) {
       var since = opts.since ? Promise.resolve(opts.since()).catch(function () { return null; }) : Promise.resolve(null);

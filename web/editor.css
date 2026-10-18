@@ -282,11 +282,6 @@
 .dge-ai-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
 .dge-ai-text b { font-weight: 600; color: var(--fg); }
 .dge-ai-text span { color: var(--muted); font-size: 12px; white-space: normal; }
-/* Rethink: its instructions, and examples to start from */
-.dge-rethink-examples { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; }
-.dge .dge-rethink-examples button { height: 26px; min-height: 0; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg); font-size: 12px; }
-.dge .dge-rethink-examples button:hover { border-color: var(--accent); color: var(--accent); }
-.dge .dge-rethink-text { min-height: 220px; font: 13px/1.5 var(--font, inherit); }
 /* Ask: the conversation above the AI button */
 .dge-ask-panel { position: absolute; right: 16px; bottom: 80px; z-index: 7; display: flex; flex-direction: column; width: min(400px, calc(100% - 32px)); max-height: calc(100% - 110px); border: 1px solid var(--line-strong); border-radius: var(--r-3); background: var(--bg); box-shadow: var(--shadow); color: var(--fg); }
 .dge-ask-panel[hidden] { display: none; }

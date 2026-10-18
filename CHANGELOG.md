@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.40.2 — 2026-10-18
+
+- **Rethink just runs:** one click, no dialog. It acts on the open comments and brings the board up to date with its default instructions. The editable instructions and the examples are gone; perspectives (next) cover showing the board to other audiences.
+
 ## 0.40.1 — 2026-10-18
 
 - New icons: the timeline is a winding path with milestones on it, solid at the start and the end; the mindmap is a head with a small map of branches inside.
