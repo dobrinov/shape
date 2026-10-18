@@ -195,7 +195,12 @@ fn comment_md(doc: &Document, c: &Comment, n: usize) -> String {
 /// A prompt asking a model to change the board as `request` says. With
 /// `ids` (a selection), it shows that part of the board (and what is around
 /// it); otherwise the whole board. The model replies with ops.
-pub fn ask(doc: &Document, ids: &[String], request: &str) -> String {
+pub fn ask(
+    doc: &Document,
+    ids: &[String],
+    request: &str,
+    recipes: &[crate::recipes::Recipe],
+) -> String {
     let title = doc.title.as_deref().unwrap_or("Untitled diagram");
     let mut s = format!("# Change the diagram \"{title}\"\n\n");
     s.push_str("The diagram is written in the `diagram` language: one statement per line (`id: Label [attrs]` declares a box, `a -> b: label` connects two, `group id: Label { … }` is a section; `mindmap`, `gantt`, `chart`, `table` and `risks` blocks hold their items one per line). The request below either gives information to add (facts, details, notes: put each where it belongs, in or next to what it is about, or as a detail of it) or asks for a change; do what it says.\n\n");
@@ -236,6 +241,8 @@ pub fn ask(doc: &Document, ids: &[String], request: &str) -> String {
         )),
     }
     s.push_str(&format!("## The request\n\n{}\n\n", request.trim()));
+    s.push_str(&crate::recipes::prompt_section(recipes));
+    s.push('\n');
     s.push_str("## How to respond\n\nReply with a single ```json code block holding the operations, for example:\n\n```json\n{\"ops\": [\n  {\"op\": \"update_node\", \"id\": \"api\", \"color\": \"red\"},\n  {\"op\": \"merge\", \"dsl\": \"cache: Redis [cylinder]\\napi -> cache: reads\"}\n]}\n```\n\n");
     s.push_str(OPS_REFERENCE);
     s.push_str("\n\nRules:\n- Change only what the request asks for; keep existing ids.\n- Information that fits an existing item goes into it (its label or `detail`); new topics become new boxes or stickies near what they relate to, in the right section.\n- To add several things, prefer one `merge` with statements in the diagram language.\n- The batch is applied all at once or not at all, so it must be valid as a whole.\n- No explanation is needed outside the code block.\n");
@@ -306,6 +313,7 @@ pub fn rethink(
     focus: &[String],
     since: Option<(&Document, &str)>,
     instructions: Option<&str>,
+    recipes: &[crate::recipes::Recipe],
 ) -> String {
     let title = root.title.as_deref().unwrap_or("Untitled diagram");
     let mut s = format!("# Rethink the board \"{title}\"\n\n");
@@ -384,6 +392,8 @@ pub fn rethink(
         .unwrap_or(RETHINK_DEFAULT);
     s.push_str(&format!("## What to do\n\n{what}\n\n"));
     s.push_str("How to change the board:\n- Keep ids; to merge, keep one item and remove the others only after moving what they said into it.\n- Ops apply to the top board. For anything inside a canvas, wrap them in an `in` op with the canvas path: `{\"op\": \"in\", \"canvas\": \"plan\", \"ops\": [...]}` (`plan/details` for a canvas inside `plan`). A comment's own ops (`resolve_comment`, `reply`) go in the `in` of the canvas it is in.\n- A box's `detail` holds the context its title leaves out; on a kanban card it shows on hover.\n- Do not set `x`/`y` or move things: the layout follows the structure.\n- Leave the data inside blocks (gantt dates, table cells, chart values, columns) as it is unless the instructions or the information say otherwise.\n- If nothing needs to change, change nothing and say so in the note.\n\n");
+    s.push_str(&crate::recipes::prompt_section(recipes));
+    s.push('\n');
     s.push_str("## How to respond\n\nReply with a single ```json code block: a short note for the people on the board (one to three sentences: what you changed and why) and the operations, for example:\n\n```json\n{\"note\": \"Split the cards into virtual and personalised spend cards as the comment says, priced per card, and grouped the interview findings by theme.\", \"ops\": [\n  {\"op\": \"add_group\", \"id\": \"pricing\", \"label\": \"Pricing\", \"members\": [\"n3\", \"n7\"]},\n  {\"op\": \"remove\", \"id\": \"n7\"},\n  {\"op\": \"in\", \"canvas\": \"status\", \"ops\": [\n    {\"op\": \"update_node\", \"id\": \"scope\", \"label\": \"Two card products: virtual cards and personalised spend cards\"},\n    {\"op\": \"resolve_comment\", \"id\": \"c1\", \"resolution\": \"Scope now lists both card products\"}\n  ]}\n]}\n```\n\n");
     s.push_str(OPS_REFERENCE);
     s.push_str("\n\nThe batch is applied all at once or not at all, so it must be valid as a whole. No explanation is needed outside the code block.\n");
@@ -424,6 +434,7 @@ pub fn answer_board(
     history: &[(String, String)],
     question: &str,
     today: Option<i64>,
+    recipes: &[crate::recipes::Recipe],
 ) -> String {
     let title = root.title.as_deref().unwrap_or("Untitled diagram");
     let mut s = format!("# A question about the board \"{title}\"\n\nAnswer the question at the end by drawing a small board of your own: a diagram made for this question from what is on the board below (the top board, then each canvas inside it, in the `diagram` language with every id).\n\n");
@@ -435,6 +446,8 @@ pub fn answer_board(
         }
     }
     s.push_str(&format!("## The question\n\n{}\n\n", question.trim()));
+    s.push_str(&crate::recipes::prompt_section(recipes));
+    s.push('\n');
     s.push_str("## How to answer\n\nFirst one or two short plain sentences that answer the question (40 words at most; the diagram carries the detail). Then one ```diagram code block: a small board that shows the answer.\n\n- Pick the form that fits the question: boxes and arrows for what depends on what, sections to group, a `timeline` for when things happened, a `table` to compare, a `mindmap` to break something down, stickies for open questions.\n- Keep it small: about 4 to 15 elements, short labels, details (`detail:`) for the rest.\n- Link every element that comes from the board to its place there: `[link: #/id]` for the top board, `[link: #/plan/id]` for an element inside canvas `plan` (the canvas path, then the id). Only ids that are on the board.\n- Start it with `title:` (a short name for the answer). Do not copy the whole board; show only what answers the question.\n- When the board does not answer it, say so in the sentences and draw what is known and what is missing (a sticky per missing piece).\n\nExample:\n\nFraud reporting is the long pole: it must ship before the open beta.\n\n```diagram\ntitle: What blocks the launch\nfraud: Fraud reporting API [red, link: #/blockers/b-fraud, detail: owner rado]\nbeta: Open beta, 28 Oct [link: #/status/beta]\nfraud -> beta: must ship first\n```\n");
     s
 }

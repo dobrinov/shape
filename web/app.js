@@ -122,6 +122,10 @@
             return res.text;
           });
         } : null,
+        // a team's recipes (recipes/*.diagram), for the AI and Insert recipe…
+        recipes: function () {
+          return fetch(api("api/recipes")).then(function (r) { return r.json(); }).then(function (v) { return v.ok ? v.recipes : {}; });
+        },
         // Rethink takes what changed in git as the new information
         since: function () {
           return fetch(api("api/since")).then(function (r) { return r.json(); }).then(function (v) {

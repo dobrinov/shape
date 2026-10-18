@@ -35,6 +35,7 @@ pub mod patch;
 pub mod perspectives;
 pub mod prompt;
 pub mod query;
+pub mod recipes;
 pub mod render;
 pub mod risks;
 pub mod route;
@@ -287,6 +288,9 @@ pub struct Session {
     /// With a canvas open: the whole board (its copy of the canvas is stale
     /// while `doc` is edited) and the canvas's path from the top.
     outer: Option<(Document, Vec<String>)>,
+    /// A team's own recipes (`recipes/*.diagram`), for prompts with the
+    /// built-in ones (see [`recipes`]).
+    pub recipes: Vec<recipes::Recipe>,
 }
 
 impl Session {
@@ -506,7 +510,7 @@ impl Session {
         question: &str,
         today: Option<i64>,
     ) -> String {
-        prompt::answer_board(&self.whole(), history, question, today)
+        prompt::answer_board(&self.whole(), history, question, today, &self.recipes)
     }
 
     /// The places on the board an answer points at (see [`prompt::answer_refs`]).
@@ -538,6 +542,7 @@ impl Session {
             &self.canvas_path(),
             old.as_ref().map(|o| (o, label)),
             instructions,
+            &self.recipes,
         ))
     }
 }

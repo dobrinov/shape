@@ -323,6 +323,51 @@ pub fn git_show_pub(reference: &str, file: &str) -> Result<String, String> {
     git_show(reference, file)
 }
 
+/// A team's recipes: `recipes/*.diagram` in the board's repository (or
+/// beside it), each starting `# recipe: Name — when to use it`.
+pub fn team_recipes(file: &str) -> Vec<diagram_core::recipes::Recipe> {
+    recipe_files(file)
+        .iter()
+        .filter_map(|(id, text)| diagram_core::recipes::from_file(id, text))
+        .collect()
+}
+
+/// The `recipes/*.diagram` files for a board: `(id, text)`.
+pub fn recipe_files(file: &str) -> Vec<(String, String)> {
+    let start = std::fs::canonicalize(file)
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf));
+    let mut dir = start;
+    let mut out = Vec::new();
+    // from the board's folder up to the repository's root
+    while let Some(d) = dir {
+        let folder = d.join("recipes");
+        if let Ok(entries) = std::fs::read_dir(&folder) {
+            let mut files: Vec<_> = entries
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| p.extension().is_some_and(|x| x == "diagram"))
+                .collect();
+            files.sort();
+            for f in files {
+                if let (Some(stem), Ok(text)) = (
+                    f.file_stem().and_then(|s| s.to_str()),
+                    std::fs::read_to_string(&f),
+                ) {
+                    if !out.iter().any(|(id, _): &(String, String)| id == stem) {
+                        out.push((stem.to_string(), text));
+                    }
+                }
+            }
+        }
+        if d.join(".git").exists() {
+            break;
+        }
+        dir = d.parent().map(Path::to_path_buf);
+    }
+    out
+}
+
 /// The version of `file` to rethink a board against, and what it is: on a
 /// branch, where it left the main branch (the file's text then, "" when it
 /// did not exist yet); on the main branch, the last commit. None when the
@@ -745,10 +790,9 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 return Err(format!("{file} already exists"));
             }
             let name = args.val("--template").unwrap_or("flow");
-            let (_, body) = TEMPLATES
-                .iter()
-                .find(|(n, _)| *n == name)
-                .ok_or_else(|| format!("unknown template {name} (flow, architecture, board, product, project)"))?;
+            let (_, body) = TEMPLATES.iter().find(|(n, _)| *n == name).ok_or_else(|| {
+                format!("unknown template {name} (flow, architecture, board, product, project)")
+            })?;
             let doc = parse_doc(body, name)?;
             save(file, &doc)?;
             eprintln!("created {file} from the {name} template — open it with `diagram {file}`");
@@ -1084,7 +1128,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                         .collect()
                 })
                 .unwrap_or_default();
-            let mut prompt = diagram_core::prompt::ask(&doc, &ids, &request);
+            let mut prompt = diagram_core::prompt::ask(&doc, &ids, &request, &team_recipes(&file));
             let cmd = match ai::command(args.val("--ai")) {
                 Some(c) if !args.flag("--print") => c,
                 _ => {

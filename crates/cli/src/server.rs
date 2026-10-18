@@ -401,6 +401,14 @@ pub fn serve(
                 };
                 respond_json(req, 200, body)
             }
+            // a team's recipes: `recipes/*.diagram` up to the repository's root
+            (Method::Get, "/api/recipes") => {
+                let files: serde_json::Map<String, Value> = crate::recipe_files(&display)
+                    .into_iter()
+                    .map(|(id, text)| (id, Value::String(text)))
+                    .collect();
+                respond_json(req, 200, json!({ "ok": true, "recipes": files }))
+            }
             // what a rethink takes as the new information (see `git_since`)
             (Method::Get, "/api/since") => {
                 let since = crate::git_since_on(&display);

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.43.0 — 2026-10-18
+
+- **Recipes:** ready-made arrangements of ordinary blocks for what a software team keeps coming back to. There are 17:
+  - Achievements; Mistakes and lessons; Incidents (log, timeline, post-mortems);
+  - a traffic-light Status report; Burndown; OKRs; Roadmap; Retrospective;
+  - RACI; Prioritisation (effort against impact); Personas; User journey;
+  - Tech debt register; Release checklist; Stakeholder map; Team ownership; Metrics.
+- **The AI knows them:** *Add what you know*, *Rethink* and *Ask* get a line on each (when to use it, its shape), so the model builds in that shape when the content fits, or adds to the one already on the board. Told "payments were down for 2 hours on Monday…", it adds an incident with a post-mortem.
+- **Insert recipe…** on the empty board's right-click menu places one; its rows are examples to write over. Recipes are not in the Blocks palette.
+- **Your team's own:** `.diagram` files in a `recipes/` folder, from the board's folder up to the repository's root, first line `# recipe: Name — when to use it`. The editor and `diagram ask` read them.
+- Core `recipes` module; prompts take recipes; WASM `recipes`, `set_recipes`; server `GET /api/recipes`.
+
 ## 0.42.0 — 2026-10-18
 
 - **Cycle diagrams:** `cycle loop: Build loop { Plan · Build · Measure · Learn }`, one step per line. The steps go round a circle with an arrow from each to the next and from the last back to the first; the circle grows with the steps so they never overlap. Steps take colours, details, links and comments. In the editor: *Blocks → Cycle*; right-click to add a step after one or edit the cycle as text. Perspectives can show cycles (`show: cycle`).

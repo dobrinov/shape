@@ -2073,6 +2073,7 @@
       var items = t ? contextItems(t) : view ? [] : [
         ["✦ Rethink the board", function () { rethink(); }, "The AI acts on the open comments and brings the whole board up to date; you see the changes first"],
         ["New canvas here…", function () { newCanvas(at); }, "A board inside this one, opened from a button here"],
+        ["Insert recipe…", function () { recipeMenu(); }, "Incidents, OKRs, a burndown, a retro…: ready-made arrangements of blocks"],
         ["Insert image…", function () { pickImages(at); }, "Or paste an image, or drop image files on the board"]
       ];
       if (!items.length) return;
@@ -2825,6 +2826,22 @@
       });
       have.slice(Math.max(rows.length - 1, 0)).forEach(function (n) { ops.push({ op: "remove", id: n.id }); });
       return ops;
+    }
+    /* Recipes: ready-made arrangements of blocks (the AI knows them too). */
+    function recipeMenu() {
+      var list = JSON.parse((st.answer ? st.answer.main.session : st.session).recipes());
+      openMenu(st.menuAt, list.map(function (r) {
+        return [r.name, function () { insertRecipe(r); }, "For " + r.when];
+      }));
+    }
+    function insertRecipe(r) {
+      var probe = new wasm.Diagram();
+      probe.set_source(r.source);
+      var ids = JSON.parse(probe.document()).groups.map(function (g) { return g.id; });
+      probe.free();
+      var have = ids.filter(function (id) { return kindOf(id); });
+      if (have.length) { select([have[0]]); reveal(have[0]); return flash("This board already has one: add to it (the AI does too)"); }
+      if (applyOps([{ op: "merge", dsl: r.source }]).ok) { if (ids[0]) { select([ids[0]]); reveal(ids[0]); } flash("Inserted “" + r.name + "”: its rows are examples, write over them"); }
     }
     /* Cycles: steps round a circle, each leading to the next. */
     function addCycle() {
@@ -4381,6 +4398,8 @@
     if (opts.base != null) setBase(opts.base, opts.baseLabel);
     restorePerspective();
     if (st.perspective) render();
+    // a team's recipes reach the AI's prompts and Insert recipe…
+    if (opts.recipes) Promise.resolve(opts.recipes()).then(function (files) { if (files && st.session.set_recipes) st.session.set_recipes(JSON.stringify(files)); }).catch(function () {});
     return api;
   }
 

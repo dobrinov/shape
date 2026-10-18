@@ -273,7 +273,7 @@ impl Diagram {
     /// the selected `ids` (a JSON array; empty: the whole board).
     pub fn ask_prompt(&self, ids: &str, request: &str) -> String {
         let ids: Vec<String> = serde_json::from_str(ids).unwrap_or_default();
-        diagram_core::prompt::ask(&self.inner.doc, &ids, request)
+        diagram_core::prompt::ask(&self.inner.doc, &ids, request, &self.inner.recipes)
     }
 
     /// A prompt asking `question` about the whole board (canvases included).
@@ -283,6 +283,27 @@ impl Diagram {
         let history: Vec<(String, String)> = serde_json::from_str(history).unwrap_or_default();
         self.inner
             .question_prompt(&history, question, diagram_core::gantt::parse_date(today))
+    }
+
+    /// A team's own recipes, as `{id: file text}` (each starting `# recipe:
+    /// Name — when`); prompts list them with the built-in ones.
+    pub fn set_recipes(&mut self, files: &str) {
+        let files: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(files).unwrap_or_default();
+        self.inner.recipes = files
+            .iter()
+            .filter_map(|(id, text)| diagram_core::recipes::from_file(id, text))
+            .collect();
+    }
+
+    /// Every recipe (built in, then the team's): `[{id, name, when, shape, source}]`.
+    pub fn recipes(&self) -> String {
+        to_json(
+            &diagram_core::recipes::builtins()
+                .into_iter()
+                .chain(self.inner.recipes.iter().cloned())
+                .collect::<Vec<_>>(),
+        )
     }
 
     /// What the board is for (`sketch`, `product`, `project`), from its top
