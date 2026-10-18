@@ -78,6 +78,12 @@
         if (pending != null) { var p = pending; pending = null; save(p); }
       }).catch(function (e) { saving = false; status("Not saved: " + e.message, "error"); });
     }
+    /* The native window calls this before it closes: save what is pending, resolve once saved. */
+    window.diagramFlush = function () {
+      clearTimeout(timer); timer = null;
+      if (editor && editor.getSource() !== lastSaved) save(editor.getSource());
+      return (function wait() { return saved.then(function () { return saving || pending != null ? wait() : null; }); })();
+    };
     /* Follow a link to another board: save what is pending, then open it here. */
     function openBoard(path, id) {
       var to = joinPath(rel, path);

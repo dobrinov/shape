@@ -84,7 +84,14 @@ jobs:
         env:
           DIAGRAM_SKIP_WASM: "1"
           DIAGRAM_RELEASE_TAG: ${{ env.TAG }}
-        run: cargo build --release --locked -p diagram --target ${{ matrix.target }}
+        # Linux binaries leave the native window out: with it they would need
+        # WebKitGTK installed just to start (servers, CI); they open the browser
+        run: |
+          if [[ "${{ matrix.os }}" == ubuntu* ]]; then
+            cargo build --release --locked -p diagram --target ${{ matrix.target }} --no-default-features
+          else
+            cargo build --release --locked -p diagram --target ${{ matrix.target }}
+          fi
 
       - name: Package
         id: pkg

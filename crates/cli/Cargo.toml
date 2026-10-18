@@ -16,3 +16,18 @@ diagram-core = { path = "../core" }
 resvg = { version = "0.48.1", default-features = false, features = ["text", "system-fonts", "memmap-fonts", "raster-images"] }
 serde_json.workspace = true
 tiny_http = "0.12"
+
+# The native window (`diagram FILE` opens one; --browser for a tab) and the
+# new-board save dialog. Without the `window` feature
+# (`cargo build --no-default-features`) boards open in the browser as before.
+tao = { version = "=0.37.1", default-features = false, features = ["rwh_06", "x11"], optional = true }
+wry = { version = "=0.57.0", optional = true }
+rfd = { version = "=0.17.2", optional = true }
+
+# macOS: an app menu, so ⌘Q / ⌘C / ⌘V / ⌘Z reach the webview
+[target.'cfg(target_os = "macos")'.dependencies]
+muda = { version = "=0.20.0", optional = true }
+
+[features]
+default = ["window"]
+window = ["dep:tao", "dep:wry", "dep:rfd", "dep:muda"]

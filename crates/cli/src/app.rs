@@ -7,8 +7,10 @@
 //! - Linux: a MIME type, its icon and a .desktop entry under ~/.local/share.
 //! - Windows: a file association under HKEY_CURRENT_USER.
 //!
-//! A board opened this way gets a server with no terminal to stop it, so it
-//! stops by itself once no editor tab has been heard from for a while.
+//! A board opens in its own window and closing it stops the server; opening
+//! the app itself asks where to save a new board. Where no window can be made
+//! the board opens in a browser tab, and with no terminal to stop that server
+//! it stops by itself once no editor tab has been heard from for a while.
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -130,7 +132,7 @@ fn macos(remove: bool) -> Result<(), String> {
 end open
 
 on run
-	open location "https://dobrinov.github.io/diagram/"
+	do shell script "export PATH=" & quoted form of {path} & "; nohup " & quoted form of {bin} & " --idle-exit > /dev/null 2>&1 &"
 end run
 "#,
         path = applescript_string(&path),

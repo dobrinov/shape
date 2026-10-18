@@ -21,6 +21,27 @@ const SANS: &[&str] = &[
 ];
 
 pub fn render(svg: &str, scale: f32) -> Result<Vec<u8>, String> {
+    pixmap(svg, scale)?
+        .encode_png()
+        .map_err(|e| format!("could not encode the PNG: {e}"))
+}
+
+/// Straight (not premultiplied) RGBA pixels, with width and height: a window icon.
+#[cfg_attr(not(feature = "window"), allow(dead_code))]
+pub fn rgba(svg: &str, scale: f32) -> Result<(Vec<u8>, u32, u32), String> {
+    let p = pixmap(svg, scale)?;
+    let px = p
+        .pixels()
+        .iter()
+        .flat_map(|c| {
+            let c = c.demultiply();
+            [c.red(), c.green(), c.blue(), c.alpha()]
+        })
+        .collect();
+    Ok((px, p.width(), p.height()))
+}
+
+fn pixmap(svg: &str, scale: f32) -> Result<tiny_skia::Pixmap, String> {
     let mut db = usvg::fontdb::Database::new();
     db.load_system_fonts();
     let families: Vec<String> = db
@@ -56,9 +77,7 @@ pub fn render(svg: &str, scale: f32) -> Result<Vec<u8>, String> {
         tiny_skia::Transform::from_scale(scale, scale),
         &mut pixmap.as_mut(),
     );
-    pixmap
-        .encode_png()
-        .map_err(|e| format!("could not encode the PNG: {e}"))
+    Ok(pixmap)
 }
 
 #[cfg(test)]

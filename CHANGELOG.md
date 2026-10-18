@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.0 — 2026-10-18
+
+- **Boards open in their own window:** `diagram FILE` (and double-clicking a `.diagram` file) opens the editor in a native app window instead of a browser tab: the system webview (WebKit on macOS, WebView2 on Windows). Closing the window saves what is pending and stops. On macOS it has an app menu, so ⌘C / ⌘V / ⌘Z / ⌘Q work. Links out of the editor open in your browser. `--browser` opens a tab as before; `--no-open` runs only the server. Where no window can be made, the browser opens.
+- **A new board asks where to go:** `diagram` with no file (or opening Diagram.app on its own) shows a save dialog to name the board and pick its folder; Cancel creates nothing.
+- The Linux release binaries are built without the window (`--no-default-features`), so they still run without WebKitGTK and open the browser; build from source for the window there.
+
 ## 0.49.0 — 2026-10-18
 
 - **Presentation mode:** the Present button opens it. The board's slides are on the right, in order, each a section, block, mindmap, box, a canvas (from the box that opens it) or the whole board. Their order is drawn on the board: a numbered badge and frame per slide, arrows from each to the next.
