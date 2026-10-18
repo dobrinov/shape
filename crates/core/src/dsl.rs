@@ -74,6 +74,8 @@ pub(crate) enum Elem {
     Setting(String),
     Asset(String),
     Canvas(String),
+    /// The presentation (there is one at most; the id is empty).
+    Presentation(String),
 }
 
 /// What one line of the source is (see [`parse_lines`]).
@@ -193,6 +195,7 @@ pub(crate) fn parse_lines(src: &str) -> (Document, Vec<Diagnostic>, Vec<LineInfo
         theme: None,
         theme_mode: None,
         theme_section: false,
+        presentation: None,
         implicit: Default::default(),
         touched: Vec::new(),
     };
@@ -209,6 +212,7 @@ pub(crate) fn parse_lines(src: &str) -> (Document, Vec<Diagnostic>, Vec<LineInfo
             .as_ref()
             .map(|m| m.line - 1)
             .or(p.gantt.as_ref().map(|g| g.1 - 1))
+            .or(p.presentation.map(|l| l - 1))
             .or_else(|| p.open_sequence());
         if t.is_empty() || t.starts_with('#') || t.starts_with("//") {
             info.push(li);
@@ -216,6 +220,8 @@ pub(crate) fn parse_lines(src: &str) -> (Document, Vec<Diagnostic>, Vec<LineInfo
         }
         let res = if p.theme.is_some() {
             p.theme_line(t)
+        } else if p.presentation.is_some() {
+            p.slide_line(t)
         } else if p.map.is_some() {
             p.outline_line(raw)
         } else if p.gantt.is_some() {
@@ -231,7 +237,10 @@ pub(crate) fn parse_lines(src: &str) -> (Document, Vec<Diagnostic>, Vec<LineInfo
         }
         // a line that opened a block is its first line
         if li.block.is_none()
-            && (p.map.is_some() || p.gantt.is_some() || p.open_sequence() == Some(i))
+            && (p.map.is_some()
+                || p.gantt.is_some()
+                || p.presentation.is_some()
+                || p.open_sequence() == Some(i))
         {
             li.block = Some(i);
         }
@@ -254,6 +263,12 @@ pub(crate) fn parse_lines(src: &str) -> (Document, Vec<Diagnostic>, Vec<LineInfo
         p.errors.push(Diagnostic::new(
             *line,
             format!("gantt `{g}` is never closed (missing `}}`)"),
+        ));
+    }
+    if let Some(line) = p.presentation {
+        p.errors.push(Diagnostic::new(
+            line,
+            "the presentation is never closed (missing `}`)".to_string(),
         ));
     }
     if let Some((g, line)) = p.stack.last() {
@@ -351,6 +366,8 @@ struct Parser {
     /// a `light {` / `dark {` section is open (else `[base: …]` set it).
     theme_mode: Option<Theme>,
     theme_section: bool,
+    /// Inside `presentation … {`: the line that opened it.
+    presentation: Option<usize>,
 }
 
 struct MapBlock {
@@ -481,6 +498,18 @@ impl Parser {
             "theme" if opens && c.rest()[5..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(5);
                 return self.theme_decl(c);
+            }
+            // `presentation: Title [transition: fade] {` (a box called
+            // presentation has no `{`)
+            "presentation"
+                if c.rest()[12..].trim_start().starts_with(':')
+                    && (t.trim_end().ends_with('{') || t.trim_end().ends_with("{}")) =>
+            {
+                if !self.stack.is_empty() {
+                    return Err("a presentation goes at the top level of a board".into());
+                }
+                c.advance(12);
+                return self.presentation_decl(c, t.trim_end().ends_with("{}"));
             }
             "perspective" if c.rest()[11..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(11);
@@ -850,6 +879,87 @@ impl Parser {
         }
         self.doc.perspectives.retain(|x| x.id != id);
         self.doc.perspectives.push(p);
+        Ok(())
+    }
+
+    /// `presentation: Title [transition: fade, instructions: …] {`
+    fn presentation_decl(&mut self, mut c: Cursor, closed: bool) -> Result<(), String> {
+        c.skip_ws();
+        // `: Title [attrs]`, as after a box's id
+        let (label, attrs) = label_and_attrs_until_brace(&mut c)?;
+        let mut p = Presentation {
+            title: label.unwrap_or_default(),
+            ..Default::default()
+        };
+        for (k, v) in &attrs {
+            match (k.as_str(), v) {
+                ("transition", Some(v)) => {
+                    p.transition = Transition::parse(v).ok_or_else(|| {
+                        format!("unknown transition `{v}` (use {})", Transition::names())
+                    })?
+                }
+                ("instructions", Some(v)) => p.instructions = Some(unescape_label(v)),
+                (k, _) => {
+                    return Err(format!(
+                        "unknown presentation attribute `{k}` (transition, instructions)"
+                    ))
+                }
+            }
+        }
+        if self.doc.presentation.is_some() {
+            return Err("a board has one presentation".into());
+        }
+        self.doc.presentation = Some(p);
+        self.touched.push(Elem::Presentation(String::new()));
+        if !closed {
+            self.presentation = Some(self.line);
+        }
+        Ok(())
+    }
+
+    /// A slide: `target [title: …, notes: …, transition: zoom]`; `*` is the
+    /// whole board.
+    fn slide_line(&mut self, t: &str) -> Result<(), String> {
+        if t == "}" {
+            self.presentation = None;
+            return Ok(());
+        }
+        let (target, attrs) = match t.find(|ch: char| ch.is_whitespace() || ch == '[') {
+            Some(i) => (&t[..i], t[i..].trim()),
+            None => (t, ""),
+        };
+        let mut s = Slide {
+            target: unquote(target),
+            ..Default::default()
+        };
+        if !attrs.is_empty() {
+            let mut c = Cursor::new(attrs);
+            let (extra, attrs) = label_and_attrs(&mut c)?;
+            if extra.is_some() || !c.at_end() {
+                return Err(format!(
+                    "write a slide as `id [title: …, notes: …]`, not `{t}`"
+                ));
+            }
+            for (k, v) in &attrs {
+                match (k.as_str(), v) {
+                    ("title", Some(v)) => s.title = Some(unescape_label(v)),
+                    ("notes", Some(v)) => s.notes = Some(unescape_label(v)),
+                    ("transition", Some(v)) => {
+                        s.transition = Some(Transition::parse(v).ok_or_else(|| {
+                            format!("unknown transition `{v}` (use {})", Transition::names())
+                        })?)
+                    }
+                    (k, _) => {
+                        return Err(format!(
+                            "unknown slide attribute `{k}` (title, notes, transition)"
+                        ))
+                    }
+                }
+            }
+        }
+        if let Some(p) = self.doc.presentation.as_mut() {
+            p.slides.push(s);
+        }
         Ok(())
     }
 
@@ -2601,6 +2711,49 @@ pub(crate) fn adr_block(doc: &Document, g: &Group, pad: &str, out: &mut String) 
     out.push_str(&format!("{pad}}}\n"));
 }
 
+/// `presentation: Title [transition: …] {` … one slide per line … `}`.
+pub(crate) fn presentation_block(p: &Presentation, out: &mut String) {
+    let mut head = String::from("presentation:");
+    if !p.title.is_empty() {
+        head.push(' ');
+        head.push_str(&label_text(&p.title));
+    }
+    let mut a = Vec::new();
+    if p.transition != Transition::default() {
+        a.push(format!("transition: {}", p.transition.as_str()));
+    }
+    if let Some(i) = &p.instructions {
+        a.push(format!(
+            "instructions: {}",
+            attr_value(&i.replace('\n', "\\n"))
+        ));
+    }
+    if p.slides.is_empty() {
+        out.push_str(&format!("{head}{} {{}}\n", attrs_text(&a)));
+        return;
+    }
+    out.push_str(&format!("{head}{} {{\n", attrs_text(&a)));
+    for s in &p.slides {
+        let mut a = Vec::new();
+        if let Some(t) = &s.title {
+            a.push(format!("title: {}", attr_value(t)));
+        }
+        if let Some(n) = &s.notes {
+            a.push(format!("notes: {}", attr_value(&n.replace('\n', "\\n"))));
+        }
+        if let Some(t) = s.transition {
+            a.push(format!("transition: {}", t.as_str()));
+        }
+        let target = if s.target == "*" {
+            s.target.clone()
+        } else {
+            id_text(&s.target)
+        };
+        out.push_str(&format!("  {target}{}\n", attrs_text(&a)));
+    }
+    out.push_str("}\n");
+}
+
 /// `perspective id: Label [tags: …, show: …, details: off]`.
 pub(crate) fn perspective_line(p: &Perspective) -> String {
     let mut head = format!("perspective {}", id_text(&p.id));
@@ -3501,7 +3654,20 @@ pub fn print(doc: &Document) -> String {
         canvas_block(c, &mut canvases);
     }
     let assets: String = doc.assets.iter().map(|a| asset_line(a) + "\n").collect();
-    for part in [nodes, maps, groups, edges, comments, canvases, assets] {
+    let mut presentation = String::new();
+    if let Some(p) = &doc.presentation {
+        presentation_block(p, &mut presentation);
+    }
+    for part in [
+        nodes,
+        maps,
+        groups,
+        edges,
+        comments,
+        presentation,
+        canvases,
+        assets,
+    ] {
         if !part.is_empty() {
             sections.push(part);
         }
@@ -3690,5 +3856,66 @@ group g {
         assert_eq!(d.edges.len(), 3);
         assert!(d.node("risks").is_some() && d.node("comment").is_some() && d.group("g").is_some());
         assert_eq!(print(&parse(&print(&d)).unwrap()), print(&d));
+    }
+}
+
+#[cfg(test)]
+mod presentation_tests {
+    use super::*;
+
+    #[test]
+    fn a_presentation_round_trips_and_changes_by_ops() {
+        let src = "title: Launch\n\n# what we show on Friday\nsummary: Summary\nrisks: Risks\nplan: Plan [canvas: plan]\n\npresentation: Launch review [transition: zoom, instructions: \"For the exec sync, ten minutes\"] {\n  summary [notes: \"Open with the date, then the ask\"]\n  risks [title: What could go wrong, transition: fade]\n  *\n  plan\n}\n\ncanvas plan: Plan {\n  a: A\n}\n";
+        let doc = parse(src).unwrap();
+        let p = doc.presentation.as_ref().unwrap();
+        assert_eq!(
+            (p.title.as_str(), p.transition),
+            ("Launch review", Transition::Zoom)
+        );
+        assert_eq!(
+            p.instructions.as_deref(),
+            Some("For the exec sync, ten minutes")
+        );
+        let targets: Vec<&str> = p.slides.iter().map(|s| s.target.as_str()).collect();
+        assert_eq!(targets, ["summary", "risks", "*", "plan"]);
+        assert_eq!(p.slides[1].title.as_deref(), Some("What could go wrong"));
+        assert_eq!(p.slides[1].transition, Some(Transition::Fade));
+        assert_eq!(print(&doc), src.replace("\n# what we show on Friday", ""));
+        assert_eq!(crate::from_json(&crate::to_json(&doc)).unwrap(), doc);
+        // a box called presentation stays a box
+        assert!(parse("presentation: Q3 deck\n")
+            .unwrap()
+            .presentation
+            .is_none());
+        assert!(parse("presentation: X [transition: wobble] {\n}\n").is_err());
+        assert!(parse("presentation: X {\n  a [colour: red]\n}\n").is_err());
+        // ops, written back through the patcher: the rest of the file stays
+        let mut s = crate::Session::new();
+        s.set_source(src);
+        let r = s.apply(r#"{"op":"presentation","transition":"glide","slides":[{"target":"risks","notes":"Two of them, both owned"},{"target":"summary"}]}"#);
+        assert_eq!(r["ok"], true, "{r}");
+        let out = s.source("dsl").unwrap();
+        assert!(out.contains("# what we show on Friday"), "{out}");
+        assert!(out.contains("presentation: Launch review [instructions: \"For the exec sync, ten minutes\"] {\n  risks [notes: \"Two of them, both owned\"]\n  summary\n}\n"), "{out}");
+        assert_eq!(
+            s.apply(r#"{"op":"presentation","slides":[{"target":"nope"}]}"#)["ok"],
+            false
+        );
+        // made when there is none
+        let mut n = crate::Session::new();
+        n.set_source("title: T\na: A\n");
+        assert_eq!(
+            n.apply(r#"{"op":"presentation","slides":[{"target":"a"},{"target":"*"}]}"#)["ok"],
+            true
+        );
+        assert_eq!(
+            n.source("dsl").unwrap(),
+            "title: T\na: A\n\npresentation: T {\n  a\n  *\n}\n"
+        );
+        assert_eq!(
+            n.apply(r#"{"op":"presentation","remove":true}"#)["ok"],
+            true
+        );
+        assert_eq!(n.source("dsl").unwrap(), "title: T\na: A\n");
     }
 }

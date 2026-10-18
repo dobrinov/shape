@@ -69,6 +69,14 @@ comment on queue->worker by ana: What happens when the worker crashes mid-order?
 comment c3 at 40,-60 by deyan: Add the admin dashboard to this picture
 comment on legacy by sam: Can we delete it now? [resolved, resolution: "Removed from the menu; code goes in Q1"]
 
+# ---------------------------------------------------------------- the board as slides
+presentation: Checkout relaunch in five minutes [instructions: "For the Monday review: where we are and what we need"] {
+  * [title: The system today, notes: "Start here: what a shopper touches, and what runs behind it"]
+  backend [title: Where orders go, notes: Payments and orders are the two services we change]
+  discovery-link [title: What we learned, transition: zoom]
+  plan-link [title: The plan and its risks, notes: Ask for sign-off on the beta date]
+}
+
 # ---------------------------------------------------------------- a theme of our own
 theme brand {
   font: Inter, system-ui, sans-serif

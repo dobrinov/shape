@@ -450,3 +450,36 @@
 .dge .dge-zoombar .dge-minimap-btn[aria-pressed="true"] { color: var(--accent); }
 .dge-presenting .dge-minimap { display: none !important; }
 @media (max-width: 640px) { .dge-minimap { display: none; } }
+/* presentation mode: the slides on the right, their order on the board */
+.dge-deck { position: absolute; top: 52px; right: 0; bottom: 0; z-index: 8; display: flex; flex-direction: column; gap: 10px; width: 340px; padding: 12px; overflow: auto; border-left: 1px solid var(--line-strong); background: var(--bg); box-shadow: var(--shadow); }
+.dge-decking .dge-ai-fab, .dge-decking .dge-ai-menu { right: 356px; }
+.dge-deck-head { position: sticky; top: -12px; z-index: 1; display: flex; align-items: center; gap: 8px; margin: -12px -12px 0; padding: 12px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.dge-deck-head b { flex: 1; font-size: 15px; }
+.dge-deck-settings { display: flex; flex-direction: column; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.dge-deck-settings label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.dge-deck .dge-input, .dge-deck .dge-select { width: 100%; box-sizing: border-box; font-size: 13px; }
+.dge-deck textarea.dge-input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: 13px/1.4 inherit; resize: vertical; }
+.dge-deck-empty { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed var(--line-strong); border-radius: 8px; font-size: 13px; }
+.dge-deck-empty p { margin: 0; color: var(--muted); line-height: 1.45; }
+.dge-deck-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.dge-slide { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.dge-slide:hover { border-color: var(--line-strong); }
+.dge-slide-top { display: flex; align-items: center; gap: 4px; }
+.dge .dge-slide-top button { height: 24px; min-height: 0; padding: 0 6px; border: 0; background: none; color: var(--muted); font-size: 13px; }
+.dge .dge-slide-top button:hover:not(:disabled) { color: var(--fg); background: var(--bg2); }
+.dge .dge-slide-top .dge-slide-go { display: flex; flex: 1; flex-direction: column; align-items: flex-start; height: auto; min-width: 0; padding: 2px 4px; text-align: left; color: var(--fg); }
+.dge-slide-go b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.dge-slide-go span { font-size: 11px; color: var(--muted); }
+.dge-slide-num { display: inline-grid; flex: none; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-fg, #fff); font-size: 12px; font-weight: 600; }
+.dge-slide-then { align-self: center; padding: 3px 0; color: var(--muted); font-size: 11px; }
+.dge-deck-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.dge-deck-frame { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 5; opacity: 0.55; }
+.dge-deck-path { fill: none; stroke: var(--accent); stroke-width: 2.5; opacity: 0.8; }
+.dge-deck-head-mark { fill: var(--accent); }
+.dge-deck-num { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
+.dge-deck-num-text { fill: #fff; font: 600 13px system-ui, sans-serif; text-anchor: middle; }
+.dge-present-notes { position: absolute; left: 50%; bottom: 72px; z-index: 9; transform: translateX(-50%); max-width: min(720px, 90vw); padding: 10px 14px; border-radius: 10px; background: rgba(20, 22, 28, 0.88); color: #f2f3f5; font-size: 15px; line-height: 1.45; }
+.dge-present-notes[hidden] { display: none; }
+.dge-presenting .dge-deck, .dge-presenting .dge-deck-layer { display: none !important; }
+.dge .dge-deck-head button.primary { height: 30px; min-height: 0; padding: 0 12px; border: 0; border-radius: 6px; background: var(--accent); color: var(--accent-fg, #fff); font-weight: 600; }
+.dge .dge-deck input.dge-input { height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }

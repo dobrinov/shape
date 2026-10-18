@@ -39,6 +39,8 @@ export interface Document {
   canvases?: Canvas[];
   /** Perspectives written on the board (they add to and override the built-in ones of its type). */
   perspectives?: Perspective[];
+  /** The board as slides, in order. */
+  presentation?: Presentation;
 }
 
 /** A board inside a board: its id, and every field of a document (`title` is its name). */
@@ -86,6 +88,27 @@ export interface Perspective {
   tags?: string[];
   show?: string[];
   details?: boolean;
+}
+
+/** How a slide comes in (default `glide`: the view moves across the board). */
+export type Transition = "glide" | "fade" | "zoom" | "none";
+
+/** The board as slides. */
+export interface Presentation {
+  title: string;
+  transition?: Transition;
+  /** Who it is for and what it should do (the AI follows them when drafting). */
+  instructions?: string;
+  slides: Slide[];
+}
+
+/** One slide: a top-level section, block, mindmap centre or box (a box that opens a canvas shows the canvas), or `*` for the whole board. */
+export interface Slide {
+  target: string;
+  title?: string;
+  /** Speaker notes. */
+  notes?: string;
+  transition?: Transition;
 }
 
 /** A box, sticky, mindmap topic or gantt task. */
@@ -415,6 +438,16 @@ export interface PerspectiveOp {
   remove?: boolean;
 }
 
+/** Set up the presentation (made when there is none); `slides` replaces the whole list; `remove: true` takes it off. */
+export interface PresentationOp {
+  op: "presentation";
+  title?: string;
+  transition?: Transition;
+  instructions?: string;
+  slides?: Slide[];
+  remove?: boolean;
+}
+
 /** Keep an image in the board (a `data:image/…;base64,…` URI); boxes show it with `image: id`. Removing the last box that shows it removes it too. */
 export interface AddAssetOp {
   op: "add_asset";
@@ -641,7 +674,7 @@ export type Op =
   | AddNodeOp | UpdateNodeOp | AddOutlineOp | RenameOp | RemoveOp | MoveOp | NudgeOp | UnpinOp
   | AddEdgeOp | UpdateEdgeOp | AddGroupOp | UpdateGroupOp
   | AddCommentOp | ReplyOp | EditCommentOp | ResolveCommentOp | ReopenCommentOp | SetOp | MergeOp | ThemeOp
-  | AddAssetOp | AddCanvasOp | UpdateCanvasOp | InOp | PerspectiveOp;
+  | AddAssetOp | AddCanvasOp | UpdateCanvasOp | InOp | PerspectiveOp | PresentationOp;
 
 /** What Board.apply() accepts: ops, `{ops}`, one op, or a model's reply text containing that JSON. */
 export type OpsInput = Op[] | { ops: Op[] } | Op | string;

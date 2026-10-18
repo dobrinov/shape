@@ -78,6 +78,7 @@ fn block_elems(doc: &Document, head: &Elem) -> Vec<Elem> {
             )
             .collect(),
         Elem::Canvas(id) => vec![Elem::Canvas(id.clone())],
+        Elem::Presentation(_) => vec![head.clone()],
         _ => Vec::new(),
     }
 }
@@ -130,6 +131,7 @@ fn block_text(doc: &Document, head: &Elem, pad: &str) -> Option<String> {
             dsl::gantt_block(doc, g, pad, &mut out);
         }
         Elem::Canvas(id) => dsl::canvas_block(doc.canvas(id)?, &mut out),
+        Elem::Presentation(_) => dsl::presentation_block(doc.presentation.as_ref()?, &mut out),
         _ => return None,
     }
     Some(out)
@@ -143,7 +145,8 @@ fn id_of(e: &Elem) -> &str {
         | Elem::Comment(x)
         | Elem::Setting(x)
         | Elem::Asset(x)
-        | Elem::Canvas(x) => x,
+        | Elem::Canvas(x)
+        | Elem::Presentation(x) => x,
     }
 }
 
@@ -152,8 +155,9 @@ fn container(doc: &Document, head: &Elem) -> Option<Option<String>> {
     match head {
         Elem::Node(id) => doc.node(id).map(|n| n.group.clone()),
         Elem::Group(id) => doc.group(id).map(|g| g.parent.clone()),
-        // canvases are only at the top
+        // canvases and the presentation are only at the top
         Elem::Canvas(id) => doc.canvas(id).map(|_| None),
+        Elem::Presentation(_) => doc.presentation.as_ref().map(|_| None),
         _ => None,
     }
 }
@@ -195,6 +199,7 @@ fn exists(doc: &Document, e: &Elem) -> bool {
         Elem::Setting(k) => dsl::setting_line(doc, k).is_some(),
         Elem::Asset(id) => doc.asset(id).is_some(),
         Elem::Canvas(id) => doc.canvas(id).is_some(),
+        Elem::Presentation(_) => doc.presentation.is_some(),
     }
 }
 
@@ -207,6 +212,7 @@ fn same(old: &Document, new: &Document, e: &Elem) -> bool {
         Elem::Setting(k) => dsl::setting_line(old, k) == dsl::setting_line(new, k),
         Elem::Asset(id) => old.asset(id) == new.asset(id),
         Elem::Canvas(id) => old.canvas(id) == new.canvas(id),
+        Elem::Presentation(_) => old.presentation == new.presentation,
     }
 }
 
@@ -240,6 +246,13 @@ fn statement(doc: &Document, e: &Elem, pad: &str, out: &mut Vec<String>) {
             if let Some(c) = doc.canvas(id) {
                 let mut s = String::new();
                 dsl::canvas_block(c, &mut s);
+                out.extend(s.lines().map(str::to_string));
+            }
+        }
+        Elem::Presentation(_) => {
+            if let Some(p) = &doc.presentation {
+                let mut s = String::new();
+                dsl::presentation_block(p, &mut s);
                 out.extend(s.lines().map(str::to_string));
             }
         }
@@ -681,6 +694,17 @@ fn edit_lines(
         }
     }
     add(at.comments, end, std::mem::take(&mut chunk));
+    // a new presentation: after the comments, before the canvases
+    let e = Elem::Presentation(String::new());
+    if new.presentation.is_some() && !done.contains(&e) {
+        let anchor = at.comments.or(at.edges);
+        // set off from what is before it (at the end, the insert does that)
+        if anchor.is_some() {
+            chunk.push(String::new());
+        }
+        statement(new, &e, "", &mut chunk);
+        add(anchor, end, std::mem::take(&mut chunk));
+    }
     for c in &new.canvases {
         let e = Elem::Canvas(c.id.clone());
         if !done.contains(&e) {

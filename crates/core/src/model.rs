@@ -30,6 +30,9 @@ pub struct Document {
     /// to (and override) the built-in ones of the board's type.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub perspectives: Vec<Perspective>,
+    /// The board as slides, in order (`presentation: Title { … }`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<Presentation>,
     /// Canvases inside this one, each a board of its own, opened from a box
     /// that links to it (`[canvas: payments]`).
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -215,6 +218,41 @@ keyword_enum!(
 keyword_enum!(LayoutKind { Layered = "layered" | "auto" | "flow", Grid = "grid" } default Layered);
 keyword_enum!(Routing { Orthogonal = "orthogonal" | "ortho" | "elbow", Curved = "curved" | "curve", Straight = "straight" | "line" } default Orthogonal);
 keyword_enum!(Theme { Light = "light", Dark = "dark" } default Light);
+keyword_enum!(
+    /// How a slide comes in: the view glides across the board to it, fades,
+    /// zooms out and back in, or cuts.
+    Transition { Glide = "glide" | "slide" | "pan", Fade = "fade", Zoom = "zoom", None = "none" | "cut" } default Glide
+);
+
+/// The board as slides: each shows one part of it (a section, a block, a
+/// box, or a canvas opened from a box; `*` is the whole board), in order.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Presentation {
+    pub title: String,
+    /// How slides come in, unless a slide says otherwise.
+    pub transition: Transition,
+    /// What the presentation is for, for the people preparing it and the
+    /// AI drafting its slides.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    pub slides: Vec<Slide>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Slide {
+    /// What it shows: an id on the board, or `*` for all of it.
+    pub target: String,
+    /// The slide's title, when not the target's own.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// What to say (speaker notes).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transition: Option<Transition>,
+}
 keyword_enum!(
     /// What a board is for; it decides the built-in perspectives.
     BoardKind { Sketch = "sketch" | "diagram", Product = "product", Project = "project" } default Sketch

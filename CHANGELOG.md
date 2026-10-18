@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.49.0 — 2026-10-18
+
+- **Presentation mode:** the Present button opens it. The board's slides are on the right, in order, each a section, block, mindmap, box, a canvas (from the box that opens it) or the whole board. Their order is drawn on the board: a numbered badge and frame per slide, arrows from each to the next.
+  - Per slide: a title (else its target's), speaker notes, its own transition, ↑ ↓ to reorder, a comment on what it shows, ×.
+  - For the presentation: a title, the transition, and instructions (who it is for, how long, what they should leave with).
+  - *Start with the board's sections* makes a deck in one click (the whole board first, then each section and block). *✦ Draft slides with the AI* writes the order, titles and notes from the board and the instructions; you see the changes before keeping them.
+- **▶ Present** plays it full screen: → next, ← back, **N** speaker notes, Esc stop. Transitions: **glide** (the default: the view moves across the board to the next slide), fade, zoom out and back in, or cut. A board without slides plays its sections as before.
+- **In the file:** `presentation: Title [transition: …, instructions: …] { … }`, one slide per line (`risks [title: …, notes: …, transition: zoom]`, `*` for the whole board), written back without touching the rest of the file. Op `presentation`; the AI's op reference has it. The example board has one.
+
 ## 0.48.0 — 2026-10-18
 
 - **Minimap:** the whole board small in the bottom-left corner, sections and boxes, with the part in view marked. Click or drag in it to move around. It takes the board's shape; **M** (or the button in the zoom bar) hides or shows it, and the choice is remembered. It is hidden while presenting and on narrow screens.

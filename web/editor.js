@@ -630,7 +630,7 @@
         setTimeout(fillThemes); // the first render came before the toolbar
       }
       if (opts.history && !view) right.appendChild(btn({ "data-act": "history", title: "History: the board's versions; see what changed since one, or bring it back", onclick: function (e) { toggleHistory(e.currentTarget); } }, icon("history")));
-      right.appendChild(btn({ title: "Present: the board's sections and blocks one at a time (← →, Esc)", onclick: function () { present(); } }, icon("present")));
+      right.appendChild(btn({ "data-act": "deck", title: view ? "Present: the board's slides one at a time (← →, Esc)" : "Presentation: the slides and their order, transitions and notes; then Present", onclick: function () { if (view) present(); else if (deck) closeDeck(); else openDeck(); } }, icon("present")));
       if (!view && hasCode) right.appendChild(btn({ "data-act": "code", title: "Code (" + MOD + "/)", onclick: function () { showCode = !showCode; applyChrome(); } }, icon("code")));
       if (hasPanel) right.appendChild(btn({ "data-act": "panel", title: "Inspector & comments", onclick: function () { showPanel = !showPanel; applyChrome(); renderPanel(); } }, icon("panel")));
       right.appendChild(btn({ title: "Light / dark", onclick: function () { st.dark = !st.dark; applyChrome(); render(); } }, icon("theme")));
@@ -924,6 +924,18 @@
       overlay.setAttribute("width", r.view.w);
       overlay.setAttribute("height", r.view.h);
       stage.appendChild(overlay);
+      if (deck) {
+        // presentation mode: the slides' order on the board
+        var layer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        layer.setAttribute("class", "dge-deck-layer");
+        layer.setAttribute("viewBox", [r.view.x, r.view.y, r.view.w, r.view.h].join(" "));
+        layer.setAttribute("width", r.view.w);
+        layer.setAttribute("height", r.view.h);
+        layer.innerHTML = '<defs><marker id="dge-deck-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dge-deck-head-mark"/></marker></defs>';
+        drawDeckOrder(layer);
+        stage.appendChild(layer);
+        if (!deck.contains(document.activeElement)) renderDeck();
+      }
       if (old && st.fitted) {
         st.panX += (r.view.x - old.view.x) * st.zoom;
         st.panY += (r.view.y - old.view.y) * st.zoom;
@@ -3664,33 +3676,286 @@
       items.sort(function (a, b) { return row(a) - row(b) || a.x - b.x; });
       return items;
     }
+    /* Presentation mode: the board's slides in order (the presentation in
+       the file), each a section, block, box or canvas; the order is drawn
+       on the board. Present plays them with their transitions. */
+    var TRANSITIONS = [["glide", "Glide"], ["fade", "Fade"], ["zoom", "Zoom out and in"], ["none", "Cut"]];
+    var deck = null;
+    function deckOf() { return st.doc && st.doc.presentation; }
+    function slideRect(target) {
+      var r = st.r;
+      if (target === "*") return { x: r.view.x, y: r.view.y, w: r.view.w, h: r.view.h };
+      var g = (r.groups || []).find(function (x) { return x.id === target; });
+      if (g) return g;
+      var n = r.nodes.find(function (x) { return x.id === target; });
+      if (!n) return null;
+      var nd = node(target);
+      if (nd && nd.mindmap) {
+        var map = r.nodes.filter(function (m) { return m.map && m.map.root === target; }).concat([n]);
+        var x0 = Math.min.apply(null, map.map(function (m) { return m.x; })), y0 = Math.min.apply(null, map.map(function (m) { return m.y; }));
+        var x1 = Math.max.apply(null, map.map(function (m) { return m.x + m.w; })), y1 = Math.max.apply(null, map.map(function (m) { return m.y + m.h; }));
+        return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      }
+      return n;
+    }
+    function targetName(t) {
+      if (t === "*") return "The whole board";
+      var g = group(t), n = node(t);
+      return (g && (g.label || g.id)) || (n && (n.label || n.id)) || t;
+    }
+    function targetKind(t) {
+      if (t === "*") return "overview";
+      var g = group(t), n = node(t);
+      if (n && n.canvas) return "canvas";
+      if (n && n.mindmap) return "mindmap";
+      if (g) return g.timeline ? "timeline" : g.cycle ? "cycle" : g.kanban ? "kanban" : g.gantt ? "gantt" : g.risks ? "risks" : g.table ? "table" : g.chart ? "chart" : g.adr ? "decision" : g.sequence ? "sequence" : g.lanes ? "swimlanes" : g.entity ? "table" : "section";
+      return "box";
+    }
+    // what can be a slide: the top-level sections and blocks, mindmaps and
+    // boxes that open canvases, in reading order
+    function slideCandidates() {
+      return slides().map(function (it) { return it.id; }).concat(
+        (st.doc.nodes || []).filter(function (n) { return n.canvas && !n.group; }).map(function (n) { return n.id; }));
+    }
+    function setDeck(change) {
+      var ops = [Object.assign({ op: "presentation" }, change)];
+      return applyOps(ops, false, true);
+    }
+    function slidesNow() { return ((deckOf() || {}).slides || []).map(function (s) { return Object.assign({}, s); }); }
+    function openDeck() {
+      if (st.preview) return flash("Keep or discard the AI's changes first", true);
+      if (st.canvasPath.length && !openCanvas([])) return;
+      if (deck) return;
+      deck = h("aside", { class: "dge-deck", "aria-label": "Presentation" });
+      el.appendChild(deck);
+      el.classList.add("dge-decking");
+      renderDeck();
+      render();
+    }
+    function closeDeck() {
+      if (!deck) return;
+      deck.remove();
+      deck = null;
+      el.classList.remove("dge-decking");
+      render();
+    }
+    function renderDeck() {
+      if (!deck) return;
+      var p = deckOf();
+      deck.innerHTML = "";
+      var head = h("div", { class: "dge-deck-head" }, [
+        h("b", {}, ["Presentation"]),
+        h("button", { class: "primary", "data-act": "play", title: "Present full screen (→ next, ← back, N notes, Esc stop)", onclick: function () { present(); } }, ["▶ Present"]),
+        h("button", { class: "dge-x", title: "Close presentation mode", onclick: closeDeck }, ["×"])
+      ]);
+      deck.appendChild(head);
+      if (!p || !p.slides || !p.slides.length) {
+        var auto = slides();
+        deck.appendChild(h("div", { class: "dge-deck-empty" }, [
+          h("p", {}, ["No slides yet. A slide shows one part of the board: a section, a block, a mindmap, a canvas, or the whole board."]),
+          auto.length ? h("button", { class: "primary", onclick: function () {
+            setDeck({ title: (deckOf() || {}).title || st.doc.title || "", slides: [{ target: "*", title: st.doc.title || "Overview" }].concat(auto.map(function (it) { return { target: it.id }; })) });
+            renderDeck();
+          } }, ["Start with the board's sections (" + (auto.length + 1) + " slides)"]) : null,
+          h("button", { onclick: draftSlides }, ["✦ Draft slides with the AI"])
+        ].filter(Boolean)));
+      }
+      var title = h("input", { class: "dge-input", value: (p && p.title) || st.doc.title || "", placeholder: "Title of the presentation" });
+      title.addEventListener("change", function () { setDeck({ title: title.value }); });
+      var trans = h("select", { class: "dge-select", title: "How slides come in" });
+      TRANSITIONS.forEach(function (t) { trans.appendChild(h("option", { value: t[0] }, [t[1]])); });
+      trans.value = (p && p.transition) || "glide";
+      trans.addEventListener("change", function () { setDeck({ transition: trans.value }); });
+      var ins = h("textarea", { class: "dge-input", rows: "3", placeholder: "Who it is for, how long, what they should leave with. The AI follows this when it drafts the slides." });
+      ins.value = (p && p.instructions) || "";
+      ins.addEventListener("change", function () { setDeck({ instructions: ins.value }); });
+      deck.appendChild(h("div", { class: "dge-deck-settings" }, [
+        h("label", {}, [h("span", {}, ["Title"]), title]),
+        h("label", {}, [h("span", {}, ["Transition"]), trans]),
+        h("label", {}, [h("span", {}, ["Instructions"]), ins]),
+        p && p.slides && p.slides.length ? h("button", { class: "dge-deck-draft", onclick: draftSlides, title: "The AI rewrites the slides (order, titles, notes) from the board and the instructions; you see the changes before keeping them" }, ["✦ Redraft the slides with the AI"]) : null
+      ].filter(Boolean)));
+      var list = h("ol", { class: "dge-deck-list" });
+      ((p && p.slides) || []).forEach(function (sl, i, all) {
+        var move = function (d) {
+          var s2 = slidesNow(), j = i + d;
+          if (j < 0 || j >= s2.length) return;
+          var x = s2[i]; s2[i] = s2[j]; s2[j] = x;
+          setDeck({ slides: s2 });
+          renderDeck();
+        };
+        var drop = function () { var s2 = slidesNow(); s2.splice(i, 1); setDeck({ slides: s2 }); renderDeck(); };
+        var patchSlide = function (k, v) { var s2 = slidesNow(); s2[i][k] = v || undefined; setDeck({ slides: s2 }); };
+        var t2 = h("select", { class: "dge-select", title: "How this slide comes in" });
+        t2.appendChild(h("option", { value: "" }, ["Transition: as set above"]));
+        TRANSITIONS.forEach(function (t) { t2.appendChild(h("option", { value: t[0] }, [t[1]])); });
+        t2.value = sl.transition || "";
+        t2.addEventListener("change", function () { patchSlide("transition", t2.value); });
+        var stitle = h("input", { class: "dge-input dge-slide-title", value: sl.title || "", placeholder: targetName(sl.target) });
+        stitle.addEventListener("change", function () { patchSlide("title", stitle.value.trim()); });
+        var notes = h("textarea", { class: "dge-input", rows: "2", placeholder: "Speaker notes: what to say" });
+        notes.value = sl.notes || "";
+        notes.addEventListener("change", function () { patchSlide("notes", notes.value.trim()); });
+        var card = h("li", { class: "dge-slide", "data-slide": String(i) }, [
+          h("div", { class: "dge-slide-top" }, [
+            h("span", { class: "dge-slide-num" }, [String(i + 1)]),
+            h("button", { class: "dge-slide-go", title: "Show it on the board", onclick: function () { var r = slideRect(sl.target); if (r) focusOn(r, 1.5, 1.5, 0.8); } }, [h("b", {}, [sl.title || targetName(sl.target)]), h("span", {}, [targetKind(sl.target)])]),
+            h("button", { title: "Earlier", disabled: i === 0, onclick: function () { move(-1); } }, ["↑"]),
+            h("button", { title: "Later", disabled: i === all.length - 1, onclick: function () { move(1); } }, ["↓"]),
+            sl.target !== "*" ? h("button", { title: "Comment on " + targetName(sl.target), onclick: function (e) { var b = e.currentTarget.getBoundingClientRect(); select([sl.target]); openComposer({ on: sl.target }, b.left - 280, b.bottom + 4); } }, [h("span", { html: icon("comment") })]) : null,
+            h("button", { title: "Remove the slide (the board keeps it)", onclick: drop }, ["×"])
+          ].filter(Boolean)),
+          stitle, notes, t2
+        ]);
+        list.appendChild(card);
+        if (i < all.length - 1) list.appendChild(h("li", { class: "dge-slide-then", "aria-hidden": "true" }, ["↓ then"]));
+      });
+      deck.appendChild(list);
+      var have = ((p && p.slides) || []).map(function (s) { return s.target; });
+      var add = h("select", { class: "dge-select dge-deck-add" });
+      add.appendChild(h("option", { value: "" }, ["+ Add a slide…"]));
+      if (st.sel.length === 1 && have.indexOf(st.sel[0]) < 0 && (group(st.sel[0]) || node(st.sel[0]))) add.appendChild(h("option", { value: st.sel[0] }, ["The selection: " + targetName(st.sel[0])]));
+      add.appendChild(h("option", { value: "*" }, ["The whole board"]));
+      slideCandidates().filter(function (t) { return have.indexOf(t) < 0; }).forEach(function (t) { add.appendChild(h("option", { value: t }, [targetName(t) + " (" + targetKind(t) + ")"])); });
+      add.addEventListener("change", function () {
+        if (!add.value) return;
+        setDeck({ slides: slidesNow().concat([{ target: add.value }]) });
+        renderDeck();
+      });
+      deck.appendChild(add);
+    }
+    /* The AI drafts the slides from the board and the instructions. */
+    function draftSlides() {
+      var p = deckOf() || {};
+      var ins = "Draft the presentation of this board (only the top board's sections, blocks, mindmaps, boxes that open canvases, or `*` for the whole board can be slides). " +
+        (p.instructions ? "Its instructions: " + p.instructions + ". " : "Make it a short walk-through for someone new to the board. ") +
+        "Reply with one `presentation` op: a title, the slides in the order to tell the story (start with an overview, `*`), a short title for each that says its point, and speaker notes (one or two sentences: what to say). Keep the transition as it is. Change nothing else on the board.";
+      runRethink(ins);
+    }
+    // the order of the slides, drawn on the board while in presentation mode
+    function drawDeckOrder(layer) {
+      var p = deckOf();
+      if (!deck || !p || !p.slides || !st.r) return;
+      var ns = "http://www.w3.org/2000/svg", pts = [];
+      p.slides.forEach(function (sl, i) {
+        var r = slideRect(sl.target);
+        if (!r) return;
+        if (sl.target !== "*") {
+          var frame = document.createElementNS(ns, "rect");
+          frame.setAttribute("class", "dge-deck-frame");
+          ["x", "y", "width", "height"].forEach(function (k, j) { frame.setAttribute(k, [r.x - 8, r.y - 8, r.w + 16, r.h + 16][j]); });
+          frame.setAttribute("rx", 12);
+          layer.appendChild(frame);
+        }
+        // the whole board: its badge above the board's top-left corner
+        var cx = sl.target === "*" ? r.x - 30 : r.x - 8, cy = sl.target === "*" ? r.y - 30 : r.y - 8;
+        pts.push([cx, cy, i, cx, cy, sl.target === "*"]);
+      });
+      // badge to badge, arcing above the boards between them
+      for (var k = 0; k + 1 < pts.length; k++) {
+        var a = pts[k], b = pts[k + 1];
+        if (a[5] || b[5]) continue;
+        var line = document.createElementNS(ns, "path");
+        var dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1;
+        var x0 = a[0] + dx / len * 16, y0 = a[1] + dy / len * 16, x1 = b[0] - dx / len * 18, y1 = b[1] - dy / len * 18;
+        var mx = (x0 + x1) / 2, my = Math.min(y0, y1) - Math.min(70, len / 5 + 16);
+        line.setAttribute("d", "M" + x0 + "," + y0 + " Q" + mx + "," + my + " " + x1 + "," + y1);
+        line.setAttribute("class", "dge-deck-path");
+        line.setAttribute("marker-end", "url(#dge-deck-arrow)");
+        layer.appendChild(line);
+      }
+      pts.forEach(function (q) {
+        var c = document.createElementNS(ns, "circle");
+        c.setAttribute("cx", q[3]); c.setAttribute("cy", q[4]); c.setAttribute("r", 13);
+        c.setAttribute("class", "dge-deck-num");
+        var t = document.createElementNS(ns, "text");
+        t.setAttribute("x", q[3]); t.setAttribute("y", q[4] + 4.5);
+        t.setAttribute("class", "dge-deck-num-text");
+        t.textContent = String(q[2] + 1);
+        layer.appendChild(c); layer.appendChild(t);
+      });
+    }
+    /* Playing it: the slides of the presentation (or, without one, the
+       board's sections in reading order), full screen. */
     function present() {
-      var list = slides();
+      var p = deckOf(), list;
+      if (st.canvasPath.length) openCanvas([]);
+      if (p && p.slides && p.slides.length) {
+        list = p.slides.map(function (sl) { return { target: sl.target, title: sl.title || targetName(sl.target), notes: sl.notes || "", transition: sl.transition || p.transition || "glide" }; });
+      } else {
+        list = slides().map(function (it) { return { target: it.id, title: it.title, notes: "", transition: "glide" }; });
+      }
       if (!list.length) { fit(); return flash("Nothing to present yet: add sections, charts, tables or mindmaps"); }
       var bar = h("div", { class: "dge-present-bar" }, []);
-      st.presenting = { list: list, at: -1, bar: bar };
+      var notes = h("div", { class: "dge-present-notes", hidden: true });
+      st.presenting = { list: list, at: -1, bar: bar, notes: notes, showNotes: false };
       el.classList.add("dge-presenting");
+      el.appendChild(notes);
       el.appendChild(bar);
+      if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(function () { /* fine: in the window */ });
       presentStep(1);
     }
     function presentStep(d) {
       var p = st.presenting;
       if (!p) return;
-      p.at = Math.max(0, Math.min(p.list.length - 1, p.at + d));
-      var it = p.list[p.at];
-      focusOn(it, 4, 4, 0.88);
+      var at = Math.max(0, Math.min(p.list.length - 1, p.at + d));
+      if (at === p.at) return;
+      var first = p.at < 0;
+      p.at = at;
+      var it = p.list[at];
+      var canvasId = (node(it.target) || {}).canvas;
+      var go = function () {
+        if (canvasId) { openCanvas([canvasId]); fit(); }
+        else {
+          if (st.canvasPath.length) openCanvas([]);
+          var r = slideRect(it.target);
+          if (it.target === "*" || !r) fit(); else focusOn(r, 4, 4, 0.88);
+        }
+      };
+      var how = first ? "none" : it.transition;
+      stage.style.transition = "";
+      if (how === "fade") {
+        stage.style.transition = "opacity 180ms ease";
+        stage.style.opacity = "0";
+        setTimeout(function () { stage.style.transition = ""; go(); requestAnimationFrame(function () { stage.style.transition = "opacity 240ms ease"; stage.style.opacity = "1"; }); }, 190);
+      } else if (how === "glide" && !canvasId && !st.canvasPath.length) {
+        stage.style.transition = "transform 650ms cubic-bezier(.4,0,.2,1)";
+        go();
+      } else if (how === "zoom" && !canvasId && !st.canvasPath.length) {
+        stage.style.transition = "transform 380ms cubic-bezier(.4,0,.2,1)";
+        fit();
+        setTimeout(function () { stage.style.transition = "transform 520ms cubic-bezier(.4,0,.2,1)"; go(); }, 400);
+      } else {
+        go();
+      }
       p.bar.innerHTML = "";
       p.bar.appendChild(h("button", { title: "Before (←)", onclick: function () { presentStep(-1); } }, ["←"]));
-      p.bar.appendChild(h("span", {}, [(p.at + 1) + " / " + p.list.length + " · " + it.title]));
+      p.bar.appendChild(h("span", {}, [(at + 1) + " / " + p.list.length + " · " + it.title]));
       p.bar.appendChild(h("button", { title: "Next (→)", onclick: function () { presentStep(1); } }, ["→"]));
+      p.bar.appendChild(h("button", { title: "Speaker notes (N)", "aria-pressed": String(p.showNotes), onclick: function () { toggleNotes(); } }, ["Notes"]));
       p.bar.appendChild(h("button", { title: "Stop (Esc)", onclick: endPresent }, ["Done"]));
+      p.notes.textContent = it.notes || "No notes for this slide.";
+      p.notes.hidden = !p.showNotes;
+    }
+    function toggleNotes() {
+      var p = st.presenting;
+      if (!p) return;
+      p.showNotes = !p.showNotes;
+      p.notes.hidden = !p.showNotes;
+      var b = p.bar.querySelector("[aria-pressed]");
+      if (b) b.setAttribute("aria-pressed", String(p.showNotes));
     }
     function endPresent() {
       var p = st.presenting;
       if (!p) return;
       st.presenting = null;
       p.bar.remove();
+      p.notes.remove();
+      stage.style.transition = "";
+      stage.style.opacity = "";
       el.classList.remove("dge-presenting");
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () { /* fine */ });
+      if (st.canvasPath.length) openCanvas([]);
       fit();
     }
 
@@ -3892,6 +4157,7 @@
       if (mod && e.key.toLowerCase() === "f") { e.preventDefault(); openFind(); return; }
       if (st.presenting) {
         if (e.key === "Escape") { e.preventDefault(); endPresent(); }
+        else if (e.key === "n" || e.key === "N") { e.preventDefault(); toggleNotes(); }
         else if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); presentStep(1); }
         else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); presentStep(-1); }
         return;

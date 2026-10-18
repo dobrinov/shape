@@ -338,6 +338,20 @@ fraud: Fraud reporting API [tags: tech exec]
 - The board's `type:` brings built-in ones. A product board: Product (`product`), Technical (`tech`), User (`user`), Senior management (`exec`). A project board: Senior management, Team (`team`), Product, Technical. Both also: Legal (`legal`), Finance (`finance`), Marketing (`marketing`), Commercial (`commercial`), Design (`design`). A sketch has none. `perspective id: Name [...]` adds one, or overrides a built-in with the same id.
 - An element shows in a perspective when it has the perspective's tag (`tags: tech exec`); mindmap topics go with their centre. In the editor, pick one in the top bar; new elements get its tag. *✦ Sort into perspectives* has the AI tag the board. Ops: `{"op":"perspective","id":"legal","label":"Legal","tags":["legal"],"show":["adr"]}` (`remove: true` takes it off).
 
+### Presentations
+
+```diagram
+presentation: Launch review [transition: glide, instructions: "For the exec sync, ten minutes"] {
+  * [title: Where we are]
+  risks [notes: "Two of them, both owned", transition: zoom]
+  plan-link [title: The plan]
+}
+```
+
+- The board as slides, in order: one per line, each showing a top-level section, block, mindmap (by its centre) or box; a box that opens a canvas shows the canvas; `*` is the whole board. A board has one presentation.
+- A slide may have a `title` (else its target's), speaker `notes` and its own `transition`. The presentation's `transition` (default `glide`: the view moves across the board; also `fade`, `zoom` out and back in, `none`) applies to every slide that names none. `instructions` say who it is for and what it should do; the AI follows them when it drafts the slides.
+- In the editor, the Present button opens presentation mode: the slides with their notes and transitions on the right, their order drawn on the board; *▶ Present* plays them full screen (→ next, ← back, N notes, Esc stop). Ops: `{"op":"presentation","transition":"fade","slides":[{"target":"risks","notes":"…"}]}` (the whole list; `remove: true` takes it off).
+
 ### Timelines
 
 ```diagram

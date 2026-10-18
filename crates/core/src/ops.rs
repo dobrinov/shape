@@ -223,6 +223,22 @@ pub enum Op {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         remove: bool,
     },
+    /// Set up the presentation (made when there is none): its title, the
+    /// transition, the instructions, the slides in order (the whole list:
+    /// `{"target": "risks", "notes": "…", "transition": "zoom"}`, `*` for
+    /// the whole board). `remove: true` takes it off. Fields left out stay.
+    Presentation {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transition: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        instructions: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        slides: Option<Vec<crate::model::Slide>>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        remove: bool,
+    },
     /// Ops for a canvas inside this board: `canvas` is its path of ids
     /// (`plan`, or `plan/details` for one inside it).
     In {
@@ -1176,6 +1192,59 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 Some(x) => *x = p,
                 None => doc.perspectives.push(p),
             }
+        }
+        Op::Presentation {
+            title,
+            transition,
+            instructions,
+            slides,
+            remove,
+        } => {
+            if *remove {
+                doc.presentation = None;
+                return Ok(());
+            }
+            let mut p = doc
+                .presentation
+                .clone()
+                .unwrap_or_else(|| crate::model::Presentation {
+                    title: doc.title.clone().unwrap_or_default(),
+                    ..Default::default()
+                });
+            if let Some(t) = title {
+                p.title = t.trim().to_string();
+            }
+            if let Some(t) = transition {
+                p.transition = crate::model::Transition::parse(t).ok_or_else(|| {
+                    format!(
+                        "unknown transition `{t}` (use {})",
+                        crate::model::Transition::names()
+                    )
+                })?;
+            }
+            if let Some(i) = instructions {
+                p.instructions = Some(i.trim().to_string()).filter(|i| !i.is_empty());
+            }
+            if let Some(list) = slides {
+                for s in list {
+                    if s.target != "*"
+                        && doc.node(&s.target).is_none()
+                        && doc.group(&s.target).is_none()
+                    {
+                        return Err(format!("no `{}` on the board for a slide", s.target));
+                    }
+                }
+                p.slides = list
+                    .iter()
+                    .cloned()
+                    .map(|mut s| {
+                        s.title = s.title.filter(|t| !t.trim().is_empty());
+                        s.notes = s.notes.filter(|t| !t.trim().is_empty());
+                        s
+                    })
+                    .collect();
+            }
+            doc.presentation = Some(p);
         }
         Op::In { canvas, ops } => {
             let path: Vec<String> = canvas
