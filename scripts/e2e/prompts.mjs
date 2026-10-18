@@ -25,7 +25,7 @@ try {
     const errors = []; p.on("pageerror", (e) => errors.push(e.message));
     await p.goto(`http://127.0.0.1:${port}/`); await p.waitForSelector(".dge-canvas svg"); await sleep(400);
     // a product board asks for a perspective first
-    await p.locator(".dge-persp-card", { hasText: "Everyone" }).click(); await sleep(200);
+    await p.locator(".dge-persp-card", { hasText: "Full board" }).click(); await sleep(200);
     // nothing selected: ⌘⇧C copies the whole board as a prompt to build it
     await p.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: `http://127.0.0.1:${port}` });
     await p.locator(".dge-canvas").click({ position: { x: 20, y: 300 } });

@@ -417,7 +417,7 @@
       if (sel._key === key) return;
       sel._key = key;
       sel.innerHTML = "";
-      sel.appendChild(h("option", { value: "" }, ["Everyone"]));
+      sel.appendChild(h("option", { value: "" }, ["Full board"]));
       list.forEach(function (p) { sel.appendChild(h("option", { value: p.id }, [p.label])); });
       if (!view) {
         sel.appendChild(h("option", { disabled: true }, ["──────────"]));
@@ -480,12 +480,15 @@
       };
       showModal("How would you like to view this board?", h("div", {}, [
         h("p", { class: "dge-muted" }, ["Each perspective shows the part of the board one audience needs. Switch any time from the top bar."]),
-        h("div", { class: "dge-persp-cards" }, [card("", "Everyone", "The whole board")].concat(list.map(function (p) {
-          var show = p.show || [], tags = p.tags || [];
-          return card(p.id, p.label, show.length ? "What is tagged " + (tags[0] || p.id) + ", and " + show.map(function (k) { return (KIND_NAMES[k] || k).toLowerCase(); }).join(", ") : "What is tagged " + (tags[0] || p.id));
+        h("div", { class: "dge-persp-cards" }, [card("", "Full board", "Everything on it")].concat(list.map(function (p) {
+          // what it shows, briefly: its blocks (the first few), else its tag
+          var show = (p.show || []).map(function (k) { return SHORT_KINDS[k] || k; }), tag = (p.tags || [])[0] || p.id;
+          var more = show.length ? show.slice(0, 3).join(", ") + (show.length > 3 ? " and more" : "") : "What is tagged “" + tag + "”";
+          return card(p.id, p.label, more.charAt(0).toUpperCase() + more.slice(1));
         })))
       ]), []);
     }
+    var SHORT_KINDS = { mindmap: "mindmaps", timeline: "timelines", adr: "decisions", risks: "risks", kanban: "kanban", gantt: "plans", table: "tables", chart: "charts", entity: "data model", sequence: "sequences", lanes: "swimlanes", sticky: "stickies", screen: "screens", cycle: "cycles" };
     var KIND_NAMES = { mindmap: "Mindmaps", timeline: "Timelines", adr: "Decision records", risks: "Risk matrices", kanban: "Kanban boards", gantt: "Gantt charts", table: "Tables", chart: "Charts", entity: "Database tables", sequence: "Sequence diagrams", lanes: "Swimlanes", sticky: "Stickies", screen: "Wireframe screens" };
     function newPerspective() {
       var name = h("input", { class: "dge-input", placeholder: "e.g. Legal, Support, Investors" });

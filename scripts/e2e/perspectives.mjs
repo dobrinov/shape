@@ -37,12 +37,12 @@ try {
 
   // opening asks whose eyes to look through
   await p.waitForSelector(".dge-persp-card");
-  assert.deepEqual((await p.locator(".dge-persp-card b").allTextContents()).slice(0, 3), ["Everyone", "Senior management", "Team"]);
-  await p.locator(".dge-persp-card", { hasText: "Everyone" }).click(); await sleep(300);
+  assert.deepEqual((await p.locator(".dge-persp-card b").allTextContents()).slice(0, 3), ["Full board", "Senior management", "Team"]);
+  await p.locator(".dge-persp-card", { hasText: "Full board" }).click(); await sleep(300);
 
   // a project board's built-in perspectives
   const names = await p.locator(".dge-persp option").allTextContents();
-  assert.deepEqual(names.slice(0, 5), ["Everyone", "Senior management", "Team", "Product", "Technical"]);
+  assert.deepEqual(names.slice(0, 5), ["Full board", "Senior management", "Team", "Product", "Technical"]);
   assert.equal(await shown(p), "api,beta,fraud,note");
   // Senior management: what is tagged for it and the risks, titles only; the file does not change
   const before = saved();

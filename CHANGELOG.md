@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.2 — 2026-10-18
+
+- **Perspectives:** the whole board is *Full board* (it was *Everyone*), in the top bar and in the picker when a board opens. The picker describes each perspective in a few words (*Decisions, risks, timelines and more*) and its text wraps instead of being cut off.
+
 ## 0.53.1 — 2026-10-18
 
 - **Wireframes in dark mode:** a phone's or tablet's body is a dark grey there, not white. The landing page's flow picture is drawn dark like the rest of the page.

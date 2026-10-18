@@ -495,3 +495,5 @@
 .dge .dge-widgets-grid button { height: 32px; min-height: 0; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--fg); font-size: 13px; text-align: left; }
 .dge .dge-widgets-grid button:hover { background: var(--bg3); }
 .dge-presenting .dge-screenbar { display: none !important; }
+.dge .dge-persp-cards .dge-persp-card { min-width: 0; white-space: normal; }
+.dge-persp-card b, .dge-persp-card span { max-width: 100%; overflow-wrap: anywhere; }
