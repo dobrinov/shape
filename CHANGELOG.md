@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.45.0 — 2026-10-18
+
+- **AI prompts…** in the Board popover: the prompts that Rethink, Sort into perspectives, Ask and Add what you know would send for this board as it is now, one tab each, to read or copy (and give feedback on). Nothing is sent from there.
+
 ## 0.44.1 — 2026-10-18
 
 - Prompts to the AI start with today's date (the editor's and `diagram ask` / `diagram expand`'s), so a model no longer guesses the year when it writes dates.

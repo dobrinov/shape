@@ -423,3 +423,7 @@
 .dge-history-text span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dge .dge-history-row button { height: 26px; min-height: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 12px; }
 .dge .dge-name-input { height: 34px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; font: inherit; background: var(--bg); color: var(--fg); }
+/* AI prompts…: one tab per AI action */
+.dge-prompt-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.dge .dge-prompt-tabs button { height: 28px; min-height: 0; padding: 0 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); font-size: 12px; }
+.dge .dge-prompt-tabs button.on { border-color: var(--accent); color: var(--accent); background: var(--bg2); }

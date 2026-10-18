@@ -395,10 +395,54 @@
     }
     /* The AI tags each element with the perspectives it belongs to. */
     function sortPerspectives() {
+      var ins = perspectiveInstructions();
+      if (!ins) return flash("This board has no perspectives yet: set its type (Board) or add one", true);
+      runRethink(ins);
+    }
+    function perspectiveInstructions() {
       var list = st.perspectives || [];
-      if (!list.length) return flash("This board has no perspectives yet: set its type (Board) or add one", true);
+      if (!list.length) return null;
       var lines = list.map(function (p) { return "- " + p.label + ": tag `" + (p.tags[0] || p.id) + "`" + (p.show.length ? " (it already shows " + p.show.join(", ") + " blocks whole)" : ""); }).join("\n");
-      runRethink("Sort the board into its perspectives, the audiences that look at it:\n\n" + lines + "\n\nAdd to each box's `tags` the tags of every perspective it matters to (`update_node` with the box's existing tags plus the new ones; a box can belong to several, and inside canvases too). Tag mindmap centres, not their topics. Change nothing else: no labels, sections or arrows. In the note, say how many elements each perspective now shows.");
+      return ("Sort the board into its perspectives, the audiences that look at it:\n\n" + lines + "\n\nAdd to each box's `tags` the tags of every perspective it matters to (`update_node` with the box's existing tags plus the new ones; a box can belong to several, and inside canvases too). Tag mindmap centres, not their topics. Change nothing else: no labels, sections or arrows. In the note, say how many elements each perspective now shows.");
+    }
+    /* AI prompts…: the prompts the AI buttons send, built for this board as
+       it is now, to read (and give feedback on). Nothing is sent. */
+    function showPrompts() {
+      boardMenu.hidden = true;
+      var dated = function (p) { return "Today is " + isoDay(today()) + ".\n\n" + p; };
+      var since = opts.since ? Promise.resolve(opts.since()).catch(function () { return null; }) : Promise.resolve(null);
+      since.then(function (v) {
+        var rethinkWith = function (ins) {
+          var r = JSON.parse(st.session.rethink_prompt(v ? v.source : undefined, v ? v.label : "", ins));
+          return r.error ? "(" + r.error + ")" : dated(r.prompt);
+        };
+        var ins = perspectiveInstructions();
+        var ids = st.sel.filter(kindOf);
+        var tabs = [
+          ["Rethink", "Sent by ✦ → Rethink: the whole board, every canvas" + (v ? ", and what is new since " + v.label : "") + ".", function () { return rethinkWith(undefined); }],
+          ["Perspectives", "Sent by ✦ Sort into perspectives: Rethink, told to tag the board for its perspectives.", function () { return ins ? rethinkWith(ins) : "This board has no perspectives yet: set its type (Board) or add one."; }],
+          ["Ask", "Sent by ✦ → Ask, with your question where it says “Your question”.", function () { return dated((st.answer ? st.answer.main.session : st.session).answer_board_prompt("[]", "Your question", isoDay(today()))); }],
+          ["Add what you know", "Sent by ✦ → Add what you know, with " + (ids.length ? "the " + ids.length + " selected" : "the whole canvas (or what you select)") + " and what you write.", function () { return dated(st.session.ask_prompt(JSON.stringify(ids), "What you write")); }]
+        ];
+        var bar = h("div", { class: "dge-prompt-tabs", role: "tablist" });
+        var note = h("p", { class: "dge-muted" });
+        var text = h("textarea", { class: "dge-preview", readonly: true, rows: 22, "aria-label": "Prompt" });
+        var pick = function (i) {
+          Array.prototype.forEach.call(bar.children, function (b, j) { b.className = i === j ? "on" : ""; b.setAttribute("aria-selected", i === j); });
+          note.textContent = tabs[i][1];
+          text.value = tabs[i][2]();
+          text.scrollTop = 0;
+        };
+        tabs.forEach(function (t, i) { bar.appendChild(h("button", { role: "tab", onclick: function () { pick(i); } }, [t[0]])); });
+        showModal("AI prompts", h("div", { class: "dge-prompt" }, [
+          h("p", { class: "dge-muted" }, ["What the AI buttons send for this board as it is now (nothing is sent from here)."]),
+          bar, note, text
+        ]), [
+          h("button", { onclick: function () { copyText(text.value).then(function () { flash("Copied the prompt"); }); } }, ["Copy"]),
+          h("button", { class: "primary", onclick: closeModal }, ["Close"])
+        ]);
+        pick(0);
+      });
     }
     /* Board: flow direction, arrow routing, theme and tidy up, out of the bar. */
     function toggleBoardMenu(anchor) {
@@ -468,7 +512,8 @@
         toolbar.kind = kindSel;
         boardMenu = h("div", { class: "dge-board-menu", role: "dialog", "aria-label": "Board", hidden: true }, [
           row("Type", kindSel), row("Flow", dir), row("Arrows", routing), row("Theme", themeSel),
-          h("button", { class: "dge-board-tidy", onclick: function () { boardMenu.hidden = true; applyOps([{ op: "unpin" }]); fitSoon(); } }, [h("span", { html: icon("tidy") }), "Tidy up the layout"])
+          h("button", { class: "dge-board-tidy", onclick: function () { boardMenu.hidden = true; applyOps([{ op: "unpin" }]); fitSoon(); } }, [h("span", { html: icon("tidy") }), "Tidy up the layout"]),
+          h("button", { class: "dge-board-tidy", "data-act": "prompts", title: "The prompts the AI buttons send, to review", onclick: showPrompts }, [h("span", { html: icon("magic") }), "AI prompts…"])
         ]);
         el.appendChild(boardMenu);
         right.appendChild(h("button", { class: "dge-bar-btn", "data-act": "board", title: "Board: flow direction, arrow style, theme, tidy up", onclick: function (e) { toggleBoardMenu(e.currentTarget); }, html: icon("tidy") + "<span>Board</span>" }));
