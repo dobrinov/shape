@@ -224,8 +224,8 @@ pub fn serve(
         .ok()
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .filter(|s| !s.is_empty())
-        .or_else(|| std::env::var("USER").ok());
+        // git's name only: without one, the editor asks who you are
+        .filter(|s| !s.is_empty());
     let root = board_root(&file);
     let start = (file.clone(), display.clone());
     for mut req in server.incoming_requests() {
@@ -369,7 +369,21 @@ pub fn serve(
                         })
                         .and_then(|d| diagram_core::export(&d, fmt)),
                 };
-                match text.and_then(|t| std::fs::write(&file, t).map_err(|e| e.to_string())) {
+                let who = req
+                    .headers()
+                    .iter()
+                    .find(|h| h.field.equiv("X-Diagram-Author"))
+                    .map(|h| url_decode(h.value.as_str()))
+                    .filter(|w| !w.trim().is_empty())
+                    .or_else(|| author.clone())
+                    .unwrap_or_default();
+                let written = text.and_then(|t| {
+                    std::fs::write(&file, &t).map_err(|e| e.to_string())?;
+                    // a board git does not track keeps snapshots instead
+                    crate::history::snapshot(&file, &t, &who);
+                    Ok(())
+                });
+                match written {
                     Ok(()) => respond_json(
                         req,
                         200,
@@ -400,6 +414,25 @@ pub fn serve(
                     }
                 };
                 respond_json(req, 200, body)
+            }
+            // the board's history: commits, or snapshots beside a board git does not track
+            (Method::Get, "/api/history") => {
+                let list: Vec<Value> = crate::history::versions(&file)
+                    .iter()
+                    .map(|v| v.to_json())
+                    .collect();
+                respond_json(
+                    req,
+                    200,
+                    json!({ "ok": true, "git": crate::history::in_git(&file), "versions": list }),
+                )
+            }
+            (Method::Get, "/api/history/version") => {
+                let id = query_param(&url, "id").unwrap_or_default();
+                match crate::history::version(&file, &id) {
+                    Ok(source) => respond_json(req, 200, json!({ "ok": true, "source": source })),
+                    Err(e) => respond_json(req, 200, json!({ "ok": false, "error": e })),
+                }
             }
             // a team's recipes: `recipes/*.diagram` up to the repository's root
             (Method::Get, "/api/recipes") => {

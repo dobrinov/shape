@@ -1653,7 +1653,7 @@ mod tests {
     #[test]
     fn ask_prompts_show_the_selection_and_ask_for_ops() {
         let d = dsl::parse("title: Shop\ngroup back: Backend {\n  api: Orders API\n  db: Postgres\n}\nweb: Web\nmail: Mail\nweb -> api\napi -> db\n").unwrap();
-        let p = ask(&d, &["db".to_string()], "Add a read replica");
+        let p = ask(&d, &["db".to_string()], "Add a read replica", &[]);
         assert!(
             p.contains("Selected: `db`.") && p.contains("api -> db") && !p.contains("mail: Mail"),
             "{p}"
@@ -1662,7 +1662,7 @@ mod tests {
             p.contains("## The request\n\nAdd a read replica") && p.contains("{\"op\":\"merge\""),
             "{p}"
         );
-        let whole = ask(&d, &[], "Tidy");
+        let whole = ask(&d, &[], "Tidy", &[]);
         assert!(whole.contains("mail: Mail"));
         let again = ask_again(&p, "{oops", "invalid JSON");
         assert!(again.starts_with(&p) && again.contains("Error: invalid JSON"));

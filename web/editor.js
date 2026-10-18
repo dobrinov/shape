@@ -61,6 +61,7 @@
     section: '<rect x="3" y="8" width="18" height="12" rx="2"/><rect x="3" y="3" width="9" height="3.5" rx="1.2" fill="currentColor" stroke="none"/>',
     fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     magic: '<path d="M10 3.5c.5 3.9 2.6 6 6.5 6.5-3.9.5-6 2.6-6.5 6.5-.5-3.9-2.6-6-6.5-6.5 3.9-.5 6-2.6 6.5-6.5z" fill="currentColor" stroke="none"/><path d="M18 13.5c.25 1.9 1.1 2.75 3 3-1.9.25-2.75 1.1-3 3-.25-1.9-1.1-2.75-3-3 1.9-.25 2.75-1.1 3-3z" fill="currentColor" stroke="none"/>',
+    history: '<path d="M4 12a8 8 0 102.3-5.6"/><path d="M4 4.5v3.5h3.5"/><path d="M12 8v4.5l3 2"/>',
     branch: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3.5-11 6.5"/>',
     blocks: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
     cycle: '<path d="M19.5 12a7.5 7.5 0 01-12.8 5.3M4.5 12a7.5 7.5 0 0112.8-5.3"/><path d="M17.6 3.6v3.3h-3.3M6.4 20.4v-3.3h3.3"/>',
@@ -473,6 +474,7 @@
         right.appendChild(h("button", { class: "dge-bar-btn", "data-act": "board", title: "Board: flow direction, arrow style, theme, tidy up", onclick: function (e) { toggleBoardMenu(e.currentTarget); }, html: icon("tidy") + "<span>Board</span>" }));
         setTimeout(fillThemes); // the first render came before the toolbar
       }
+      if (opts.history && !view) right.appendChild(btn({ "data-act": "history", title: "History: the board's versions; see what changed since one, or bring it back", onclick: function (e) { toggleHistory(e.currentTarget); } }, icon("history")));
       right.appendChild(btn({ title: "Present: the board's sections and blocks one at a time (← →, Esc)", onclick: function () { present(); } }, icon("present")));
       if (!view && hasCode) right.appendChild(btn({ "data-act": "code", title: "Code (" + MOD + "/)", onclick: function () { showCode = !showCode; applyChrome(); } }, icon("code")));
       if (hasPanel) right.appendChild(btn({ "data-act": "panel", title: "Inspector & comments", onclick: function () { showPanel = !showPanel; applyChrome(); renderPanel(); } }, icon("panel")));
@@ -656,6 +658,8 @@
     /* `top`: ops for the whole board (its type, its perspectives), applied to
        the top board also while a canvas is open. */
     function applyOps(ops, live, top) {
+      // without a name (none from git), say who you are first
+      if (opts.requireName && !st.author && !view) { askName(); return { ok: false, error: "your name first" }; }
       // editing while looking at the AI's changes keeps them
       if (st.preview && !live) acceptPreview();
       // something new, made while looking through a perspective, belongs to it
@@ -2827,6 +2831,80 @@
       have.slice(Math.max(rows.length - 1, 0)).forEach(function (n) { ops.push({ op: "remove", id: n.id }); });
       return ops;
     }
+    /* Who you are: asked once when git does not know (it signs comments
+       and the versions kept of the board), remembered in this browser. */
+    function askName(then) {
+      if (!modal.hidden) return;
+      var input = h("input", { class: "dge-name-input", placeholder: "Your name", autocomplete: "name" });
+      var go = function () {
+        var v = input.value.trim();
+        if (!v) return input.focus();
+        st.author = v;
+        lsSet("diagram.author", v);
+        closeModal();
+        flash("Hello, " + v + ": your comments and versions are signed with your name");
+        if (then) then();
+      };
+      input.addEventListener("keydown", function (e) { e.stopPropagation(); if (e.key === "Enter") go(); });
+      showModal("Who are you?", h("div", { class: "dge-persp-form" }, [
+        h("p", { class: "dge-muted" }, ["Git does not know your name here, so the board does not either. It signs your comments and the versions kept of the board, so others know who changed what."]),
+        input
+      ]), [h("button", { class: "primary", onclick: go }, ["Continue"])]);
+      setTimeout(function () { input.focus(); }, 0);
+    }
+    /* History: the board's versions (commits in git, snapshots otherwise).
+       A version can be compared with now or brought back (undoable). */
+    var historyMenu = null;
+    function toggleHistory(anchor) {
+      if (historyMenu && !historyMenu.hidden) { historyMenu.hidden = true; return; }
+      if (!historyMenu) { historyMenu = h("div", { class: "dge-board-menu dge-history", role: "dialog", "aria-label": "History", hidden: true }); el.appendChild(historyMenu); }
+      historyMenu.innerHTML = "";
+      historyMenu.appendChild(h("div", { class: "dge-muted" }, ["Loading the history…"]));
+      var r = anchor.getBoundingClientRect(), host = el.getBoundingClientRect();
+      historyMenu.hidden = false;
+      historyMenu.style.top = (r.bottom - host.top + 6) + "px";
+      historyMenu.style.left = Math.max(8, Math.min(r.right - host.left - 340, host.width - 348)) + "px";
+      opts.history.list().then(function (res) {
+        historyMenu.innerHTML = "";
+        var head = res.git ? "Commits that changed this board" : "Versions kept of this board (it is not in git)";
+        historyMenu.appendChild(h("b", {}, [head]));
+        if (!res.versions || !res.versions.length) {
+          historyMenu.appendChild(h("p", { class: "dge-muted" }, [res.git ? "No commits yet." : "None yet: a version is kept every few minutes while you edit."]));
+          return;
+        }
+        var list = h("div", { class: "dge-history-list" });
+        res.versions.forEach(function (v) {
+          var when = ago(v.time);
+          list.appendChild(h("div", { class: "dge-history-row" }, [
+            h("span", { class: "dge-num", "aria-hidden": "true" }, [(v.author || "?").split(/\s+/).map(function (w) { return w.charAt(0); }).join("").slice(0, 2).toUpperCase()]),
+            // the exact time (and the whole message) on hover
+            h("span", { class: "dge-history-text", title: new Date(v.time * 1000).toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" }) + (v.message ? "\n" + v.message : "") }, [h("b", {}, [v.author || "someone"]), h("span", {}, [when + (v.message ? " · " + v.message : "")])]),
+            h("button", { title: "Highlight what changed since this version", onclick: function () { opts.history.get(v.id).then(function (src) { setBase(src, v.message ? "“" + v.message + "”" : when); historyMenu.hidden = true; }, function (e) { flash(e.message, true); }); } }, ["Changes"]),
+            h("button", { title: "Bring the board back to this version (" + MOD + "Z undoes it)", onclick: function () { opts.history.get(v.id).then(function (src) { restoreVersion(src, v.author, when); }, function (e) { flash(e.message, true); }); } }, ["Restore"])
+          ]));
+        });
+        historyMenu.appendChild(list);
+      }, function (e) { historyMenu.innerHTML = ""; historyMenu.appendChild(h("p", {}, ["No history: " + e.message])); });
+    }
+    function ago(t) {
+      var s = Math.max(0, Date.now() / 1000 - t);
+      if (s < 90) return "just now";
+      if (s < 3600) return Math.round(s / 60) + " min ago";
+      if (s < 86400) return Math.round(s / 3600) + " h ago";
+      if (s < 86400 * 7) return Math.round(s / 86400) + " days ago";
+      return new Date(t * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    }
+    function restoreVersion(src, who, when) {
+      if (opts.requireName && !st.author) return askName();
+      historyMenu.hidden = true;
+      st.undo.push(st.text);
+      st.redo = [];
+      st.session.set_source(src);
+      st.text = st.session.source("dsl");
+      refreshDoc();
+      afterChange(true);
+      flash("Back to " + (who ? who + "'s" : "the") + " version from " + when + " (" + MOD + "Z undoes it)");
+    }
     /* Recipes: ready-made arrangements of blocks (the AI knows them too). */
     function recipeMenu() {
       var list = JSON.parse((st.answer ? st.answer.main.session : st.session).recipes());
@@ -4001,6 +4079,7 @@
     document.addEventListener("pointerdown", function (e) {
       if (blocksMenu && !blocksMenu.hidden && !blocksMenu.contains(e.target) && !(blocksBtn && blocksBtn.contains(e.target))) closeBlocks();
       if (boardMenu && !boardMenu.hidden && !boardMenu.contains(e.target) && !e.target.closest("[data-act=board]")) boardMenu.hidden = true;
+      if (historyMenu && !historyMenu.hidden && !historyMenu.contains(e.target) && !e.target.closest("[data-act=history]")) historyMenu.hidden = true;
     });
 
     function baseName() {
@@ -4228,6 +4307,7 @@
       getDocument: function () { return JSON.parse(st.session.document()); },
       errors: function () { return st.errors.slice(); },
       setBase: setBase,
+      author: function () { return st.author || ""; },
       prompt: function (o) { return st.session.prompt(JSON.stringify(o || {})); },
       brief: function () { return st.session.brief(); },
       exportSVG: exportSVG,
@@ -4398,6 +4478,7 @@
     if (opts.base != null) setBase(opts.base, opts.baseLabel);
     restorePerspective();
     if (st.perspective) render();
+    if (opts.requireName && !st.author && !view) setTimeout(function () { askName(); }, 300);
     // a team's recipes reach the AI's prompts and Insert recipe…
     if (opts.recipes) Promise.resolve(opts.recipes()).then(function (files) { if (files && st.session.set_recipes) st.session.set_recipes(JSON.stringify(files)); }).catch(function () {});
     return api;

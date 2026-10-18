@@ -2,6 +2,7 @@ mod ai;
 mod app;
 mod assets;
 mod export;
+mod history;
 mod png;
 mod server;
 mod skills;

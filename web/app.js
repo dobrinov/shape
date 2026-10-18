@@ -67,7 +67,9 @@
       if (saving) { pending = text; return; }
       saving = true;
       status("Saving…");
-      saved = fetch(api("api/file"), { method: "PUT", body: text }).then(function (r) { return r.json(); }).then(function (res) {
+      // the name signs the snapshots kept of a board git does not track
+      var who = editor && editor.author ? editor.author() : "";
+      saved = fetch(api("api/file"), { method: "PUT", body: text, headers: who ? { "X-Diagram-Author": encodeURIComponent(who) } : {} }).then(function (r) { return r.json(); }).then(function (res) {
         saving = false;
         if (!res.ok) throw new Error(res.error);
         mtime = res.mtime;
@@ -122,6 +124,18 @@
             return res.text;
           });
         } : null,
+        // without a name from git, the editor asks who you are before you edit
+        requireName: !f.author,
+        // the board's versions: commits, or snapshots when git does not track it
+        history: {
+          list: function () { return fetch(api("api/history")).then(function (r) { return r.json(); }); },
+          get: function (id) {
+            return fetch(api("api/history/version") + (FILE ? "&" : "?") + "id=" + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (v) {
+              if (!v.ok) throw new Error(v.error);
+              return v.source;
+            });
+          }
+        },
         // a team's recipes (recipes/*.diagram), for the AI and Insert recipe…
         recipes: function () {
           return fetch(api("api/recipes")).then(function (r) { return r.json(); }).then(function (v) { return v.ok ? v.recipes : {}; });

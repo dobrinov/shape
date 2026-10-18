@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.44.0 — 2026-10-18
+
+- **History:** the clock button in the top bar lists the board's versions, with who made each and when (hover a version for its exact time).
+  - In git they are the commits that changed the file.
+  - A board git does not track gets snapshots kept beside it in `.diagram-history/<file>/`: one at most every five minutes of saving, signed by whoever saved, the newest 200 kept.
+  - *Changes* highlights what changed since a version. *Restore* brings one back; ⌘Z undoes it.
+- **Your name first:** when git does not know your name, the editor asks for it before you edit or comment. It signs your comments and the snapshots, and this browser remembers it.
+- Server `GET /api/history` and `GET /api/history/version?id=`; `PUT /api/file` takes the author in `X-Diagram-Author`.
+- Fixed two prompt tests left behind by recipes.
+
 ## 0.43.0 — 2026-10-18
 
 - **Recipes:** ready-made arrangements of ordinary blocks for what a software team keeps coming back to. There are 17:

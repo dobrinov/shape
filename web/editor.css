@@ -414,3 +414,12 @@
 .dge-persp-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; margin-top: 6px; }
 .dge-persp-kinds label, .dge-persp-check { display: flex; align-items: center; gap: 6px; font-weight: 400; }
 .dge-persp-form > label.dge-persp-check { flex-direction: row; align-items: center; font-weight: 400; }
+/* history: the board's versions */
+.dge-board-menu.dge-history { width: 340px; max-height: 60vh; overflow: auto; }
+.dge-history-list { display: flex; flex-direction: column; gap: 2px; }
+.dge-history-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 8px; }
+.dge-history-row:hover { background: var(--bg3); }
+.dge-history-text { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.dge-history-text span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dge .dge-history-row button { height: 26px; min-height: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 12px; }
+.dge .dge-name-input { height: 34px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; font: inherit; background: var(--bg); color: var(--fg); }
