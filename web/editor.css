@@ -427,3 +427,10 @@
 .dge-prompt-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .dge .dge-prompt-tabs button { height: 28px; min-height: 0; padding: 0 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); font-size: 12px; }
 .dge .dge-prompt-tabs button.on { border-color: var(--accent); color: var(--accent); background: var(--bg2); }
+/* Your AI: connect one, check it, what to try when it fails */
+.dge-ai-setup p { margin: 10px 0; line-height: 1.5; }
+.dge-ai-setup code { padding: 1px 5px; border-radius: 4px; background: var(--bg2); font: 12px var(--mono); }
+.dge-ai-tool { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.dge-ai-error { max-height: 160px; overflow: auto; margin: 0; padding: 10px; border-radius: 6px; background: var(--bg2); font: 12px/1.5 var(--mono); white-space: pre-wrap; }
+.dge-ok { color: #1a7f37; }
+.dge .dge-ai-menu .dge-ai-foot { width: 100%; height: 30px; min-height: 0; margin-top: 4px; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; color: var(--muted); font-size: 12px; }

@@ -325,8 +325,31 @@ pub fn serve(
             (Method::Get, "/api/ai") => respond_json(
                 req,
                 200,
-                json!({ "available": ai.is_some(), "command": ai }),
+                json!({ "available": ai.is_some(), "command": ai, "installed": crate::ai::installed(), "presets": crate::ai::PRESETS.iter().map(|p| p.0).collect::<Vec<_>>() }),
             ),
+            // a tiny prompt, to see whether the harness works
+            (Method::Post, "/api/ai/check") => {
+                let Some(cmd) = ai.clone() else {
+                    respond_json(
+                        req,
+                        200,
+                        json!({ "ok": false, "error": "no AI is connected" }),
+                    );
+                    continue;
+                };
+                std::thread::spawn(move || {
+                    match crate::ai::run(&cmd, "Reply with the single word OK.") {
+                        Ok(text) => {
+                            respond_json(req, 200, json!({ "ok": true, "text": text.trim() }))
+                        }
+                        Err(e) => respond_json(
+                            req,
+                            200,
+                            json!({ "ok": false, "hint": crate::ai::hint(&cmd, &e), "error": e }),
+                        ),
+                    }
+                });
+            }
             (Method::Post, "/api/ai") => {
                 let mut prompt = String::new();
                 let _ = req.as_reader().read_to_string(&mut prompt);
@@ -341,7 +364,11 @@ pub fn serve(
                 // models take seconds; keep serving saves and polls meanwhile
                 std::thread::spawn(move || match crate::ai::run(&cmd, &prompt) {
                     Ok(text) => respond_json(req, 200, json!({ "ok": true, "text": text })),
-                    Err(e) => respond_json(req, 200, json!({ "ok": false, "error": e })),
+                    Err(e) => respond_json(
+                        req,
+                        200,
+                        json!({ "ok": false, "hint": crate::ai::hint(&cmd, &e), "error": e }),
+                    ),
                 });
             }
             (Method::Get, "/api/version") => {

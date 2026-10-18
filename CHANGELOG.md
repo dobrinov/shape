@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.46.0 — 2026-10-18
+
+- **Connect your AI:** with no AI connected, the ✦ menu starts with *Connect your AI*. It lists Claude Code, Codex CLI and Gemini CLI: which subscription each uses, how to install it, how to sign in, a link to its docs, and which are already installed. It also says how to pick one (`--ai`) or use any other command. The copy-the-prompt dialog links to it too.
+- **When the AI fails:** the editor shows what the tool said and what to try:
+  - not found: install it or give its full path;
+  - not signed in: the command that signs in;
+  - a limit reached or the service busy: wait, or use another one;
+  - no connection: check the network.
+
+  *Check it works* sends a one-word prompt to test it. With an AI connected, the ✦ menu's *Your AI: check it, or change it…* opens the same dialog.
+- The subscription CLIs are also looked for where their installers put them (`~/.local/bin`, `~/.claude/local`, Homebrew, npm and bun folders), so an editor opened from Finder or a desktop launcher finds them.
+- Server: `GET /api/ai` lists the installed CLIs; `POST /api/ai/check`; failed calls come with a `hint`.
+
 ## 0.45.0 — 2026-10-18
 
 - **AI prompts…** in the Board popover: the prompts that Rethink, Sort into perspectives, Ask and Add what you know would send for this board as it is now, one tab each, to read or copy (and give feedback on). Nothing is sent from there.

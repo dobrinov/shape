@@ -60,6 +60,7 @@
     kanban: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/><rect x="4.8" y="7" width="2.4" height="2.4" rx=".6" fill="currentColor" stroke="none"/><rect x="4.8" y="11" width="2.4" height="2.4" rx=".6" fill="currentColor" stroke="none"/><rect x="10.8" y="7" width="2.4" height="2.4" rx=".6" fill="currentColor" stroke="none"/><rect x="16.8" y="7" width="2.4" height="2.4" rx=".6" fill="currentColor" stroke="none"/>',
     section: '<rect x="3" y="8" width="18" height="12" rx="2"/><rect x="3" y="3" width="9" height="3.5" rx="1.2" fill="currentColor" stroke="none"/>',
     fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+    setup: '<path d="M9 3v4M15 3v4"/><path d="M6.5 7h11v3.5a5.5 5.5 0 01-11 0z"/><path d="M12 16v5"/>',
     magic: '<path d="M10 3.5c.5 3.9 2.6 6 6.5 6.5-3.9.5-6 2.6-6.5 6.5-.5-3.9-2.6-6-6.5-6.5 3.9-.5 6-2.6 6.5-6.5z" fill="currentColor" stroke="none"/><path d="M18 13.5c.25 1.9 1.1 2.75 3 3-1.9.25-2.75 1.1-3 3-.25-1.9-1.1-2.75-3-3 1.9-.25 2.75-1.1 3-3z" fill="currentColor" stroke="none"/>',
     history: '<path d="M4 12a8 8 0 102.3-5.6"/><path d="M4 4.5v3.5h3.5"/><path d="M12 8v4.5l3 2"/>',
     branch: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3.5-11 6.5"/>',
@@ -199,10 +200,14 @@
       aiItem("rethink", "Rethink", "Act on the comments and bring the board up to date",
         "Rethink: the AI reads the whole board, every canvas included. It acts on the open comments first (changing the board everywhere a comment affects it, then resolving the comment), then organises: related items in sections, duplicates merged, stale items updated. In git, what changed on this branch counts as new information too. Nothing is lost, and you see the changes before keeping them.",
         "", function () { rethink(); }),
+      opts.ai ? null : aiItem("setup", "Connect your AI", "None is connected: set up the one you pay for",
+        "Connect your AI: diagram uses the AI subscription you already have (Claude, ChatGPT or Gemini) through its command-line tool. Until one is connected, the actions below show the prompt to paste into any chat.",
+        "", function () { closeAiMenu(); setupAI(); }),
       aiItem("add", "Add what you know", "Details, facts or notes: the AI puts them in place",
         "Add what you know (" + MOD + "K): write down details or information you have, about the selection or the whole canvas; the AI adds them where they belong, or makes the change you ask for. You see the changes before keeping them.",
-        MOD + "K", function () { askAI(); })
-    ]);
+        MOD + "K", function () { askAI(); }),
+      opts.ai && opts.aiSetup ? h("button", { class: "dge-ai-foot", title: "Which AI is used, and whether it works", onclick: function () { closeAiMenu(); setupAI(); } }, ["Your AI: check it, or change it…"]) : null
+    ].filter(Boolean));
     var aiFab = h("button", { class: "dge-ai-fab", "aria-haspopup": "menu", "aria-label": "AI", title: "AI features: Rethink this canvas, or Add what you know. They run on your own AI subscription, and you see every change before keeping it.", html: icon("magic"), onclick: function () {
       if (aiMenu.hidden) { aiMenu.hidden = false; aiFab.classList.add("on"); } else closeAiMenu();
     } });
@@ -1046,19 +1051,79 @@
       return true;
     }
 
+    /* Your AI: how to connect one (none is), which one is used and whether
+       it works, or, after a call failed, what went wrong and what to try. */
+    function setupAI(failure) {
+      var setup = opts.aiSetup;
+      var body = h("div", { class: "dge-ai-setup" });
+      var code = function (t) { return h("code", {}, [t]); };
+      // `quoted` parts of a hint as code
+      var said = function (t) { return h("span", {}, String(t || "").split("`").map(function (part, i) { return i % 2 ? code(part) : part; })); };
+      var status = h("p", { class: "dge-muted" });
+      var check = function () {
+        status.textContent = "Asking it to say OK…";
+        setup.check().then(function (r) {
+          status.innerHTML = "";
+          if (r.ok) status.appendChild(h("span", { class: "dge-ok" }, ["✓ It works: it answered “" + String(r.text).slice(0, 60) + "”."]));
+          else status.appendChild(h("span", {}, [h("b", {}, ["It did not work: "]), r.error, h("br"), h("b", {}, ["What to try: "]), said(r.hint)]));
+        }, function (e) { status.textContent = "Could not check: " + e.message; });
+      };
+      var render = function (info) {
+        body.innerHTML = "";
+        if (failure) {
+          body.appendChild(h("p", {}, ["Nothing on the board changed. What it said:"]));
+          body.appendChild(h("pre", { class: "dge-ai-error" }, [String(failure.message || failure)]));
+          if (failure.hint) body.appendChild(h("p", {}, [h("b", {}, ["What to try: "]), said(failure.hint)]));
+        }
+        if (opts.ai) {
+          if (info && info.command) body.appendChild(h("p", {}, ["Connected through ", code(info.command), ". To use another one, start the editor with ", code("diagram FILE --ai codex"), " (or ", code("claude"), ", ", code("gemini"), ", ", code("claude:opus"), ", any command that reads a prompt and prints the answer), or set ", code("DIAGRAM_AI"), "."]));
+          else body.appendChild(h("p", {}, ["The AI is the one this app was set up with."]));
+          if (setup) body.appendChild(status);
+          return;
+        }
+        var installed = (info && info.installed) || [];
+        body.appendChild(h("p", {}, ["diagram uses the AI subscription you already pay for, through its command-line tool, signed in as you. Install one and sign in once:"]));
+        [
+          ["claude", "Claude Code", "Claude Pro or Max", "curl -fsSL https://claude.ai/install.sh | bash", "claude", "https://docs.anthropic.com/en/docs/claude-code/setup"],
+          ["codex", "Codex CLI", "ChatGPT Plus or Pro", "npm install -g @openai/codex", "codex login", "https://github.com/openai/codex"],
+          ["gemini", "Gemini CLI", "a Google account", "npm install -g @google/gemini-cli", "gemini", "https://github.com/google-gemini/gemini-cli"]
+        ].forEach(function (t) {
+          var has = installed.indexOf(t[0]) >= 0;
+          body.appendChild(h("div", { class: "dge-ai-tool" }, [
+            h("div", {}, [h("b", {}, [t[1]]), h("span", { class: "dge-muted" }, [" · with " + t[2]]), has ? h("span", { class: "dge-ok" }, [" · installed"]) : null, " ", h("a", { href: t[5], target: "_blank", rel: "noopener" }, ["docs ↗"])]),
+            has ? null : h("div", {}, ["Install: ", code(t[3])]),
+            h("div", {}, ["Sign in: run ", code(t[4]), " in a terminal once"])
+          ]));
+        });
+        body.appendChild(h("p", {}, [installed.length
+          ? "One is installed but this editor started without it: close it and open the board again (" : "Then open the board again (",
+          code("diagram FILE"), "); it uses the first one it finds. Pick one with ", code("--ai codex"), ", or use any command that reads a prompt and prints the answer: ", code("--ai \"my-tool --flag\""), "."]));
+        body.appendChild(h("p", { class: "dge-muted" }, ["Until then, the ✦ actions show the prompt to paste into any chat, and take the reply back."]));
+      };
+      showModal(failure ? "The AI did not answer" : opts.ai ? "Your AI" : "Connect your AI", body, [
+        opts.ai && setup ? h("button", { onclick: check }, ["Check it works"]) : null,
+        h("button", { class: "primary", onclick: closeModal }, ["Close"])
+      ].filter(Boolean));
+      render(null);
+      if (setup) setup.status().then(render, function () {});
+    }
     /* Ask the model. With no `ai` option the prompt is shown to copy into any
        chat or harness, and the reply is pasted back. */
     function ask(prompt, title) {
       // the date, so the model does not guess the year
       prompt = "Today is " + isoDay(today()) + ".\n\n" + prompt;
-      if (opts.ai) return Promise.resolve(opts.ai(prompt));
+      // when the AI fails, say why and what to try
+      if (opts.ai) return Promise.resolve().then(function () { return opts.ai(prompt); }).catch(function (e) {
+        if (String(e && e.message) !== "cancelled") { setupAI(e); if (e && typeof e === "object") e.shown = true; }
+        throw e;
+      });
       return new Promise(function (resolve, reject) {
         var pre = h("textarea", { class: "dge-preview", readonly: true, rows: 10 });
         pre.value = prompt;
         var reply = h("textarea", { class: "dge-preview", rows: 8, placeholder: "Paste the model's reply here" });
         var settled = false;
         showModal(title || "✦ Ask a model", h("div", { class: "dge-prompt" }, [
-          h("p", { class: "dge-muted" }, ["No model is connected here. Copy the prompt into any chat or agent, then paste its reply."]),
+          h("p", { class: "dge-muted" }, ["No model is connected here. Copy the prompt into any chat or agent, then paste its reply. ", h("a", { href: "#", onclick: function (e) { e.preventDefault(); settled = true; reject(new Error("cancelled")); setupAI(); } }, ["Connect your AI…"])]),
           pre, reply
         ]), [
           h("button", { onclick: function () { copyText(prompt).then(function () { flash("Prompt copied"); }); } }, ["Copy prompt"]),
@@ -1416,7 +1481,8 @@
         if (!res.count) return showNote(note || "The AI changed nothing.");
         startPreview(next, res.count, note);
       }, function (e) {
-        if (String(e && e.message) !== "cancelled") flash("AI: " + (e && e.message || e), true);
+        if (e && e.shown) flash(""); // the dialog says it
+        else if (String(e && e.message) !== "cancelled") flash("AI: " + (e && e.message || e), true);
       });
     }
     /* What the AI said when it changed nothing: stays until read. */
@@ -1487,7 +1553,7 @@
         ops.push({ op: "add_outline", parent: id, outline: outline });
         var res = applyOps(ops);
         if (res.ok) flash("✦ Added " + res.created.length + " topics");
-      }).catch(function (e) { if (e && e.message !== "cancelled") flash(e.message || String(e), true); else flash(""); })
+      }).catch(function (e) { if (e && e.message !== "cancelled" && !e.shown) flash(e.message || String(e), true); else flash(""); })
         .then(function () { thinking(id, false); });
     }
     /* Free space for a new map: below everything that is there. */
@@ -1508,7 +1574,7 @@
         if (!outline.trim()) throw new Error("The reply had no topics");
         var res = applyOps([{ op: "add_outline", outline: outline, x: Math.round(at.x - 80), y: Math.round(at.y - 24) }]);
         if (res.ok) { select([res.created[0]]); reveal(res.created[0]); flash("✦ Added a mindmap with " + res.created.length + " topics"); }
-      }).catch(function (e) { if (e && e.message !== "cancelled") flash(e.message || String(e), true); else flash(""); });
+      }).catch(function (e) { if (e && e.message !== "cancelled" && !e.shown) flash(e.message || String(e), true); else flash(""); });
     }
     function pasteOutline(text) {
       var lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); });

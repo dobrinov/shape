@@ -120,10 +120,15 @@
         // ✦ actions go to the harness the server was started with (--ai CMD)
         ai: harness.available ? function (prompt) {
           return fetch("api/ai", { method: "POST", body: prompt }).then(function (r) { return r.json(); }).then(function (res) {
-            if (!res.ok) throw new Error(res.error);
+            if (!res.ok) { var e = new Error(res.error); e.hint = res.hint; throw e; }
             return res.text;
           });
         } : null,
+        // ✦ → Connect your AI / Your AI: what is installed, and a check that it answers
+        aiSetup: {
+          status: function () { return fetch("api/ai").then(function (r) { return r.json(); }); },
+          check: function () { return fetch("api/ai/check", { method: "POST" }).then(function (r) { return r.json(); }); }
+        },
         // without a name from git, the editor asks who you are before you edit
         requireName: !f.author,
         // the board's versions: commits, or snapshots when git does not track it
