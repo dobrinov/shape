@@ -153,12 +153,13 @@ pub fn run(cmd: &str, prompt: &str) -> Result<String, String> {
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("cannot run `{cmd}`: {e}"))?;
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(prompt.as_bytes())
-        .map_err(|e| format!("`{cmd}`: {e}"))?;
+    // a command that ends before reading it all (not found, not signed
+    // in) closes the pipe: how it ended says more than the broken pipe
+    if let Err(e) = child.stdin.take().unwrap().write_all(prompt.as_bytes()) {
+        if e.kind() != std::io::ErrorKind::BrokenPipe {
+            return Err(format!("`{cmd}`: {e}"));
+        }
+    }
     let out = child
         .wait_with_output()
         .map_err(|e| format!("`{cmd}`: {e}"))?;
@@ -189,8 +190,11 @@ mod tests {
         assert!(hint("codex exec -", "error: not logged in").contains("codex login"));
         assert!(hint("gemini", "429 Too Many Requests").contains("limit"));
         assert!(hint("my-ai", "boom").contains("echo 'Say OK' | my-ai"));
-        let e = run("exit 127", "x").unwrap_err();
-        assert!(e.contains("command not found"), "{e}");
+        // ended before reading the prompt: what happened, not a broken pipe
+        for _ in 0..20 {
+            let e = run("exit 127", &"x".repeat(1 << 20)).unwrap_err();
+            assert!(e.contains("command not found"), "{e}");
+        }
         assert_eq!(run("cat", "hi").unwrap(), "hi");
     }
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.1 — 2026-10-18
+
+- Fixed: when the AI tool ended before reading the whole prompt (not installed, not signed in), the error said "broken pipe" instead of what happened. This also made a test fail now and then on Linux, which held back the website's deploys.
+
 ## 0.55.0 — 2026-10-18
 
 - **A new icon:** a white square, a yellow circle and a green triangle on an indigo-to-blue tile, for Shape.app, the window, the favicon, the website and the `.shape` / `.diagram` document icon (which now reads SHAPE). Run `shape install-app` again to get it in Finder and the Dock.
