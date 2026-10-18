@@ -121,7 +121,9 @@ git clone https://github.com/dobrinov/diagram && cd diagram
 make install        # builds web/pkg (WASM), then `cargo install --path crates/cli`
 ```
 
-A plain `cargo install --path crates/cli` also works. Its `build.rs` runs wasm-pack whenever the WASM bundle is missing or out of date.
+A plain `cargo install --path crates/cli` also works. Its `build.rs` runs wasm-pack whenever the WASM bundle is missing or out of date. The editor's native window uses the system webview (WebKit on macOS, WebView2 on Windows 10/11, WebKitGTK on Linux: `sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev` to build there); `--no-default-features` builds without it, and boards then open in the browser.
+
+**The editor:** `diagram FILE` opens the board in its own window; closing the window saves and stops. `diagram` with no file asks where to save a new board. `--browser` opens a browser tab instead (as before), `--no-open` just runs the server. Where no window can be made (no display), the browser opens.
 
 **Open boards from Finder (or Files, or Explorer):**
 
@@ -129,15 +131,16 @@ A plain `cargo install --path crates/cli` also works. Its `build.rs` runs wasm-p
 diagram install-app      # once; `diagram install-app --remove` undoes it
 ```
 
-After this, `.diagram` files get their own document icon, and double-clicking one opens it in the editor. A board opened that way has no terminal behind it, so its server stops by itself a few minutes after you close the tab. On macOS this is a small Diagram.app in `~/Applications` (or `~/Library/Application Support/diagram`). On Linux it is a MIME type, an icon and a `.desktop` entry in `~/.local/share`. On Windows it is a file association for your user. Run it again after moving or reinstalling diagram.
+After this, `.diagram` files get their own document icon, and double-clicking one opens it in the editor's window (opening Diagram.app itself starts a new board). Closing the window stops it; where it falls back to a browser tab, the server stops by itself a few minutes after you close the tab. On macOS this is a small Diagram.app in `~/Applications` (or `~/Library/Application Support/diagram`). On Linux it is a MIME type, an icon and a `.desktop` entry in `~/.local/share`. On Windows it is a file association for your user. Run it again after moving or reinstalling diagram.
 
 **New versions:** once a day, the editor asks GitHub whether a newer release exists. If one does, the terminal says so (with `brew upgrade diagram` when Homebrew installed it), and a *New* badge in the top bar links to the release notes. Set `DIAGRAM_NO_UPDATE_CHECK=1` to turn this off; it is also off when `CI` is set.
 
 ## Usage
 
 ```
-diagram [FILE]                     open FILE in the editor (created if missing;
-                                   no FILE starts a new untitled.diagram)
+diagram [FILE]                     open FILE in the editor, in its own window (created if
+                                   missing; no FILE asks where to save a new board)
+                                   --browser: in a browser tab · --no-open: the server only
 diagram new FILE [--template flow|architecture|board]
 
 diagram svg  FILE [-o out.svg]     static SVG       ┐ --dark --transparent --title

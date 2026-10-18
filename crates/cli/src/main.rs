@@ -7,9 +7,10 @@ mod png;
 mod server;
 mod skills;
 mod update;
+mod window;
 
 use std::collections::{HashMap, HashSet};
-use std::io::Read;
+use std::io::{IsTerminal, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
@@ -22,8 +23,8 @@ use diagram_core::{Document, RenderOptions};
 pub const HELP: &str = r#"diagram — lightweight diagrams as text, with review comments that become LLM prompts
 
 USAGE
-  diagram [FILE]                     open FILE in the editor (created if missing;
-                                     no FILE starts a new untitled.diagram)
+  diagram [FILE]                     open FILE in the editor, in its own window (created if
+                                     missing; no FILE asks where to save a new board)
   diagram new FILE [--template flow|architecture|board|product|project]   start a diagram from a template
                                      (product and project boards come with perspectives)
   --canvas ID[/ID…]                  with any command: work on that canvas inside the board
@@ -98,7 +99,9 @@ MORE
   diagram version
 
 SERVER OPTIONS
-  --port N  --no-open  --ai CMD
+  --port N  --ai CMD
+  --browser                          open the editor in a browser tab instead of a window
+  --no-open                          neither: just the server (no FILE then makes untitled.diagram)
   --idle-exit                        stop once no editor tab has been heard from for 3 minutes
 
 FILE may be `-` for stdin. Formats are chosen by extension: .diagram (DSL),
@@ -769,24 +772,58 @@ fn run(args: Args) -> Result<ExitCode, String> {
             ok
         }
         "open" => {
-            let file = args.pos.first().cloned().unwrap_or_else(untitled);
-            if !Path::new(&file).exists() {
-                std::fs::write(&file, "idea: Start here\nidea -> next: then\n")
-                    .map_err(|e| format!("{file}: {e}"))?;
-                eprintln!("created {file}");
-            }
+            use window::{Native, Open};
             let port = args
                 .val("--port")
                 .map(|p| p.parse::<u16>().map_err(|_| "--port must be a number"))
                 .transpose()?;
+            let open = window::choose(
+                args.flag("--no-open"),
+                args.flag("--browser"),
+                cfg!(feature = "window"),
+            );
+            // made first: on macOS the window owns the app before any dialog
+            let native = match open {
+                Open::Window => Native::init(),
+                _ => None,
+            };
+            let file = match args.pos.first() {
+                Some(f) => PathBuf::from(f),
+                None => {
+                    // from a terminal or a double-click on the app: ask where
+                    // the new board goes (not from scripts and tests)
+                    let terminal = std::io::stdin().is_terminal();
+                    let asked = native
+                        .as_ref()
+                        .filter(|_| terminal || args.flag("--idle-exit"));
+                    match asked {
+                        Some(n) => match n.ask_new_board(&window::start_dir(terminal)) {
+                            Some(f) => f,
+                            None => return ok, // cancelled
+                        },
+                        None => PathBuf::from(untitled()),
+                    }
+                }
+            };
+            if !file.exists() {
+                std::fs::write(&file, "idea: Start here\nidea -> next: then\n")
+                    .map_err(|e| format!("{}: {e}", file.display()))?;
+                let at = std::fs::canonicalize(&file).unwrap_or_else(|_| file.clone());
+                eprintln!("created {}", at.display());
+            }
+            let show = match (open, native) {
+                (Open::Nowhere, _) => server::Show::None,
+                (Open::Window, Some(n)) => server::Show::Window(n),
+                (Open::Window, None) => {
+                    if cfg!(feature = "window") {
+                        eprintln!("diagram: no window here (no display?); opening the browser");
+                    }
+                    server::Show::Browser
+                }
+                (Open::Browser, _) => server::Show::Browser,
+            };
             let ai = ai::command(args.val("--ai"));
-            server::serve(
-                PathBuf::from(file),
-                port,
-                !args.flag("--no-open"),
-                ai,
-                args.flag("--idle-exit"),
-            )?;
+            server::serve(file, port, show, ai, args.flag("--idle-exit"))?;
             ok
         }
         "install-app" => {

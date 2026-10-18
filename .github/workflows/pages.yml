@@ -29,6 +29,11 @@ jobs:
           node-version: 22
       - name: Install wasm-pack
         run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+      # the CLI's native window (wry) builds on WebKitGTK
+      - name: Install the webview libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
       - name: Test
         run: make wasm && DIAGRAM_SKIP_WASM=1 cargo test --workspace && node --test web/test/*.test.mjs
       - name: Check the example

@@ -180,27 +180,74 @@ pub fn open_browser(url: &str) {
         .spawn();
 }
 
+/// Where the editor shows up once the server listens.
+pub enum Show {
+    /// nowhere: the server only (`--no-open`)
+    None,
+    /// a browser tab (`--browser`, or when there is no window to be had)
+    Browser,
+    /// the native window; the server runs beside it and stops when it closes
+    Window(crate::window::Native),
+}
+
 pub fn serve(
     file: PathBuf,
     port: Option<u16>,
-    open: bool,
+    show: Show,
     ai: Option<String>,
     idle_exit: bool,
 ) -> Result<(), String> {
     let (server, port) = bind(port)?;
     let url = format!("http://127.0.0.1:{port}/");
     let display = file.display().to_string();
-    eprintln!("diagram: editing {display} at {url}  (Ctrl-C to stop)");
+    let stop = if matches!(show, Show::Window(_)) {
+        "close the window to stop"
+    } else {
+        "Ctrl-C to stop"
+    };
+    eprintln!("diagram: editing {display} at {url}  ({stop})");
     match &ai {
         Some(c) => eprintln!("diagram: ✦ AI via `{c}`"),
         None => eprintln!(
             "diagram: no AI harness (use --ai CMD); ✦ actions will show the prompt to copy"
         ),
     }
-    if open {
-        open_browser(&url);
-    }
     crate::update::start();
+    match show {
+        Show::None => listen(server, file, display, ai, idle_exit),
+        Show::Browser => {
+            open_browser(&url);
+            listen(server, file, display, ai, idle_exit)
+        }
+        Show::Window(window) => {
+            let name = crate::window::board_name(&file);
+            // the window's own lifetime ends the process: no idle timer
+            let listener = std::thread::spawn(move || {
+                if let Err(e) = listen(server, file, display, ai, false) {
+                    eprintln!("diagram: {e}");
+                    std::process::exit(1);
+                }
+            });
+            // returns only when no window could be made: a tab, then
+            if let Err(e) = window.run(&url, &name) {
+                eprintln!("diagram: no window ({e}); opening the browser");
+                open_browser(&url);
+            }
+            listener
+                .join()
+                .map_err(|_| "the server stopped".to_string())
+        }
+    }
+}
+
+/// Answer the editor's requests until the process ends.
+fn listen(
+    server: Server,
+    file: PathBuf,
+    display: String,
+    ai: Option<String>,
+    idle_exit: bool,
+) -> Result<(), String> {
     // started from a double-click (`diagram install-app`): no terminal to stop
     // it, so it stops once the editor tabs are gone (they check in every 30s)
     let heard = std::sync::Arc::new(std::sync::Mutex::new(std::time::Instant::now()));
