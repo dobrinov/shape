@@ -435,13 +435,202 @@ pub fn route(doc: &Document, layout: &Layout) -> Vec<EdgePath> {
             }
             Routing::Curved => curve(&e.id, p.pa, p.sa, p.pb, p.sb),
             Routing::Orthogonal => {
-                let pts = orthogonal(p.pa, p.sa, p.pb, p.sb, &p.a, &p.b, lane.get(&i).copied());
+                let mut pts = orthogonal(p.pa, p.sa, p.pb, p.sb, &p.a, &p.b, lane.get(&i).copied());
+                // a path across a box goes round the boxes instead
+                let boxes = obstacles(layout, &e.from, &e.to, &p.a, &p.b);
+                if crosses(&pts, &boxes) {
+                    if let Some(better) = around(p.pa, p.sa, p.pb, p.sb, &boxes) {
+                        pts = better;
+                    }
+                }
                 polyline(&e.id, &pts)
             }
         };
         out.push(path);
     }
     out
+}
+
+/// How far a path keeps from a box it goes round.
+const CLEAR: f64 = 12.0;
+
+/// The boxes an arrow from `from` to `to` must not cross, grown by
+/// [`CLEAR`]: every node but its two ends (and what is inside them).
+fn obstacles(layout: &Layout, from: &str, to: &str, a: &Rect, b: &Rect) -> Vec<Rect> {
+    let inside = |r: &Rect, o: &Rect| {
+        r.x >= o.x - 0.5
+            && r.y >= o.y - 0.5
+            && r.right() <= o.right() + 0.5
+            && r.bottom() <= o.bottom() + 0.5
+    };
+    layout
+        .nodes
+        .iter()
+        .filter(|n| n.id != from && n.id != to)
+        .map(|n| n.rect)
+        .filter(|r| !inside(r, a) && !inside(r, b))
+        .map(|r| Rect {
+            x: r.x - CLEAR,
+            y: r.y - CLEAR,
+            w: r.w + 2.0 * CLEAR,
+            h: r.h + 2.0 * CLEAR,
+        })
+        .collect()
+}
+
+/// Whether the polyline runs through one of `boxes` (touching its edge is fine).
+fn crosses(pts: &[(f64, f64)], boxes: &[Rect]) -> bool {
+    pts.windows(2).any(|w| {
+        let (x0, x1) = (w[0].0.min(w[1].0), w[0].0.max(w[1].0));
+        let (y0, y1) = (w[0].1.min(w[1].1), w[0].1.max(w[1].1));
+        boxes.iter().any(|r| {
+            // the box grown by CLEAR, less a little, so a path along it does not count
+            let (l, t, rr, bb) = (
+                r.x + CLEAR * 0.5,
+                r.y + CLEAR * 0.5,
+                r.right() - CLEAR * 0.5,
+                r.bottom() - CLEAR * 0.5,
+            );
+            x1 > l && x0 < rr && y1 > t && y0 < bb
+        })
+    })
+}
+
+/// An orthogonal path from `pa` (leaving by side `sa`) to `pb` (arriving by
+/// `sb`) that goes round `boxes`: the shortest on a grid of the boxes' edges,
+/// with few bends. None when there is none.
+fn around(
+    pa: (f64, f64),
+    sa: Side,
+    pb: (f64, f64),
+    sb: Side,
+    boxes: &[Rect],
+) -> Option<Vec<(f64, f64)>> {
+    use std::cmp::Reverse;
+    use std::collections::BinaryHeap;
+    let (na, nb) = (sa.normal(), sb.normal());
+    let s = (pa.0 + na.0 * STUB, pa.1 + na.1 * STUB);
+    let t = (pb.0 + nb.0 * STUB, pb.1 + nb.1 * STUB);
+    // only the boxes near the two ends matter
+    let (lx, hx) = (s.0.min(t.0) - 400.0, s.0.max(t.0) + 400.0);
+    let (ly, hy) = (s.1.min(t.1) - 400.0, s.1.max(t.1) + 400.0);
+    let near: Vec<&Rect> = boxes
+        .iter()
+        .filter(|r| r.right() > lx && r.x < hx && r.bottom() > ly && r.y < hy)
+        .filter(|r| !in_rect(r, s) && !in_rect(r, t))
+        .collect();
+    let mut xs = vec![s.0, t.0];
+    let mut ys = vec![s.1, t.1];
+    for r in &near {
+        xs.extend([r.x, r.right()]);
+        ys.extend([r.y, r.bottom()]);
+    }
+    for v in [&mut xs, &mut ys] {
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        v.dedup_by(|a, b| (*a - *b).abs() < 0.5);
+    }
+    let (nx, ny) = (xs.len(), ys.len());
+    let free = |x: f64, y: f64| {
+        !near
+            .iter()
+            .any(|r| x > r.x + 0.5 && x < r.right() - 0.5 && y > r.y + 0.5 && y < r.bottom() - 0.5)
+    };
+    let find = |v: &[f64], x: f64| v.iter().position(|c| (c - x).abs() < 0.5);
+    let (si, sj) = (find(&xs, s.0)?, find(&ys, s.1)?);
+    let (ti, tj) = (find(&xs, t.0)?, find(&ys, t.1)?);
+    // the first move goes on away from the box, the last comes in towards it
+    let dir_of = |d: (f64, f64)| -> usize {
+        if d.0 > 0.0 {
+            0
+        } else if d.0 < 0.0 {
+            1
+        } else if d.1 > 0.0 {
+            2
+        } else {
+            3
+        }
+    };
+    let start_dir = dir_of(na);
+    let end_dir = dir_of((-nb.0, -nb.1));
+    const BEND: f64 = 40.0;
+    let idx = |i: usize, j: usize, d: usize| (j * nx + i) * 4 + d;
+    let mut best = vec![f64::INFINITY; nx * ny * 4];
+    let mut from: Vec<Option<usize>> = vec![None; nx * ny * 4];
+    let mut heap = BinaryHeap::new();
+    let key = |c: f64| Reverse((c * 100.0) as i64);
+    best[idx(si, sj, start_dir)] = 0.0;
+    heap.push((key(0.0), idx(si, sj, start_dir)));
+    let mut goal = None;
+    while let Some((Reverse(c), state)) = heap.pop() {
+        let cost = c as f64 / 100.0;
+        if cost > best[state] + 0.01 {
+            continue;
+        }
+        let d = state % 4;
+        let cell = state / 4;
+        let (i, j) = (cell % nx, cell / nx);
+        if i == ti && j == tj {
+            // arriving straight in counts no bend; otherwise one more
+            let total = cost + if d == end_dir { 0.0 } else { BEND };
+            if goal.is_none_or(|(g, _)| total < g) {
+                goal = Some((total, state));
+            }
+            continue;
+        }
+        for nd in 0..4 {
+            // never straight back
+            if (d ^ 1) == nd && d / 2 == nd / 2 {
+                continue;
+            }
+            let (ni, nj) = match nd {
+                0 if i + 1 < nx => (i + 1, j),
+                1 if i > 0 => (i - 1, j),
+                2 if j + 1 < ny => (i, j + 1),
+                3 if j > 0 => (i, j - 1),
+                _ => continue,
+            };
+            let (x0, y0, x1, y1) = (xs[i], ys[j], xs[ni], ys[nj]);
+            if !free((x0 + x1) / 2.0, (y0 + y1) / 2.0) || !free(x1, y1) {
+                continue;
+            }
+            let step = (x1 - x0).abs() + (y1 - y0).abs() + if nd == d { 0.0 } else { BEND };
+            let next = idx(ni, nj, nd);
+            if cost + step < best[next] - 0.01 {
+                best[next] = cost + step;
+                from[next] = Some(state);
+                heap.push((key(cost + step), next));
+            }
+        }
+    }
+    let (_, mut state) = goal?;
+    let mut cells = vec![state / 4];
+    while let Some(prev) = from[state] {
+        state = prev;
+        cells.push(state / 4);
+    }
+    cells.reverse();
+    let mut pts = vec![pa];
+    for c in cells {
+        let q = (xs[c % nx], ys[c / nx]);
+        // keep only the corners
+        let n = pts.len();
+        if n >= 2 {
+            let (a, b) = (pts[n - 2], pts[n - 1]);
+            let same_line = ((a.0 - b.0).abs() < 0.5 && (b.0 - q.0).abs() < 0.5)
+                || ((a.1 - b.1).abs() < 0.5 && (b.1 - q.1).abs() < 0.5);
+            if same_line {
+                pts[n - 1] = q;
+                continue;
+            }
+        }
+        pts.push(q);
+    }
+    pts.push(pb);
+    Some(pts)
+}
+
+fn in_rect(r: &Rect, p: (f64, f64)) -> bool {
+    p.0 > r.x && p.0 < r.right() && p.1 > r.y && p.1 < r.bottom()
 }
 
 fn orthogonal(
@@ -638,6 +827,37 @@ fn self_loop(id: &str, r: &Rect) -> EdgePath {
 mod tests {
     use super::*;
     use crate::{dsl, layout::layout};
+
+    #[test]
+    fn arrows_go_round_boxes_in_their_way() {
+        // a pinned box right between the two ends of an arrow
+        let d = dsl::parse("a: Start [x: 0, y: 100]\nwall: In the way [x: 200, y: 60, w: 120, h: 120]\nb: End [x: 420, y: 100]\na -> b\n").unwrap();
+        let l = layout(&d);
+        let paths = route(&d, &l);
+        let p = paths.iter().find(|p| p.id == "a->b").unwrap();
+        let wall = l.rect("wall").unwrap();
+        for w in p.pts.windows(2) {
+            let (x0, x1) = (w[0].0.min(w[1].0), w[0].0.max(w[1].0));
+            let (y0, y1) = (w[0].1.min(w[1].1), w[0].1.max(w[1].1));
+            assert!(
+                !(x1 > wall.x && x0 < wall.right() && y1 > wall.y && y0 < wall.bottom()),
+                "{:?} crosses {wall:?}",
+                p.pts
+            );
+        }
+        assert!(p.pts.len() > 2, "it bends round the box: {:?}", p.pts);
+        // it still starts and ends where it did, at the two boxes
+        let (a, b) = (l.rect("a").unwrap(), l.rect("b").unwrap());
+        assert!(
+            (p.pts[0].0 - a.right()).abs() < 1.0 && (p.pts.last().unwrap().0 - b.x).abs() < 1.0,
+            "{:?}",
+            p.pts
+        );
+        // an arrow with nothing in its way keeps its plain path
+        let d = dsl::parse("a: A [x: 0, y: 0]\nb: B [x: 300, y: 0]\na -> b\n").unwrap();
+        let l = layout(&d);
+        assert_eq!(route(&d, &l)[0].pts.len(), 2);
+    }
 
     #[test]
     fn routes_every_edge() {

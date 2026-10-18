@@ -324,7 +324,7 @@ make site     # build the static site into docs/
 
 ## Limitations
 
-- Edges are routed with spread ports, separate lanes and rounded elbows, but they don't avoid obstacles. In a dense diagram, a line can cross a box. Pinning nodes, changing `direction` or using `routing: curved` usually helps.
+- Elbow arrows go round the boxes in their way; curved and straight ones (`routing: curved | straight`) still go straight across.
 - `#` comment lines in a `.shape` file are dropped when a tool rewrites the file (canvas edits, `apply`, `fmt`). Use `comment` statements for anything that must survive.
 - Collaboration happens through files, git, share links and HTML exports. There is no real-time multi-user server (yet).
 

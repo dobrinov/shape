@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.0 — 2026-10-18
+
+- **Arrows go round boxes:** an elbow arrow whose usual path would cross a box takes the shortest way round the boxes instead, with as few bends as it can, keeping clear of them. Arrows with nothing in their way keep their shape. On a board like Spend Cards, the arrow to Phase 2 no longer runs through Phase 1. Curved and straight arrows are unchanged.
+
 ## 0.55.1 — 2026-10-18
 
 - Fixed: when the AI tool ended before reading the whole prompt (not installed, not signed in), the error said "broken pipe" instead of what happened. This also made a test fail now and then on Linux, which held back the website's deploys.
