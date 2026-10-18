@@ -38,7 +38,7 @@
     hand: '<path transform="scale(1.5)" d="M5.2 8.6V3.4a1 1 0 0 1 2 0V7.4m0-.4V2.6a1 1 0 0 1 2 0V7m0-.2V3.4a1 1 0 0 1 2 0V8m0-2.6a1 1 0 0 1 2 0v4.2c0 2.6-1.9 4.6-4.4 4.6-1.8 0-2.9-.8-3.9-2.3L2.6 9.3a1 1 0 0 1 1.6-1.2l1 1.1" stroke-width=".8"/>',
     node: '<rect x="4" y="6" width="16" height="12" rx="2"/>',
     sticky: '<path d="M5 4h14v10l-5 6H5z"/><path d="M14 20v-6h5"/>',
-    mindmap: '<rect x="2" y="9" width="8" height="6" rx="3"/><path d="M10 12c3 0 3-6 7-6M10 12c3 0 3 6 7 6M17 6h4M17 18h4"/>',
+    mindmap: '<path d="M15.4 21.5v-3.4c2.7-1.4 4.4-4.1 4.4-7.2A8 8 0 0011.7 3c-4 0-7.2 2.9-7.7 6.7L2.7 13a.6.6 0 00.5.9h1.3v2.4a2.3 2.3 0 002.3 2.3h1.6v2.9"/><g stroke-width="1.4"><circle cx="12.2" cy="10.6" r="1.5"/><path d="M12.2 9.1V6.9M13.5 9.8l2-1.1M13.4 11.6l1.7 1.3M11 11.6l-1.8 1.4"/></g><circle cx="12.2" cy="5.9" r="1.2" fill="currentColor" stroke="none"/><circle cx="16.4" cy="8.2" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="13.6" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.4" cy="13.6" r="1.2" fill="currentColor" stroke="none"/>',
     connect: '<path d="M5 19L19 5"/><path d="M11 5h8v8"/>',
     comment: '<path d="M4 5h16v11H9l-5 4z"/>',
     undo: '<path d="M9 7L4 12l5 5"/><path d="M4 12h11a5 5 0 010 10h-3"/>',
@@ -63,7 +63,7 @@
     magic: '<path d="M10 3.5c.5 3.9 2.6 6 6.5 6.5-3.9.5-6 2.6-6.5 6.5-.5-3.9-2.6-6-6.5-6.5 3.9-.5 6-2.6 6.5-6.5z" fill="currentColor" stroke="none"/><path d="M18 13.5c.25 1.9 1.1 2.75 3 3-1.9.25-2.75 1.1-3 3-.25-1.9-1.1-2.75-3-3 1.9-.25 2.75-1.1 3-3z" fill="currentColor" stroke="none"/>',
     branch: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3.5-11 6.5"/>',
     blocks: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
-    timeline: '<path d="M3 12h18"/><circle cx="6.5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M17.5 8.6l1.05 2.15 2.35.33-1.7 1.65.4 2.35-2.1-1.1-2.1 1.1.4-2.35-1.7-1.65 2.35-.33z" fill="currentColor" stroke="none"/><path d="M6.5 10V6M12 14v4"/>',
+    timeline: '<path d="M4.5 5H16a3.5 3.5 0 010 7H8a3.5 3.5 0 000 7h11.5"/><circle cx="4.5" cy="5" r="2.7" fill="currentColor" stroke="none"/><circle cx="19.5" cy="19" r="2.7" fill="currentColor" stroke="none"/><circle cx="10.5" cy="5" r="2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="19" r="2" fill="currentColor" stroke="none"/>',
     ask: '<path d="M4 5.5A2.5 2.5 0 016.5 3h11A2.5 2.5 0 0120 5.5v8a2.5 2.5 0 01-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 014 14.5z"/><path d="M10 7.8a2 2 0 113 1.7c-.7.4-1 .8-1 1.5"/><circle cx="12" cy="13.2" r=".6" fill="currentColor"/>',
     rethink: '<rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M14 7h3.5a2 2 0 012 2v2M10 17H6.5a2 2 0 01-2-2v-2"/><path d="M17.5 9.5l2 2 2-2M6.5 14.5l-2-2-2 2"/>',
     add: '<path d="M5 4h14v11l-5 5H5z"/><path d="M12 8v7M8.5 11.5h7"/>'

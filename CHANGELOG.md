@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.40.1 — 2026-10-18
+
+- New icons: the timeline is a winding path with milestones on it, solid at the start and the end; the mindmap is a head with a small map of branches inside.
+
 ## 0.40.0 — 2026-10-18
 
 - **Ask draws its answer.** A question about the board ("what blocks the launch?") is answered on a temporary canvas made for it.
