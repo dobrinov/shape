@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.46.1 — 2026-10-18
+
+- **Arrow labels no longer cover each other:** a label that would sit on another label, or on a box, moves along its arrow (or just beside it) to a free spot.
+- **Parallel arrows keep apart:** the long runs of elbow arrows that would pass within 24px of each other are spread out.
+
 ## 0.46.0 — 2026-10-18
 
 - **Connect your AI:** with no AI connected, the ✦ menu starts with *Connect your AI*. It lists Claude Code, Codex CLI and Gemini CLI: which subscription each uses, how to install it, how to sign in, a link to its docs, and which are already installed. It also says how to pick one (`--ai`) or use any other command. The copy-the-prompt dialog links to it too.

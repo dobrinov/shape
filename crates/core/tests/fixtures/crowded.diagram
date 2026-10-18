@@ -1,0 +1,30 @@
+group summary: Status, 17 Oct 2026 [orange] {
+  what: The Cards Ship In Phases And Each One [rounded, detail: the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a r]
+  phase1: The Cards Ship In Phases And Each One Waits On A Review By T [blue, detail: the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship i]
+  phase2: The Cards Ship In Phases And Each One Waits On A Revi [purple, detail: the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team b]
+  status-now: The Cards Ship In Phases And Each One Waits On A Review By The Team [text, green, detail: the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on]
+}
+group inside: More detail [gray] {
+  status-link: The Cards Sh [pill, green]
+  pricing-link: The Car [pill, yellow]
+  ship-link: The Cards [pill, blue]
+  blockers-link: The Cards Ship I [pill, red]
+  product-link: The Cards Ship In Phases An [pill, purple]
+  people-link: The Cards Ship In Phases [pill]
+}
+group risks-top: At risk [red] {
+  risk-now: The Cards Ship In Phases And Each One Waits On [text, red, detail: the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on awe start on the 26th at the latest\". The 28 Oct beta is virtual cards only."]
+  risk-p2: The Cards Ship In Phases And Each One Waits On A Review By The Team Bef [text, red, detail: the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits o]
+}
+group asks: What we need from you [blue] {
+  ask-price: The Cards Ship In Phases And Each One Waits On A R [detail: the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before]
+  ask-p1: The Cards Ship In Phases And Each One Waits On [detail: the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards s]
+  ask-billing: The Cards Ship In Phases And Each One Wa [detail: the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards ship in phases and each one waits on a review by the team before launch the cards]
+}
+
+phase1 -> phase2: then
+risk-now ..> phase1: threatens [red]
+risk-p2 ..> phase2: threatens [red]
+ask-p1 -> phase1: prices [dotted]
+ask-price -> phase2: prices [dotted]
+ask-billing -> phase2: bills [dotted]

@@ -45,6 +45,36 @@ pub struct EdgePath {
     pub end: ((f64, f64), (f64, f64)),
     #[serde(skip)]
     pub start: ((f64, f64), (f64, f64)),
+    /// Points along the path, for placing a label elsewhere on it.
+    #[serde(skip)]
+    pub pts: Vec<(f64, f64)>,
+}
+
+impl EdgePath {
+    /// The point `f` (0 to 1) of the way along the path.
+    pub fn at(&self, f: f64) -> (f64, f64) {
+        let p = &self.pts;
+        if p.len() < 2 {
+            return self.mid;
+        }
+        let lens: Vec<f64> = p
+            .windows(2)
+            .map(|w| ((w[1].0 - w[0].0).powi(2) + (w[1].1 - w[0].1).powi(2)).sqrt())
+            .collect();
+        let goal = lens.iter().sum::<f64>() * f;
+        let mut acc = 0.0;
+        for (k, l) in lens.iter().enumerate() {
+            if acc + l >= goal && *l > 0.0 {
+                let t = (goal - acc) / l;
+                return (
+                    p[k].0 + (p[k + 1].0 - p[k].0) * t,
+                    p[k].1 + (p[k + 1].1 - p[k].1) * t,
+                );
+            }
+            acc += l;
+        }
+        p[p.len() - 1]
+    }
 }
 
 /// Shapes whose outline does not follow their bounding box: edges attach at
@@ -287,6 +317,92 @@ pub fn route(doc: &Document, layout: &Layout) -> Vec<EdgePath> {
         }
     }
 
+    // middle segments that would run closer than GAP to each other (from
+    // different gaps, so not spread above) move apart, within their gap
+    if routing == Routing::Orthogonal {
+        const GAP: f64 = 24.0;
+        // (edge, vertical segment?, where, its range, the span it covers)
+        let mut segs: Vec<(usize, bool, f64, (f64, f64), (f64, f64))> = Vec::new();
+        for (i, p) in plans.iter().enumerate() {
+            let Some(p) = p else { continue };
+            if doc.edges[i].from == doc.edges[i].to {
+                continue;
+            }
+            let h = p.sa.horizontal();
+            let sw = |q: (f64, f64)| if h { q } else { (q.1, q.0) };
+            let (p1, p2) = (sw(p.pa), sw(p.pb));
+            let (na, nb) = (sw(p.sa.normal()).0, sw(p.sb.normal()).0);
+            let forward = (p2.0 - p1.0) * na > 2.0 * STUB - 1.0 && na == -nb;
+            if !forward || (p1.1 - p2.1).abs() < 1.0 {
+                continue;
+            }
+            let (lo, hi) = (p1.0.min(p2.0) + STUB, p1.0.max(p2.0) - STUB);
+            let at = lane.get(&i).copied().unwrap_or((p1.0 + p2.0) / 2.0);
+            segs.push((i, h, at, (lo, hi), (p1.1.min(p2.1), p1.1.max(p2.1))));
+        }
+        // spreading one group can bring it close to another: a few rounds
+        for _ in 0..6 {
+            let mut moved = false;
+            for s in segs.iter_mut() {
+                if let Some(&at) = lane.get(&s.0) {
+                    s.2 = at;
+                }
+            }
+            for h in [true, false] {
+                let mut list: Vec<_> = segs.iter().filter(|s| s.1 == h).cloned().collect();
+                list.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap().then(a.0.cmp(&b.0)));
+                // clusters of segments that are close and side by side
+                let mut used = vec![false; list.len()];
+                for k in 0..list.len() {
+                    if used[k] {
+                        continue;
+                    }
+                    let mut cluster = vec![k];
+                    used[k] = true;
+                    let mut grew = true;
+                    while grew {
+                        grew = false;
+                        for j in 0..list.len() {
+                            if used[j] {
+                                continue;
+                            }
+                            let near = cluster.iter().any(|&c| {
+                                let (a, b) = (&list[c], &list[j]);
+                                (a.2 - b.2).abs() < GAP && a.4 .0 < b.4 .1 && b.4 .0 < a.4 .1
+                            });
+                            if near {
+                                cluster.push(j);
+                                used[j] = true;
+                                grew = true;
+                            }
+                        }
+                    }
+                    if cluster.len() < 2 {
+                        continue;
+                    }
+                    cluster.sort_by(|a, b| list[*a].2.partial_cmp(&list[*b].2).unwrap());
+                    let centre =
+                        cluster.iter().map(|&c| list[c].2).sum::<f64>() / cluster.len() as f64;
+                    let half = (cluster.len() as f64 - 1.0) / 2.0;
+                    for (n, &c) in cluster.iter().enumerate() {
+                        let (lo, hi) = list[c].3;
+                        let want = centre + (n as f64 - half) * GAP;
+                        let at = if hi > lo {
+                            want.clamp(lo, hi)
+                        } else {
+                            list[c].2
+                        };
+                        moved |= (at - list[c].2).abs() > 0.5;
+                        lane.insert(list[c].0, at);
+                    }
+                }
+            }
+            if !moved {
+                break;
+            }
+        }
+    }
+
     let mut out = Vec::new();
     for (i, e) in doc.edges.iter().enumerate() {
         if let Some(pts) = crate::sequence::message_points(doc, layout, e) {
@@ -455,6 +571,7 @@ fn polyline(id: &str, pts: &[(f64, f64)]) -> EdgePath {
         mid,
         end: (p[last], unit(p[last - 1], p[last])),
         start: (p[0], unit(p[1], p[0])),
+        pts: p,
     }
 }
 
@@ -489,6 +606,7 @@ fn curve(id: &str, pa: (f64, f64), sa: Side, pb: (f64, f64), sb: Side) -> EdgePa
         mid: bez(0.5),
         end: (pb, unit(c2, pb)),
         start: (pa, unit(c1, pa)),
+        pts: (0..=16).map(|i| bez(i as f64 / 16.0)).collect(),
     }
 }
 
@@ -512,6 +630,7 @@ fn self_loop(id: &str, r: &Rect) -> EdgePath {
         mid: (r.right() + 14.0, r.y - 14.0),
         end: (e, (-1.0, 0.0)),
         start: (s, (0.0, 1.0)),
+        pts: Vec::new(),
     }
 }
 

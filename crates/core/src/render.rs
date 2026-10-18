@@ -157,12 +157,43 @@ fn draw(doc: &Document, opts: &RenderOptions, def: Option<crate::model::ThemeDef
                 .fold(0.0, f64::max)
                 + 14.0;
             let h = lines.len() as f64 * 12.0 * LINE_H + 8.0;
-            let r = Rect {
-                x: path.mid.0 - w / 2.0,
-                y: path.mid.1 - h / 2.0,
+            // the middle of the line, or further along it when that is on
+            // another label or a box
+            let rect_at = |c: (f64, f64)| Rect {
+                x: c.0 - w / 2.0,
+                y: c.1 - h / 2.0,
                 w,
                 h,
             };
+            let overlap = |a: &Rect, b: &Rect| {
+                (a.right().min(b.right()) - a.x.max(b.x)).max(0.0)
+                    * (a.bottom().min(b.bottom()) - a.y.max(b.y)).max(0.0)
+            };
+            let cost = |r: &Rect| {
+                labels.iter().map(|(_, o, _)| overlap(r, o)).sum::<f64>() * 1000.0
+                    + lay
+                        .nodes
+                        .iter()
+                        .filter(|nb| nb.id != e.from && nb.id != e.to)
+                        .map(|nb| overlap(r, &nb.rect))
+                        .sum::<f64>()
+            };
+            let mut r = rect_at(path.mid);
+            let mut best = cost(&r);
+            'find: for off in [0.0, 1.0, -1.0] {
+                for f in [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.12, 0.88] {
+                    if best <= 0.0 {
+                        break 'find;
+                    }
+                    let (x, y) = path.at(f);
+                    // beside the line (above or below it) when on it is taken
+                    let c = rect_at((x, y + off * (h / 2.0 + 3.0)));
+                    let k = cost(&c) + if off == 0.0 { 0.0 } else { 1.0 };
+                    if k < best {
+                        (r, best) = (c, k);
+                    }
+                }
+            }
             bounds = bounds.union(&r);
             labels.push((e.id.clone(), r, lines));
         }
@@ -2251,6 +2282,56 @@ fn pins(doc: &Document, lay: &Layout, edges: &[EdgePath], mode: CommentMode) -> 
 mod tests {
     use super::*;
     use crate::dsl;
+
+    #[test]
+    fn labels_and_parallel_lines_keep_apart() {
+        // the shape of a real board where they did not
+        let d = dsl::parse(include_str!("../tests/fixtures/crowded.diagram")).unwrap();
+        let r = render(&d, &RenderOptions::default());
+        let nums = |tag: &str, key: &str| -> f64 {
+            let i = tag.find(&format!(" {key}=\"")).unwrap() + key.len() + 3;
+            tag[i..].split('"').next().unwrap().parse().unwrap()
+        };
+        let labels: Vec<Rect> = r
+            .svg
+            .split("<rect class=\"dg-label-bg\"")
+            .skip(1)
+            .map(|t| Rect {
+                x: nums(t, "x"),
+                y: nums(t, "y"),
+                w: nums(t, "width"),
+                h: nums(t, "height"),
+            })
+            .collect();
+        assert_eq!(labels.len(), 6);
+        for (i, a) in labels.iter().enumerate() {
+            for b in &labels[i + 1..] {
+                assert!(
+                    a.right() <= b.x || b.right() <= a.x || a.bottom() <= b.y || b.bottom() <= a.y,
+                    "labels overlap: {a:?} {b:?}"
+                );
+            }
+        }
+        // the long runs of the arrows side by side are far enough apart
+        let runs: Vec<f64> = r
+            .edges
+            .iter()
+            .filter(|e| e.id.starts_with("ask"))
+            .filter_map(|e| {
+                e.pts
+                    .windows(2)
+                    .filter(|w| (w[0].0 - w[1].0).abs() < 0.5 && (w[0].1 - w[1].1).abs() > 30.0)
+                    .map(|w| w[0].0)
+                    .next()
+            })
+            .collect();
+        assert!(runs.len() >= 2, "{runs:?}");
+        for (i, a) in runs.iter().enumerate() {
+            for b in &runs[i + 1..] {
+                assert!((a - b).abs() >= 20.0, "lines too close: {runs:?}");
+            }
+        }
+    }
 
     #[test]
     fn renders_every_shape() {
