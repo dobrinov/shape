@@ -117,6 +117,10 @@ fn block_text(doc: &Document, head: &Elem, pad: &str) -> Option<String> {
                 dsl::screen_block(doc, g, pad, &mut out);
                 return Some(out);
             }
+            if g.todo {
+                dsl::todo_block(doc, g, pad, &mut out);
+                return Some(out);
+            }
             if g.entity {
                 dsl::entity_block(doc, g, pad, &mut out);
                 return Some(out);
@@ -403,6 +407,7 @@ fn edit_lines(
                     || n.timeline != g.timeline
                     || n.cycle != g.cycle
                     || n.screen.is_some() != g.screen.is_some()
+                    || n.todo != g.todo
                     || n.entity != g.entity
                     || n.adr.is_some() != g.adr.is_some() =>
             {

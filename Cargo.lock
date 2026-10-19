@@ -2219,7 +2219,7 @@ dependencies = [
 
 [[package]]
 name = "shape"
-version = "0.57.0"
+version = "0.58.0"
 dependencies = [
  "muda",
  "resvg",
@@ -2233,7 +2233,7 @@ dependencies = [
 
 [[package]]
 name = "shape-core"
-version = "0.57.0"
+version = "0.58.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2241,7 +2241,7 @@ dependencies = [
 
 [[package]]
 name = "shape-wasm"
-version = "0.57.0"
+version = "0.58.0"
 dependencies = [
  "serde",
  "serde_json",

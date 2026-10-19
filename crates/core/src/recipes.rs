@@ -218,15 +218,14 @@ table tech-debt: Tech debt {
 }
 "#),
         r("release-checklist", "Release checklist", "what must be true before shipping a release",
-          "a kanban `release-checklist` (to check, done) with one card per check",
+          "a todo list `release-checklist`, one item per check (`[x]` when done), with owners and due dates",
           r#"
-kanban release-checklist: Release checklist {
-  column release-checklist.todo: To check {
-    rc-migrations: Migrations run on staging
-    rc-rollback: Rollback tested
-    rc-notes: Release notes written
-  }
-  column release-checklist.done: Done {}
+todo release-checklist: Release checklist {
+  [x] Release notes written [owner: ana]
+  [ ] Migrations run on staging [owner: sam]
+  [ ] Rollback tested
+    [ ] On staging
+  [ ] Support told what changes
 }
 "#),
         r("stakeholders", "Stakeholder map", "who cares about the work and how much say they have",

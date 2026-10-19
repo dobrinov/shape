@@ -115,6 +115,12 @@ pub fn theme_of(
 }
 
 pub fn render(doc: &Document, opts: &RenderOptions) -> Rendered {
+    // to-do items past their date are red, as of the day given
+    let today = opts.today.as_deref().and_then(crate::gantt::parse_date);
+    crate::todo::with_today(today, || render_board(doc, opts))
+}
+
+fn render_board(doc: &Document, opts: &RenderOptions) -> Rendered {
     // foreign keys are drawn (and laid out) as lines between columns
     let related = crate::entities::with_relations(doc);
     let doc = related.as_ref().unwrap_or(doc);

@@ -171,6 +171,15 @@ canvas plan: Delivery plan {
     Announcement [after: launch/launch-day, milestone]
   }
 
+  todo go-live: Before we go live {
+    [x] Release notes written [owner: ana]
+    [ ] Migrations run on staging [owner: sam, due: 2026-10-24]
+    [ ] Rollback tested [owner: sam]
+      [ ] On staging
+      [ ] On a production copy
+    [ ] Support told what changes [owner: mia, due: 2026-10-27]
+  }
+
   kanban sprint: Sprint 12 {
     column todo: To do {
       saved: Saved cards [owner: ana]

@@ -196,6 +196,7 @@ pub(crate) fn parse_lines(src: &str) -> (Document, Vec<Diagnostic>, Vec<LineInfo
         theme_mode: None,
         theme_section: false,
         presentation: None,
+        todo_base: None,
         implicit: Default::default(),
         touched: Vec::new(),
     };
@@ -224,6 +225,14 @@ pub(crate) fn parse_lines(src: &str) -> (Document, Vec<Diagnostic>, Vec<LineInfo
             p.slide_line(t)
         } else if p.map.is_some() {
             p.outline_line(raw)
+        } else if p
+            .gantt
+            .as_ref()
+            .is_some_and(|(g, _)| p.doc.group(g).is_some_and(|g| g.todo))
+            && t != "}"
+        {
+            let g = p.gantt.as_ref().unwrap().0.clone();
+            p.todo_line(&g, raw)
         } else if p.gantt.is_some() {
             p.task_line(t)
         } else {
@@ -368,6 +377,8 @@ struct Parser {
     theme_section: bool,
     /// Inside `presentation … {`: the line that opened it.
     presentation: Option<usize>,
+    /// Inside a to-do list: how far its first item is indented.
+    todo_base: Option<usize>,
 }
 
 struct MapBlock {
@@ -526,6 +537,22 @@ impl Parser {
             "cycle" if c.rest()[5..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(5);
                 return self.timeline_decl(c, true);
+            }
+            // a to-do list: one item per line, `[x]` for done
+            "todo"
+                if c.rest()[4..].starts_with(|ch: char| ch.is_whitespace())
+                    && (t.trim_end().ends_with('{') || t.trim_end().ends_with("{}")) =>
+            {
+                c.advance(4);
+                self.timeline_decl(c, false)?;
+                if let Some(Elem::Group(id)) = self.touched.last().cloned() {
+                    if let Some(g) = self.doc.group_mut(&id) {
+                        g.timeline = false;
+                        g.todo = true;
+                    }
+                }
+                self.todo_base = None;
+                return Ok(());
             }
             // a wireframe screen: one component per line
             "screen"
@@ -1266,6 +1293,65 @@ impl Parser {
         if !closes_inline {
             self.gantt = Some((id, self.line));
         }
+        Ok(())
+    }
+
+    /// An item of a to-do list: `[x] Release notes [owner: ana, due: 28 Oct]`,
+    /// indented two spaces per level under the item it belongs to.
+    fn todo_line(&mut self, list: &str, raw: &str) -> Result<(), String> {
+        let indent = raw.len() - raw.trim_start().len();
+        let base = *self.todo_base.get_or_insert(indent);
+        let level = (indent.saturating_sub(base) / 2).min(8) as u8;
+        let t = raw.trim();
+        let t = t
+            .strip_prefix("- ")
+            .or_else(|| t.strip_prefix("* "))
+            .unwrap_or(t);
+        let (done, t) = if let Some(r) = t.strip_prefix("[x]").or_else(|| t.strip_prefix("[X]")) {
+            (true, r)
+        } else if let Some(r) = t.strip_prefix("[ ]").or_else(|| t.strip_prefix("[]")) {
+            (false, r)
+        } else {
+            (false, t)
+        };
+        let (text, attrs) = split_attrs(t.trim());
+        let label = unescape_label(text.trim());
+        let mut attrs = parse_attrs(attrs.unwrap_or(""))?;
+        let mut explicit = None;
+        attrs.retain(|(k, v)| match (k.as_str(), v) {
+            ("id", Some(v)) => {
+                explicit = Some(v.clone());
+                false
+            }
+            _ => true,
+        });
+        // `due` is the item's date
+        for (k, _) in attrs.iter_mut() {
+            if k == "due" {
+                *k = "date".into();
+            }
+        }
+        let wanted = explicit.clone().unwrap_or_else(|| row_id(list, &label));
+        let id = if !self.doc.id_taken(&wanted) {
+            wanted
+        } else if self.implicit.remove(&wanted) {
+            self.doc.nodes.retain(|n| n.id != wanted);
+            wanted
+        } else if explicit.is_some() {
+            return Err(format!("id `{wanted}` is already used"));
+        } else {
+            self.doc.fresh_id(&wanted)
+        };
+        let mut n = Node::new(&id);
+        n.label = label;
+        n.group = Some(list.to_string());
+        n.level = level;
+        apply_node_attrs(&mut n, &attrs)?;
+        if done {
+            n.done = Some(100.0);
+        }
+        self.touched.push(Elem::Node(n.id.clone()));
+        self.doc.nodes.push(n);
         Ok(())
     }
 
@@ -2945,6 +3031,63 @@ pub(crate) fn cycle_block(doc: &Document, g: &Group, pad: &str, out: &mut String
     out.push_str(&format!("{pad}}}\n"));
 }
 
+/// `todo id: Title {` … `[x] item [owner: …, due: …]` per item … `}`.
+pub(crate) fn todo_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
+    let mut head = id_text(&g.id);
+    if !g.label.is_empty() && g.label != g.id {
+        head.push_str(": ");
+        head.push_str(&label_text(&g.label));
+    }
+    let mut a = Vec::new();
+    if let Some(c) = &g.color {
+        a.push(if c.starts_with('#') {
+            format!("color: {c}")
+        } else {
+            c.clone()
+        });
+    }
+    if let Some(w) = g.w {
+        a.push(format!("w: {}", fmt_num(w)));
+    }
+    a.extend(group_pos(g));
+    head.push_str(&attrs_text(&a));
+    let items: Vec<&Node> = doc
+        .nodes
+        .iter()
+        .filter(|n| n.group.as_deref() == Some(g.id.as_str()))
+        .collect();
+    if items.is_empty() {
+        out.push_str(&format!("{pad}todo {head} {{}}\n"));
+        return;
+    }
+    out.push_str(&format!("{pad}todo {head} {{\n"));
+    for n in items {
+        let mut a: Vec<String> = node_attrs(n)
+            .into_iter()
+            .filter(|x| x != "done" && !x.starts_with("done:"))
+            .map(|x| match x.strip_prefix("date: ") {
+                Some(d) => format!("due: {d}"),
+                None => x,
+            })
+            .collect();
+        if row_id(&g.id, n.display()) != n.id {
+            a.insert(0, format!("id: {}", attr_value(&n.id)));
+        }
+        let tick = if n.done.is_some_and(|d| d >= 100.0) {
+            "[x]"
+        } else {
+            "[ ]"
+        };
+        let indent = "  ".repeat(n.level as usize);
+        out.push_str(&format!(
+            "{pad}  {indent}{tick} {}{}\n",
+            label_text(n.display()),
+            attrs_text(&a)
+        ));
+    }
+    out.push_str(&format!("{pad}}}\n"));
+}
+
 /// `screen id: Title [web] {` … `kind [id]: Label [attrs]` per component … `}`.
 pub(crate) fn screen_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
     let mut head = id_text(&g.id);
@@ -3713,6 +3856,10 @@ pub(crate) fn group_block(
     }
     if g.screen.is_some() {
         screen_block(doc, g, &pad, out);
+        return;
+    }
+    if g.todo {
+        todo_block(doc, g, &pad, out);
         return;
     }
     if g.entity {

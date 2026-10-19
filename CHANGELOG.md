@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.58.0 — 2026-10-19
+
+- **To-do lists:** `todo launch: Launch checklist { … }`, one item per line, `[x]` done and `[ ]` to do (Markdown-style `- [ ]` works too). Two more spaces make a sub-item. An item can have an owner, a due date (`due:`) and details.
+  - The list shows how many are done and a progress bar; done items are struck through; one past its due date and not done is red.
+  - In the editor: *Blocks → To-do list*. Click an item's box to tick it. With an item selected, Enter adds the next one and Tab / ⇧Tab change its level. Right-click for owner, due date, details and *Edit as text*.
+  - Prompts show a list as a Markdown checklist; the AI can tick, add and indent items. The Release checklist recipe is now a to-do list, Delivery shows to-do lists, and folded cards say *2 of 5 done*. The example board's delivery plan has one.
+
 ## 0.57.0 — 2026-10-18
 
 - **A new logo:** an S folded like a ribbon, blue, teal and green, on a dark tile, with a lowercase *shape* wordmark. It is the app's icon, the window's, the favicon, the document icon and the share image, and the wordmark heads the website and the editor. Run `shape install-app` again to see it in Finder and the Dock.

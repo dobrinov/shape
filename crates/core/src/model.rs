@@ -393,6 +393,9 @@ pub struct Node {
     /// A timeline's event that matters most: drawn as a star.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub important: bool,
+    /// A to-do item's depth under the one above it (0: a top-level item).
+    #[serde(skip_serializing_if = "is_zero_u8")]
+    pub level: u8,
     /// A wireframe screen's component: what it is drawn as.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub widget: Option<Widget>,
@@ -530,6 +533,9 @@ pub struct Group {
     /// A cycle: its nodes are steps that come round again, drawn on a circle.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub cycle: bool,
+    /// A to-do list: its nodes are items (`done` ticks one), in order.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub todo: bool,
     /// A wireframe screen, drawn as this device: its nodes are components,
     /// top to bottom.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -597,6 +603,7 @@ impl Group {
             || self.timeline
             || self.cycle
             || self.screen.is_some()
+            || self.todo
     }
 
     pub fn display(&self) -> &str {
@@ -1253,4 +1260,8 @@ mod tests {
         assert!(svg.contains("Go to m1 on delivery.shape"));
         assert!(!svg.contains("<a href"));
     }
+}
+
+fn is_zero_u8(v: &u8) -> bool {
+    *v == 0
 }

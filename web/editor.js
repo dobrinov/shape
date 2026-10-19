@@ -67,6 +67,7 @@
     branch: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3.5-11 6.5"/>',
     blocks: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
     screen: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
+    todo: '<rect x="3.5" y="4.5" width="5" height="5" rx="1.2"/><path d="M4.8 7l1 1 1.6-1.8"/><rect x="3.5" y="14.5" width="5" height="5" rx="1.2"/><path d="M12 7h8.5M12 17h8.5"/>',
     tablet: '<rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
     flow: '<rect x="2.5" y="5" width="6" height="11" rx="1.5"/><rect x="15.5" y="8" width="6" height="11" rx="1.5"/><path d="M8.5 10.5h4l-1.5-1.5M12.5 10.5l-1.5 1.5"/>',
     page: '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M2.5 8h19M5 6h.01M7 6h.01"/>',
@@ -352,6 +353,7 @@
           ["risks", "Risk matrix", "Likelihood × impact", go(addRisks)]
         ]],
         ["Plan", [
+          ["todo", "To-do list", "Checkboxes, owners, due dates", go(addTodo)],
           ["kanban", "Kanban", "Cards in columns", go(addKanban)],
           ["gantt", "Gantt chart", "Tasks and forecast", go(addGantt)],
           ["table", "Table", "Rows and columns", go(addTable)],
@@ -495,8 +497,8 @@
         })))
       ]), []);
     }
-    var SHORT_KINDS = { mindmap: "mindmaps", timeline: "timelines", adr: "decisions", risks: "risks", kanban: "kanban", gantt: "plans", table: "tables", chart: "charts", entity: "data model", sequence: "sequences", lanes: "swimlanes", sticky: "stickies", screen: "screens", cycle: "cycles" };
-    var KIND_NAMES = { mindmap: "Mindmaps", timeline: "Timelines", adr: "Decision records", risks: "Risk matrices", kanban: "Kanban boards", gantt: "Gantt charts", table: "Tables", chart: "Charts", entity: "Database tables", sequence: "Sequence diagrams", lanes: "Swimlanes", sticky: "Stickies", screen: "Wireframe screens" };
+    var SHORT_KINDS = { todo: "to-dos", mindmap: "mindmaps", timeline: "timelines", adr: "decisions", risks: "risks", kanban: "kanban", gantt: "plans", table: "tables", chart: "charts", entity: "data model", sequence: "sequences", lanes: "swimlanes", sticky: "stickies", screen: "screens", cycle: "cycles" };
+    var KIND_NAMES = { mindmap: "Mindmaps", timeline: "Timelines", adr: "Decision records", risks: "Risk matrices", kanban: "Kanban boards", gantt: "Gantt charts", table: "Tables", chart: "Charts", entity: "Database tables", sequence: "Sequence diagrams", lanes: "Swimlanes", sticky: "Stickies", screen: "Wireframe screens", todo: "To-do lists" };
     function newPerspective() {
       var name = h("input", { class: "dge-input", placeholder: "e.g. Legal, Support, Investors" });
       var tags = h("input", { class: "dge-input", placeholder: "e.g. legal" });
@@ -2168,6 +2170,29 @@
           ["Delete component", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
         ];
       }
+      if (t.type === "node" && !view && todoOf(t.id)) {
+        var tl = todoOf(t.id), it = node(t.id);
+        return [
+          [doneOf(it) ? "Untick" : "Tick", function () { toggleTodo(t.id); }, "Or click its box"],
+          ["Edit text", function () { editLabel(t.id); }],
+          ["Add item after", function () { addTodoItem(tl.id, t.id); }, "Enter"],
+          [it.level ? "Out a level" : "Make it a sub-item", function () { applyOps([{ op: "update_node", id: t.id, level: it.level ? it.level - 1 : 1 }]); }, it.level ? "⇧Tab" : "Tab"],
+          ["Owner…", function () { askAt(st.menuAt, it.owner || "", "Who does it", function (v) { if (v !== null) applyOps([{ op: "update_node", id: t.id, owner: v.trim() }]); }); }],
+          ["Due date…", function () { askAt(st.menuAt, it.date || "", "When, e.g. 2026-10-28 or 28 Oct 2026", function (v) { if (v !== null) applyOps([{ op: "update_node", id: t.id, date: v.trim() }]); }); }],
+          [it.detail ? "Edit details…" : "Add details…", function () { editDetails(t.id); }, "Shown on hover"],
+          ["Edit list as text…", function () { editTodo(tl.id); }, "One item per line"],
+          "-",
+          ["Delete item", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
+        ];
+      }
+      if (gr && !view && gr.todo) return [
+        ["Rename", function () { editLabel(t.id); }],
+        ["Add item", function () { addTodoItem(t.id, null); }],
+        ["Edit as text…", function () { editTodo(t.id); }, "One item per line: [x] done, [ ] to do"],
+        ["Colour…", function () { colourMenu(t.id, "update_group", gr.color); }],
+        "-",
+        ["Delete", function () { applyOps([{ op: "remove", id: t.id, keep_members: false }]); select([]); }, "The list and its items"]
+      ];
       if (gr && !view && gr.screen) return [
         ["Rename", function () { editLabel(t.id); }],
         ["Edit as text…", function () { editScreen(t.id); }, "One component per line"],
@@ -2439,6 +2464,12 @@
       if (t && (t.type === "link" || t.type === "open") && st.tool !== "select" && st.tool !== "hand" && !view) t = { type: "node", id: t.id };
       if (e.button === 0 && t && t.type === "link" && !st.linking) { e.preventDefault(); followLink(t.link); return; }
       if (e.button === 0 && t && t.type === "open") { e.preventDefault(); openCanvas(st.canvasPath.concat([t.canvas])); return; }
+      // a to-do item's checkbox: a click ticks it
+      // (the connector handle on its left sits on the box: a click there ticks too)
+      if (t && (t.type === "node" || t.type === "handle") && !view && e.button === 0 && todoOf(t.id) && st.tool === "select") {
+        var tg = geom(t.id);
+        if (tg && p.x - tg.x < 26) { e.preventDefault(); toggleTodo(t.id); return; }
+      }
       // a folded block in a perspective: it opens in place
       if (t && t.type === "node" && /^@fold\//.test(t.id)) { e.preventDefault(); if (e.button === 0) unfold(t.id.slice(6)); return; }
       if (st.linking && e.button === 0) {
@@ -2879,7 +2910,8 @@
         var ops;
         if (kind === "node") {
           ops = [{ op: "update_node", id: id, label: v }];
-          var scr = screenOf(id);
+          // a screen's component or a list's item keeps its block's prefix
+          var scr = screenOf(id) || todoOf(id);
           var nice = (scr ? scr.id + "." : "") + slug(v);
           // a box that was just added gets an id from its label
           if (isNew && v && nice !== id && !idTaken(nice)) ops.push({ op: "rename", id: id, to: nice });
@@ -3277,6 +3309,42 @@
       var have = ids.filter(function (id) { return kindOf(id); });
       if (have.length) { select([have[0]]); reveal(have[0]); return flash("This board already has one: add to it (the AI does too)"); }
       if (applyOps([{ op: "merge", dsl: r.source }]).ok) { if (ids[0]) { select([ids[0]]); reveal(ids[0]); } flash("Inserted “" + r.name + "”: its rows are examples, write over them"); }
+    }
+    /* To-do lists: items with checkboxes, owners and due dates. */
+    function todoOf(id) { var n = node(id), g = n && n.group && group(n.group); return g && g.todo ? g : null; }
+    function doneOf(n) { return !!(n && n.done && n.done >= 100); }
+    function toggleTodo(id) { applyOps([{ op: "update_node", id: id, done: doneOf(node(id)) ? 0 : 100 }]); select([id]); }
+    function addTodo() {
+      var gid = freshId("todo");
+      var res = applyOps([{ op: "merge", dsl: "todo " + gid + ": To-do {\n  [ ] First thing\n  [ ] Second thing\n}" }]);
+      if (res.ok) { select([gid]); reveal(gid); editLabel(gid, true); }
+    }
+    /* A new item after `after` (or at the end), at its level; its text is typed next. */
+    function addTodoItem(gid, after) {
+      var list = st.doc.nodes.filter(function (n) { return n.group === gid; });
+      var at = after ? list.indexOf(node(after)) + 1 : list.length;
+      var id = freshId(gid + ".item");
+      if (!applyOps([{ op: "add_node", id: id, label: "New item", group: gid, index: at, level: after ? node(after).level || 0 : 0 }]).ok) return;
+      select([id]);
+      editLabel(id, true);
+    }
+    function editTodo(gid) {
+      var ta = h("textarea", { class: "dge-chart-data", spellcheck: "false", rows: "12" });
+      ta.value = st.session.todo_text(gid);
+      var save = function () {
+        var r = JSON.parse(st.session.todo_edit_ops(gid, ta.value));
+        if (!r.ok) return flash(r.error, true);
+        if (applyOps(r.ops).ok) closeModal();
+      };
+      ta.addEventListener("keydown", function (e) { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") save(); });
+      showModal("To-do: " + (group(gid).label || gid), h("div", {}, [
+        h("p", { class: "dge-muted" }, ["One item per line: `[x] Done thing`, `[ ] Thing to do`, two spaces more for a sub-item, `[owner: ana, due: 28 Oct]` after it."]),
+        ta
+      ]), [
+        h("button", { onclick: closeModal }, ["Cancel"]),
+        h("button", { class: "primary", onclick: save }, ["Save (" + MOD + "↵)"])
+      ]);
+      setTimeout(function () { ta.focus(); }, 0);
     }
     /* Wireframe screens: a phone or a browser window, one component per
        line; arrows from components to screens make the flow. */
@@ -3961,7 +4029,7 @@
       var g = group(t), n = node(t);
       if (n && n.canvas) return "canvas";
       if (n && n.mindmap) return "mindmap";
-      if (g) return g.screen ? (g.screen === "web" ? "web page" : "screen") : g.timeline ? "timeline" : g.cycle ? "cycle" : g.kanban ? "kanban" : g.gantt ? "gantt" : g.risks ? "risks" : g.table ? "table" : g.chart ? "chart" : g.adr ? "decision" : g.sequence ? "sequence" : g.lanes ? "swimlanes" : g.entity ? "table" : "section";
+      if (g) return g.todo ? "to-do list" : g.screen ? (g.screen === "web" ? "web page" : "screen") : g.timeline ? "timeline" : g.cycle ? "cycle" : g.kanban ? "kanban" : g.gantt ? "gantt" : g.risks ? "risks" : g.table ? "table" : g.chart ? "chart" : g.adr ? "decision" : g.sequence ? "sequence" : g.lanes ? "swimlanes" : g.entity ? "table" : "section";
       return "box";
     }
     // what can be a slide: the top-level sections and blocks, mindmaps and
@@ -4430,6 +4498,12 @@
         e.preventDefault();
         copyText(st.session.outline(one)).then(function () { flash("Outline copied"); });
         return;
+      }
+      // a to-do item: Enter adds the next, Tab / ⇧Tab change its level (Space stays panning)
+      if (st.sel.length === 1 && !mod && todoOf(st.sel[0])) {
+        var ti = node(st.sel[0]);
+        if (e.key === "Enter") { e.preventDefault(); addTodoItem(todoOf(ti.id).id, ti.id); return; }
+        if (e.key === "Tab") { e.preventDefault(); applyOps([{ op: "update_node", id: ti.id, level: Math.max(0, (ti.level || 0) + (e.shiftKey ? -1 : 1)) }]); select([ti.id]); return; }
       }
       // a screen's component: ⌥↑ ⌥↓ move it
       if (st.sel.length === 1 && e.altKey && !mod && (e.key === "ArrowUp" || e.key === "ArrowDown") && node(st.sel[0]) && screenOf(st.sel[0])) {

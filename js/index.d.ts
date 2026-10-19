@@ -178,6 +178,8 @@ export interface Node {
   important?: boolean;
   /** Wireframe screen component: what it is drawn as. */
   widget?: Widget;
+  /** To-do item: its depth under the item above (0 = top level). */
+  level?: number;
   /** Database table column (the label is its name). */
   column?: Column;
 }
@@ -253,6 +255,8 @@ export interface Group {
   cycle?: boolean;
   /** A wireframe screen drawn as this device (its nodes are components, top to bottom). */
   screen?: Device;
+  /** A to-do list (its nodes are items; `done: 100` ticks one). */
+  todo?: boolean;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -351,6 +355,8 @@ export interface AddNodeOp {
   important?: boolean;
   /** Wireframe screen component: what it is drawn as. */
   widget?: Widget;
+  /** To-do item: its depth under the item above (0 = top level). */
+  level?: number;
   /** Database table column. */
   column?: Column;
 }
@@ -406,6 +412,8 @@ export interface UpdateNodeOp {
   important?: boolean;
   /** Wireframe screen component: what it is drawn as. */
   widget?: Widget;
+  /** To-do item: its depth under the item above (0 = top level). */
+  level?: number;
   /** Database table column. */
   column?: Column;
 }
@@ -579,6 +587,8 @@ export interface AddGroupOp {
   cycle?: boolean;
   /** A wireframe screen drawn as this device (its nodes are components, top to bottom). */
   screen?: Device;
+  /** A to-do list (its nodes are items; `done: 100` ticks one). */
+  todo?: boolean;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -627,6 +637,8 @@ export interface UpdateGroupOp {
   cycle?: boolean;
   /** A wireframe screen drawn as this device (its nodes are components, top to bottom). */
   screen?: Device;
+  /** A to-do list (its nodes are items; `done: 100` ticks one). */
+  todo?: boolean;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -819,6 +831,8 @@ export interface GroupBox extends Rect {
   cycle?: boolean;
   /** A wireframe screen. */
   screen?: Device;
+  /** A to-do list. */
+  todo?: boolean;
   /** A database table. */
   entity?: boolean;
 }

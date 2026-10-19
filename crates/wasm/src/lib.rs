@@ -309,6 +309,20 @@ impl Diagram {
         )
     }
 
+    /// To-do list `gid`'s items as text, one per line ("" when it is not one).
+    pub fn todo_text(&self, gid: &str) -> String {
+        shape_core::todo::text_of(&self.inner.doc, gid).unwrap_or_default()
+    }
+
+    /// The ops that make to-do list `gid` what `text` says: `{ok, ops}` or
+    /// `{ok: false, error}`.
+    pub fn todo_edit_ops(&self, gid: &str, text: &str) -> String {
+        match shape_core::todo::edit_ops(&self.inner.doc, gid, text) {
+            Ok(ops) => serde_json::json!({ "ok": true, "ops": ops }).to_string(),
+            Err(e) => serde_json::json!({ "ok": false, "error": e }).to_string(),
+        }
+    }
+
     /// Screen `gid`'s components as text, one per line ("" when it is not
     /// a screen).
     pub fn screen_text(&self, gid: &str) -> String {

@@ -9,7 +9,7 @@ use crate::model::{BoardKind, Document, Group, Node, Perspective};
 /// The block kinds `show` can name.
 pub const KINDS: &[&str] = &[
     "mindmap", "timeline", "adr", "risks", "kanban", "gantt", "table", "chart", "entity",
-    "sequence", "lanes", "sticky", "cycle", "screen",
+    "sequence", "lanes", "sticky", "cycle", "screen", "todo",
 ];
 
 fn p(id: &str, label: &str, tags: &[&str], show: &[&str], details: bool) -> Perspective {
@@ -51,7 +51,7 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
         "delivery",
         "Delivery",
         &["delivery", "team"],
-        &["timeline", "gantt", "kanban", "risks", "table"],
+        &["timeline", "todo", "gantt", "kanban", "risks", "table"],
         true,
     );
     // the business around it, on product and project boards alike
@@ -166,6 +166,8 @@ fn kind_of(g: &Group) -> &'static str {
         "cycle"
     } else if g.screen.is_some() {
         "screen"
+    } else if g.todo {
+        "todo"
     } else {
         "section"
     }
@@ -327,6 +329,9 @@ pub fn summary(doc: &Document, g: &Group) -> String {
             })
             .collect::<Vec<_>>()
             .join(", ")
+    } else if g.todo {
+        let done = members.iter().filter(|m| crate::todo::is_done(m)).count();
+        format!("{done} of {n} done")
     } else if g.gantt {
         plural(n, "task", "tasks")
     } else if g.timeline {
@@ -498,7 +503,7 @@ mod tests {
         assert!(
             out.contains("type: product\n")
                 && out.contains(
-                    "perspective delivery: Squad [tags: delivery team, show: timeline gantt kanban risks table]"
+                    "perspective delivery: Squad [tags: delivery team, show: timeline todo gantt kanban risks table]"
                 )
                 && !out.contains("perspective ux"),
             "{out}"

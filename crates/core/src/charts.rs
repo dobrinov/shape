@@ -110,6 +110,8 @@ pub fn plot_any(doc: &Document, g: &Group) -> Plot {
         crate::cycle::plot(doc, g)
     } else if g.screen.is_some() {
         crate::screen::plot(doc, g)
+    } else if g.todo {
+        crate::todo::plot(doc, g)
     } else {
         plot(doc, g)
     }

@@ -81,6 +81,9 @@ pub enum Op {
         /// `input`, `list`…; "" clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         widget: Option<String>,
+        /// A to-do item's depth under the item above it (0: top level).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        level: Option<u8>,
         /// Gantt task: percent done, 0–100 (0 clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         done: Option<f64>,
@@ -165,6 +168,9 @@ pub enum Op {
         /// `input`, `list`…; "" clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         widget: Option<String>,
+        /// A to-do item's depth under the item above it (0: top level).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        level: Option<u8>,
         /// Gantt task: percent done, 0–100 (0 clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         done: Option<f64>,
@@ -388,6 +394,9 @@ pub enum Op {
         /// A cycle (its nodes are steps, each leading to the next).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cycle: Option<bool>,
+        /// A to-do list (its nodes are items; `done: 100` ticks one).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        todo: Option<bool>,
         /// A wireframe screen drawn as this device (mobile, tablet, web;
         /// its nodes are components); "" makes it a section again.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -455,6 +464,9 @@ pub enum Op {
         /// A cycle (its nodes are steps, each leading to the next).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cycle: Option<bool>,
+        /// A to-do list (its nodes are items; `done: 100` ticks one).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        todo: Option<bool>,
         /// A wireframe screen drawn as this device (mobile, tablet, web;
         /// its nodes are components); "" makes it a section again.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -936,6 +948,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             date,
             important,
             widget,
+            level,
             done,
             owner,
             probability,
@@ -980,6 +993,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             event(&mut n, date, important)?;
             if let Some(w) = widget.as_deref().filter(|w| !w.is_empty()) {
                 n.widget = Some(widget_kind(w)?);
+            }
+            if let Some(l) = level {
+                n.level = (*l).min(8);
             }
             // a screen's components: `login.submit`, and drawn as something
             if let Some(scr) = n
@@ -1042,6 +1058,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             date,
             important,
             widget,
+            level,
             done,
             owner,
             probability,
@@ -1115,6 +1132,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             task(n, start, days, after, milestone, done, owner)?;
             event(n, date, important)?;
+            if let Some(l) = level {
+                n.level = (*l).min(8);
+            }
             if let Some(w) = widget {
                 n.widget = if w.is_empty() {
                     None
@@ -1805,6 +1825,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             table,
             timeline,
             cycle,
+            todo,
             screen,
             columns,
             entity,
@@ -1839,6 +1860,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             g.table = table.unwrap_or(false) || columns.is_some();
             g.timeline = timeline.unwrap_or(false);
             g.cycle = cycle.unwrap_or(false);
+            g.todo = todo.unwrap_or(false);
             g.screen = match screen.as_deref().filter(|d| !d.is_empty()) {
                 Some(d) => Some(device(d)?),
                 None => None,
@@ -1882,6 +1904,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             table,
             timeline,
             cycle,
+            todo,
             screen,
             columns,
             entity,
@@ -1933,6 +1956,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             if let Some(c) = cycle {
                 g.cycle = *c;
+            }
+            if let Some(t) = todo {
+                g.todo = *t;
             }
             if let Some(d) = screen {
                 g.screen = if d.is_empty() { None } else { Some(device(d)?) };

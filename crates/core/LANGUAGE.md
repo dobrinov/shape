@@ -339,6 +339,21 @@ fraud: Fraud reporting API [tags: tech exec]
 - A perspective starts high level: its top-level sections and blocks are folded into cards (title, what is inside, the first few items), except the ones that role looks at first (charts for Business, the timeline for Delivery, Product and Marketing). In the editor, click a card to open it in place; *Expand all* opens everything.
 - An element shows in a perspective when it has the perspective's tag (`tags: tech exec`); mindmap topics go with their centre. In the editor, pick one in the top bar; new elements get its tag. *✦ Sort into perspectives* has the AI tag the board. Ops: `{"op":"perspective","id":"legal","label":"Legal","tags":["legal"],"show":["adr"]}` (`remove: true` takes it off).
 
+### To-do lists
+
+```shape
+todo launch: Launch checklist {
+  [x] Release notes [owner: ana]
+  [ ] Rollback tested [due: 2026-10-28]
+    [ ] On staging
+  [ ] Tell support
+}
+```
+
+- One item per line: `[x]` done, `[ ]` to do (`- [ ]` works too, as in Markdown). Two more spaces make a sub-item of the one above. After the text: `owner`, `due` (a date as people write it), `detail`, a colour, `id`.
+- The list shows how many are done and a progress bar; an item past its due date and not done is red. An item's id is the list's and its text (`launch.release-notes`).
+- In the editor: *Blocks → To-do list*. Click an item's box to tick it; with an item selected, Enter adds the next one and Tab / ⇧Tab change its level; right-click for owner, due date and *Edit as text*. Ops: `update_node` with `done: 100` ticks an item (`0` unticks), `add_node` with `group` and `level` adds one.
+
 ### Wireframe screens
 
 ```shape
