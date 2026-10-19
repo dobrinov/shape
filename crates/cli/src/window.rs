@@ -266,6 +266,8 @@ mod native {
             let webview = webview.map_err(|e| e.to_string())?;
 
             #[cfg(target_os = "macos")]
+            mac::name();
+            #[cfg(target_os = "macos")]
             let menu = mac::menu(proxy.clone());
             let mut closing = false;
             event_loop.run(move |event, _, flow| {
@@ -327,28 +329,90 @@ mod native {
         /// Shape's icon and name in the Dock: the binary runs outside an app
         /// bundle, so macOS would show a plain program icon (and "exec").
         pub fn dock_icon() {
-            use objc2::AnyThread;
-            use objc2_app_kit::{NSApplication, NSImage};
-            use objc2_foundation::{MainThreadMarker, NSData, NSProcessInfo, NSString};
+            use objc2_app_kit::NSApplication;
+            use objc2_foundation::MainThreadMarker;
             let Some(mtm) = MainThreadMarker::new() else {
                 return;
             };
-            let svg = include_str!("../icons/app.svg");
-            let Ok(png) = crate::png::render(svg, 0.5) else {
-                return;
-            };
-            let data = NSData::with_bytes(&png);
-            let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) else {
+            let Some(image) = icon() else {
                 return;
             };
             let app = NSApplication::sharedApplication(mtm);
             unsafe { app.setApplicationIconImage(Some(&image)) };
+        }
+
+        /// The app's name, "Shape", in the menu bar and the Dock (the process
+        /// is called `shape`). Set before the menu is made, or the menu bar
+        /// keeps the old one.
+        pub fn name() {
+            use objc2_foundation::{NSProcessInfo, NSString};
             NSProcessInfo::processInfo().setProcessName(&NSString::from_str("Shape"));
         }
+
+        fn icon() -> Option<objc2::rc::Retained<objc2_app_kit::NSImage>> {
+            use objc2::AnyThread;
+            use objc2_app_kit::NSImage;
+            use objc2_foundation::NSData;
+            let png = crate::png::render(include_str!("../icons/app.svg"), 0.5).ok()?;
+            NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(&png))
+        }
+
+        /// Shape → About Shape: the standard panel, with the icon, the
+        /// version, what Shape is and a link to the website.
+        fn show_about() {
+            use objc2::runtime::AnyObject;
+            use objc2::AnyThread;
+            use objc2_app_kit::{
+                NSAboutPanelOptionApplicationIcon, NSAboutPanelOptionApplicationName,
+                NSAboutPanelOptionApplicationVersion, NSAboutPanelOptionCredits,
+                NSAboutPanelOptionVersion, NSApplication, NSAttributedStringAppKitDocumentFormats,
+            };
+            use objc2_foundation::{MainThreadMarker, NSAttributedString, NSData, NSDictionary, NSString};
+            let Some(mtm) = MainThreadMarker::new() else {
+                return;
+            };
+            let html = format!(
+                "<div style=\"font: 11px -apple-system; text-align: center; color: {}\">{}<br><br><a href=\"{SITE}\">{}</a></div>",
+                "#7f7f7f",
+                "One board for the whole project: mindmaps, plans, wireframes, decisions and slides, in a text file in your repo. The AI you already pay for keeps it current.",
+                SITE.trim_start_matches("https://").trim_end_matches('/'),
+            );
+            let data = NSData::with_bytes(html.as_bytes());
+            let Some(credits) = (unsafe {
+                NSAttributedString::initWithHTML_documentAttributes(NSAttributedString::alloc(), &data, None)
+            }) else {
+                return;
+            };
+            let name = NSString::from_str("Shape");
+            let version = NSString::from_str(env!("CARGO_PKG_VERSION"));
+            // the build number, under the version: the same, so the panel shows it once
+            let build = NSString::from_str("");
+            let mut keys: Vec<&NSString> = unsafe {
+                vec![
+                    NSAboutPanelOptionApplicationName,
+                    NSAboutPanelOptionApplicationVersion,
+                    NSAboutPanelOptionVersion,
+                    NSAboutPanelOptionCredits,
+                ]
+            };
+            let mut values: Vec<&AnyObject> = vec![name.as_ref(), version.as_ref(), build.as_ref(), credits.as_ref()];
+            let image = icon();
+            if let Some(i) = &image {
+                keys.push(unsafe { NSAboutPanelOptionApplicationIcon });
+                values.push(i.as_ref());
+            }
+            let options = NSDictionary::from_slices(&keys, &values);
+            let app = NSApplication::sharedApplication(mtm);
+            unsafe { app.orderFrontStandardAboutPanelWithOptions(&options) };
+            app.activate();
+        }
+
+        const SITE: &str = "https://dobrinov.github.io/shape/";
 
         pub fn menu(proxy: EventLoopProxy<Ev>) -> Menu {
             let cmd = |key| Some(Accelerator::new(Modifiers::META, key));
             let quit = MenuItem::with_id("quit", "Quit Shape", true, cmd(Code::KeyQ));
+            let about = MenuItem::with_id("about", "About Shape", true, None);
             let close = MenuItem::with_id("close", "Close Window", true, cmd(Code::KeyW));
             let menu = Menu::new();
             let sep = P::separator;
@@ -356,7 +420,7 @@ mod native {
                 "Shape",
                 true,
                 &[
-                    &P::about(None, None),
+                    &about,
                     &sep(),
                     &P::hide(None),
                     &P::hide_others(None),
@@ -387,7 +451,9 @@ mod native {
                 let _ = menu.append(&sub);
             }
             MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
-                if e.id == "quit" || e.id == "close" {
+                if e.id == "about" {
+                    show_about();
+                } else if e.id == "quit" || e.id == "close" {
                     let _ = proxy.send_event(Ev::CloseRequested);
                 }
             }));

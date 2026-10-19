@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.3 — 2026-10-19
+
+- **About Shape** (macOS, Shape → About Shape): Shape's icon, its version, what it is in a sentence, and a link to the website. Before, it showed a folder icon and nothing else.
+- The menu bar says *Shape*, not *shape*.
+
 ## 0.60.2 — 2026-10-19
 
 - Fixed: scrolling (a mouse wheel or a two-finger swipe) over an open popup, such as the Blocks menu, the Ask panel or the AI menu, moved the board behind it. It now scrolls the popup, and the board stays put; over the bars and the minimap the board stays put too.
