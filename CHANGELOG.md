@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.62.1 — 2026-10-19
+
+- Fixed: the editor could miss new versions for a day. It kept GitHub's answer for 24 hours (even one older than itself) and asked only when it started. Now it asks when it starts and every hour while it runs, keeps the answer for an hour, never believes one older than itself, and the *New: …* badge appears in an editor left open too.
+
 ## 0.62.0 — 2026-10-19
 
 - **Delivery shows what is being delivered now.** Its summary leads with the next milestone and its traffic light (*Now delivering: v1.0 · At risk · due Nov 13, in 25 days* and why), then the board's own blocks:

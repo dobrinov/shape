@@ -101,6 +101,7 @@
       fetch("api/update").then(function (r) { return r.json(); }).then(function (u) {
         if (!u.checked) { if (tries < 5) setTimeout(function () { checkUpdate(tries + 1); }, 2000); return; }
         if (!u.latest) return;
+        if (document.getElementById("update").textContent === "New: " + u.latest + " ↗") return;
         var a = document.getElementById("update");
         a.textContent = "New: " + u.latest + " ↗";
         a.href = u.url;
@@ -108,6 +109,9 @@
         a.hidden = false;
       }).catch(function () { /* no server check: nothing to show */ });
     }
+    // the server asks again every hour: so does an editor left open, and on coming back to it
+    setInterval(function () { checkUpdate(5); }, 60 * 60 * 1000);
+    window.addEventListener("focus", function () { checkUpdate(5); });
     var ai = fetch("api/ai").then(function (r) { return r.json(); }).catch(function () { return {}; });
     return Promise.all([fetch(api("api/file")).then(function (r) { return r.json(); }), ai]).then(function (both) {
       var f = both[0], harness = both[1];

@@ -1,14 +1,16 @@
-//! Is there a newer Shape? At most once a day the editor asks GitHub for
-//! the latest release (in the background, through `curl`); the answer is
-//! cached, and a failure (offline, rate limit) is quiet.
+//! Is there a newer Shape? The editor asks GitHub for the latest release in
+//! the background (through `curl`) when it starts and every hour while it
+//! runs; the answer is cached for an hour (one older than this copy is not
+//! believed), and a failure (offline, rate limit) is quiet.
 //! `SHAPE_NO_UPDATE_CHECK=1` turns it off; so does `CI`.
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::OnceLock;
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const REPO: &str = "dobrinov/shape";
-const DAY: u64 = 24 * 60 * 60;
+/// How long an answer is kept, and how often a running editor asks again.
+const HOUR: u64 = 60 * 60;
 
 /// A release newer than this binary.
 #[derive(Debug, Clone)]
@@ -20,29 +22,40 @@ pub struct Update {
     pub url: String,
 }
 
-/// The answer of the check [`start`] began: `None` while it runs, then
-/// `Some(None)` when this is the latest (or the check is off or failed).
-static FOUND: OnceLock<Option<Update>> = OnceLock::new();
+/// The answer of the checks [`start`] runs: `None` until the first is done,
+/// then `Some(None)` when this is the latest (or the check is off or failed).
+static FOUND: Mutex<Option<Option<Update>>> = Mutex::new(None);
 
-/// Look for a newer release in the background; say so on stderr when there is one.
+/// Look for a newer release in the background, now and every hour; say so
+/// on stderr when one turns up.
 pub fn start() {
     std::thread::spawn(|| {
-        let found = check();
-        if let Some(u) = &found {
-            eprintln!(
-                "shape: {} is out (you have {}): {}",
-                u.latest,
-                env!("CARGO_PKG_VERSION"),
-                u.how
-            );
+        let mut told = String::new();
+        loop {
+            let found = check();
+            if let Some(u) = found.as_ref().filter(|u| u.latest != told) {
+                eprintln!(
+                    "shape: {} is out (you have {}): {}",
+                    u.latest,
+                    env!("CARGO_PKG_VERSION"),
+                    u.how
+                );
+                told = u.latest.clone();
+            }
+            if let Ok(mut f) = FOUND.lock() {
+                *f = Some(found);
+            }
+            if off() {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_secs(HOUR));
         }
-        let _ = FOUND.set(found);
     });
 }
 
-/// What [`start`] found, once it is done.
-pub fn found() -> Option<&'static Option<Update>> {
-    FOUND.get()
+/// What the checks found, once the first is done.
+pub fn found() -> Option<Option<Update>> {
+    FOUND.lock().ok().and_then(|f| f.clone())
 }
 
 fn check() -> Option<Update> {
@@ -62,7 +75,7 @@ fn off() -> bool {
     set("SHAPE_NO_UPDATE_CHECK") || set("DIAGRAM_NO_UPDATE_CHECK") || set("CI")
 }
 
-/// The latest release's version: from the cache when it is less than a day old.
+/// The latest release's version: from the cache when it is less than an hour old.
 fn latest() -> Option<String> {
     let file = cache_file();
     let now = SystemTime::now()
@@ -72,7 +85,7 @@ fn latest() -> Option<String> {
     if let Some(cached) = file
         .as_ref()
         .and_then(|f| std::fs::read_to_string(f).ok())
-        .and_then(|s| fresh(&s, now))
+        .and_then(|s| fresh(&s, now, env!("CARGO_PKG_VERSION")))
     {
         return Some(cached);
     }
@@ -86,11 +99,13 @@ fn latest() -> Option<String> {
     Some(v)
 }
 
-/// The version in a cache file (`SECONDS VERSION`) written less than a day before `now`.
-fn fresh(cache: &str, now: u64) -> Option<String> {
+/// The version in a cache file (`SECONDS VERSION`) written less than an hour
+/// before `now`, unless it is older than `current` (this copy is newer than
+/// what was cached: the cache is out of date).
+fn fresh(cache: &str, now: u64, current: &str) -> Option<String> {
     let (at, v) = cache.trim().split_once(' ')?;
     let at: u64 = at.parse().ok()?;
-    (now.saturating_sub(at) < DAY && !v.is_empty()).then(|| v.to_string())
+    (now.saturating_sub(at) < HOUR && !v.is_empty() && !newer(current, v)).then(|| v.to_string())
 }
 
 fn fetch() -> Option<String> {
@@ -198,13 +213,15 @@ mod tests {
     }
 
     #[test]
-    fn the_cache_lasts_a_day() {
+    fn the_cache_lasts_an_hour_and_never_trails_this_copy() {
         assert_eq!(
-            fresh("1000 0.34.0\n", 1000 + DAY - 1).as_deref(),
+            fresh("1000 0.34.0\n", 1000 + HOUR - 1, "0.34.0").as_deref(),
             Some("0.34.0")
         );
-        assert_eq!(fresh("1000 0.34.0\n", 1000 + DAY), None);
-        assert_eq!(fresh("garbage", 1000), None);
-        assert_eq!(fresh("", 1000), None);
+        assert_eq!(fresh("1000 0.34.0\n", 1000 + HOUR, "0.34.0"), None);
+        // cached before this copy came out: ask again
+        assert_eq!(fresh("1000 0.53.1\n", 1001, "0.61.0"), None);
+        assert_eq!(fresh("garbage", 1000, "0.1.0"), None);
+        assert_eq!(fresh("", 1000, "0.1.0"), None);
     }
 }
