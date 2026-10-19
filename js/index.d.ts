@@ -757,6 +757,10 @@ export interface RenderOptions {
   focus?: string[];
   /** Show the board as this perspective sees it (`Board.perspectives()` lists them). */
   perspective?: Perspective | null;
+  /** With a perspective: its summary (a headline, milestones with traffic lights, blockers, decisions, risks), computed from the whole board. */
+  dashboard?: boolean;
+  /** With `dashboard`: an earlier version of the board (its source), for "Changed since". */
+  before?: string | null;
   padding?: number;
 }
 

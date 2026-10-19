@@ -482,7 +482,7 @@ mod tests {
 
     #[test]
     fn types_and_perspectives_round_trip_and_change_by_ops() {
-        let src = "title: Spend Cards\ntype: project\n\nperspective exec: Leadership [tags: exec boss, show: adr risks, details: off]\nperspective ux: Design [tags: ux]\n\napi: Orders API [tags: tech]\n";
+        let src = "title: Launch\ntype: project\n\nperspective exec: Leadership [tags: exec boss, show: adr risks, details: off]\nperspective ux: Design [tags: ux]\n\napi: Orders API [tags: tech]\n";
         let doc = dsl::parse(src).unwrap();
         assert_eq!(doc.settings.kind, BoardKind::Project);
         assert_eq!(dsl::print(&doc), src);

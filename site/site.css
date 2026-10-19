@@ -182,3 +182,8 @@ footer { flex-wrap: wrap; row-gap: 8px; }
 @media (max-width: 480px) { .ai-bar { border-radius: 14px; } .ai-note { min-width: 100%; } }
 /* the wordmark: lowercase, geometric, like the logo */
 .brand { font-family: "Avenir Next", Futura, "Century Gothic", -apple-system, sans-serif; font-weight: 700; font-size: 21px; letter-spacing: -0.03em; }
+
+/* One board, every audience: tabs over the perspectives' summaries */
+.persp-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.persp-tabs button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.persp-tabs button[aria-selected="true"] { background: var(--fg, #e6e9ef); color: #0a0d13; border-color: transparent; }

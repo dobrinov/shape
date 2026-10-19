@@ -417,8 +417,8 @@
       if (!sel || !st.session) return;
       if (toolbar.folds) {
         toolbar.folds.hidden = !st.perspective;
-        toolbar.folds.textContent = st.perspOpen ? "Expand all" : "Fold all";
-        toolbar.folds.title = st.perspOpen ? "Open every folded section and block" : "Back to the high-level view: sections and blocks folded";
+        toolbar.folds.textContent = st.perspDash ? "Details" : "Summary";
+        toolbar.folds.title = st.perspDash ? "The blocks behind this summary, as they are on the board" : "Back to the summary: where things stand, at a glance";
       }
       var main = st.answer ? st.answer.main.session : st.session;
       var list = JSON.parse(main.perspectives());
@@ -437,11 +437,51 @@
       }
       sel.value = cur;
     }
+    /* A perspective opens on its summary (a dashboard Shape computes from
+       the whole board: see dashboard.rs); it is read-only, and a row opens
+       what it stands for on the full board, with a way back. */
+    function dashOn() { return !!(st.perspective && st.perspDash); }
+    function openFromDash(rowId) {
+      var m = /^@dash\/[^/]*\/(.*):(.*)$/.exec(rowId);
+      if (!m || !m[2] || m[2].charAt(0) === "#") return;
+      var path = m[1] ? m[1].split("/") : [], id = m[2];
+      st.backTo = st.perspective.id;
+      st.perspective = null;
+      if (toolbar.persp) toolbar.persp.value = "";
+      fillPerspectives();
+      if (path.join("/") !== (st.canvasPath || []).join("/")) openCanvas(path); else render();
+      showBack();
+      setTimeout(function () { if (node(id) || group(id)) { select([id]); reveal(id); } }, 0);
+    }
+    function showBack() {
+      if (!toolbar.back) return;
+      var p = st.backTo && (st.perspectives || []).find(function (x) { return x.id === st.backTo; });
+      toolbar.back.hidden = !p;
+      if (p) toolbar.back.textContent = "← " + p.label;
+    }
+    function goBack() {
+      var id = st.backTo;
+      if ((st.canvasPath || []).length) openCanvas([]);
+      if (toolbar.persp) toolbar.persp.value = id;
+      pickPerspective(id);
+    }
+    /* "Changed since": the board as it was a week ago (or its oldest version). */
+    function loadBefore() {
+      if (!opts.history || view) return;
+      opts.history.list().then(function (res) {
+        var vs = (res && res.versions) || [], week = Date.now() / 1000 - 7 * 86400;
+        var v = vs.filter(function (x) { return x.time <= week; })[0] || vs[vs.length - 1];
+        if (!v) return;
+        return opts.history.get(v.id).then(function (src) { st.before = src; if (dashOn()) render(); });
+      }).catch(function () {});
+    }
     function pickPerspective(id) {
       if (id === "__new") { toolbar.persp.value = st.perspective ? st.perspective.id : ""; return newPerspective(); }
       if (id === "__sort") { toolbar.persp.value = st.perspective ? st.perspective.id : ""; return sortPerspectives(); }
       st.perspective = (st.perspectives || []).find(function (p) { return p.id === id; }) || null;
-      st.perspOpen = []; // it starts high level: everything folded
+      st.perspOpen = null;
+      st.perspDash = true; // it starts with the summary
+      st.backTo = null; showBack();
       try { if (id) localStorage.setItem(perspectiveKey(), id); else localStorage.removeItem(perspectiveKey()); } catch (e) { /* fine */ }
       fillPerspectives();
       render();
@@ -452,7 +492,8 @@
       try { id = localStorage.getItem(perspectiveKey()); } catch (e) { /* fine */ }
       fillPerspectives();
       if (id) st.perspective = (st.perspectives || []).find(function (p) { return p.id === id; }) || null;
-      st.perspOpen = [];
+      st.perspOpen = null;
+      st.perspDash = true;
       fillPerspectives();
     }
     /* A new type brings other perspectives: the board is rethought so each
@@ -563,7 +604,8 @@
       if (g) focusOn(g, 1, 1.2, 0.9);
     }
     function toggleFolds() {
-      st.perspOpen = st.perspOpen ? null : [];
+      st.perspDash = !st.perspDash;
+      st.perspOpen = null;
       render();
       fillPerspectives(true);
       fit();
@@ -642,6 +684,8 @@
       toolbar.appendChild(toolbar.persp);
       toolbar.folds = h("button", { class: "dge-bar-btn dge-folds", "data-act": "folds", hidden: true, onclick: function () { toggleFolds(); } });
       toolbar.appendChild(toolbar.folds);
+      toolbar.back = h("button", { class: "dge-bar-btn dge-back", hidden: true, title: "Back to the summary you came from", onclick: function () { goBack(); } });
+      toolbar.appendChild(toolbar.back);
       toolbar.branch = h("button", { class: "dge-branch", hidden: true, onclick: function () { toggleBranchChanges(); } });
       toolbar.appendChild(toolbar.branch);
       if (opts.status) [].concat(opts.status).forEach(function (s) { toolbar.appendChild(s); });
@@ -974,7 +1018,8 @@
 
     // --------------------------------------------------------------- render
     function render() {
-      var r = JSON.parse(st.session.render(JSON.stringify({ comments: st.showResolved ? "all" : "open", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null })));
+      el.classList.toggle("dge-dash", dashOn());
+      var r = JSON.parse(st.session.render(JSON.stringify({ comments: st.showResolved ? "all" : "open", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null, dashboard: dashOn(), before: st.before || null })));
       if (r.error) {
         flash(r.error, true);
         return;
@@ -2502,6 +2547,13 @@
       });
     }
     canvas.addEventListener("contextmenu", function (e) {
+      if (dashOn()) {
+        e.preventDefault();
+        var dt = st.r && hit(e.target);
+        if (dt && dt.id && /^@dash\//.test(dt.id)) openMenu({ x: e.clientX, y: e.clientY }, [["Open it on the board", function () { openFromDash(dt.id); }]]);
+        else openMenu({ x: e.clientX, y: e.clientY }, [["Details", function () { toggleFolds(); }, "The blocks behind this summary"]]);
+        return;
+      }
       var t = st.r && hit(e.target);
       var at = toDiagram(e.clientX, e.clientY);
       var items = t ? contextItems(t) : view ? [] : [
@@ -2529,6 +2581,15 @@
       closeMenu();
       var p = toDiagram(e.clientX, e.clientY);
       var t = hit(e.target);
+      // the summary: a row opens what it stands for; elsewhere it pans
+      if (dashOn()) {
+        e.preventDefault();
+        if (e.button === 0 && t && t.id && /^@dash\//.test(t.id) && !st.space) return openFromDash(t.id);
+        st.drag = { type: "pan", sx: e.clientX, sy: e.clientY, px: st.panX, py: st.panY };
+        canvas.setPointerCapture(e.pointerId);
+        canvas.classList.add("panning");
+        return;
+      }
       // with a tool that puts something on the board (a comment, a box…), a
       // link or canvas badge is part of its box: nothing is followed
       if (t && (t.type === "link" || t.type === "open") && st.tool !== "select" && st.tool !== "hand" && !view) t = { type: "node", id: t.id };
@@ -2858,7 +2919,7 @@
     canvas.addEventListener("pointerleave", function () { if (st.hover && !st.drag) { st.hover = null; drawOverlay(); } });
 
     canvas.addEventListener("dblclick", function (e) {
-      if (view || !st.r || st.tool === "hand") return;
+      if (view || !st.r || st.tool === "hand" || dashOn()) return;
       // the first click may have re-rendered what is under the pointer
       var under = document.elementFromPoint(e.clientX, e.clientY) || e.target;
       var t = hit(under);
@@ -4695,6 +4756,8 @@
       }
       if (mod && e.key === "/" && hasCode) { e.preventDefault(); showCode = !showCode; applyChrome(); syncCode(true); return; }
       if (typing || !el.contains(document.activeElement) && document.activeElement !== document.body) return;
+      // the summary is read-only: moving around, finding and the AI, nothing that edits
+      if (dashOn() && (mod ? "fkcs".indexOf(e.key.toLowerCase()) < 0 : ["f", "F", "m", "M", "0", "+", "=", "-", "z", "Z", "Escape", " ", "?"].indexOf(e.key) < 0)) return;
       if (e.key === "Alt") canvas.classList.add("out");
       if (e.key === " " && !st.space) { st.space = true; canvas.classList.add("space"); e.preventDefault(); return; }
       if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
@@ -5273,11 +5336,11 @@
 
     // -------------------------------------------------------------- exports
     function exportSVG() {
-      return JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null }))).svg;
+      return JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null, dashboard: dashOn(), before: st.before || null }))).svg;
     }
     function exportPNG(scale) {
       scale = scale || 2;
-      var r = JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null })));
+      var r = JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null, dashboard: dashOn(), before: st.before || null })));
       return new Promise(function (resolve, reject) {
         var img = new Image();
         var url = URL.createObjectURL(new Blob([r.svg], { type: "image/svg+xml" }));
@@ -5542,6 +5605,8 @@
       if (opts.requireName && !st.author && !view) askName(then); else then();
     }, 300);
     // a team's recipes reach the AI's prompts and Insert recipe…
+    // what changed in the last week, for the summaries
+    loadBefore();
     // a schema block whose file changed offers to update
     if (opts.sources) setTimeout(checkSchemas, 1200);
     if (opts.recipes) Promise.resolve(opts.recipes()).then(function (files) { if (files && st.session.set_recipes) st.session.set_recipes(JSON.stringify(files)); }).catch(function () {});

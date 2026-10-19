@@ -33,6 +33,7 @@ USAGE
 EXPORT
   shape svg  FILE [-o out.svg]       static SVG
   shape png  FILE [-o out.png]       PNG image (--scale N, default 2)
+                                     svg / png --perspective ID: that perspective's dashboard
   shape html FILE [-o out.html]      self-contained interactive page (viewer + WASM)
     render options: --dark --transparent --title --comments open|all|none
                     --today | --as-of YYYY-MM-DD   mark that day on gantt charts and show the forecast
@@ -144,6 +145,7 @@ const VALUE_FLAGS: &[&str] = &[
     "--in",
     "--canvas",
     "--into",
+    "--perspective",
     "--only",
     "--label",
 ];
@@ -752,6 +754,21 @@ fn rendered(args: &Args, file: &str) -> Result<(Document, shape_core::Rendered),
     let doc = load(file)?;
     let mut opts = render_opts(args)?;
     opts.themes = file_themes(&doc, file)?;
+    // a perspective's dashboard (`--base` is what it says changed since)
+    if let Some(id) = args.val("--perspective") {
+        let p = shape_core::perspectives::all(&doc)
+            .into_iter()
+            .find(|p| p.id == id)
+            .ok_or_else(|| {
+                let ids: Vec<String> = shape_core::perspectives::all(&doc).into_iter().map(|p| p.id).collect();
+                format!("no perspective `{id}` (this board has: {})", ids.join(", "))
+            })?;
+        let now = today(args)?.unwrap_or_else(today_utc);
+        let before = args.val("--base").map(|b| load_base(b, file)).transpose()?;
+        let dash = shape_core::dashboard::build(&doc, &p, now, before.as_ref());
+        let r = shape_core::render::render(&dash, &opts);
+        return Ok((doc, r));
+    }
     let r = match args.val("--base") {
         Some(b) => shape_core::render_diff(&load_base(b, file)?, &doc, &opts),
         None => shape_core::render::render(&doc, &opts),

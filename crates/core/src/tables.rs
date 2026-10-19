@@ -20,6 +20,8 @@ const SIZE: f64 = 13.0;
 const LINE: f64 = 18.0;
 const PAD_X: f64 = 10.0;
 const PAD_Y: f64 = 8.0;
+/// How much wider bold text is than regular.
+const BOLD: f64 = 1.08;
 /// The widest a column gets before its text wraps.
 const MAX_COL: f64 = 260.0;
 
@@ -78,13 +80,16 @@ pub fn plot(doc: &Document, g: &Group) -> Plot {
     let mut grid: Vec<Vec<String>> = vec![g.columns.clone()];
     grid.extend(rows.iter().map(|r| cells(r)));
     let ncols = grid.iter().map(|r| r.len()).max().unwrap_or(1).max(1);
+    // the header and the first column are bold: wider than they measure
+    let bold = |i: usize, k: usize| if i == 0 || k == 0 { BOLD } else { 1.0 };
     // each column as wide as its text, up to a limit (then it wraps)
     let mut widths: Vec<f64> = (0..ncols)
         .map(|k| {
             grid.iter()
-                .filter_map(|r| r.get(k))
-                .flat_map(|c| c.split('\n'))
-                .map(|l| text::width(l, SIZE))
+                .enumerate()
+                .filter_map(|(i, r)| r.get(k).map(|c| (i, c)))
+                .flat_map(|(i, c)| c.split('\n').map(move |l| (i, l)))
+                .map(|(i, l)| text::width(l, SIZE) * bold(i, k))
                 .fold(40.0, f64::max)
                 .min(MAX_COL)
                 + 2.0 * PAD_X
@@ -103,7 +108,8 @@ pub fn plot(doc: &Document, g: &Group) -> Plot {
         let lines: Vec<Vec<String>> = (0..ncols)
             .map(|k| {
                 let c = row.get(k).map(|s| s.as_str()).unwrap_or("");
-                text::wrap(c, SIZE, widths[k] - 2.0 * PAD_X)
+                // (a hair over, so a word that just fits is not broken)
+                text::wrap(c, SIZE, (widths[k] - 2.0 * PAD_X) / bold(i, k) + 1.0)
             })
             .collect();
         let h = lines.iter().map(|l| l.len()).max().unwrap_or(1).max(1) as f64 * LINE + 2.0 * PAD_Y;

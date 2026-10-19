@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.61.0 — 2026-10-19
+
+- **Perspectives open on a summary.** Instead of the board's blocks folded into cards, each perspective opens on a first screen Shape works out from the whole board (the boards inside it too), so it never needs keeping up to date:
+  - a **headline** that answers the role's first question: *Off track: v1.0 in 20 days*, and why;
+  - **milestones** with a traffic light and the reason: *off track* when the work planned to end by it is forecast to end after it (or is late), *at risk* when it is behind or open blockers, high risks or overdue to-dos weigh on the next milestone, *on track* otherwise;
+  - **open blockers** (a blockers kanban, a section about blockers, anything tagged `blocker`), **decisions needed** (proposed decision records, a section of asks), **top risks**, and **what changed** since a week ago;
+  - by role: Delivery is about the plan, Business adds the board's revenue charts (or says there are none yet), Marketing the checklists, Product and Design the screens, Technical and Legal the decision records.
+- Click a row to open what it stands for on the full board, in whichever board inside it it is; *← Delivery* goes back. *Details* shows the blocks behind a summary. A summary is read-only.
+- `shape svg|png FILE --perspective delivery` exports a perspective's summary (`--as-of DATE`, `--base REF` for what changed).
+- The landing page shows the summaries of Shape's own board, as Delivery, Product and Marketing see it. The example board is now a project board, with a blocker and an open decision.
+- Fixed: a table's bold first column could run into the next one, and a word that just fit could break in two.
+
 ## 0.60.3 — 2026-10-19
 
 - **About Shape** (macOS, Shape → About Shape): Shape's icon, its version, what it is in a sentence, and a link to the website. Before, it showed a folder icon and nothing else.
@@ -47,7 +59,7 @@ From a beta tester's notes:
 
 ## 0.56.0 — 2026-10-18
 
-- **Arrows go round boxes:** an elbow arrow whose usual path would cross a box takes the shortest way round the boxes instead, with as few bends as it can, keeping clear of them. Arrows with nothing in their way keep their shape. On a board like Spend Cards, the arrow to Phase 2 no longer runs through Phase 1. Curved and straight arrows are unchanged.
+- **Arrows go round boxes:** an elbow arrow whose usual path would cross a box takes the shortest way round the boxes instead, with as few bends as it can, keeping clear of them. Arrows with nothing in their way keep their shape. On a board with two phases side by side, the arrow to the second no longer runs through the first. Curved and straight arrows are unchanged.
 
 ## 0.55.1 — 2026-10-18
 

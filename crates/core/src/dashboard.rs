@@ -1,0 +1,1103 @@
+//! Dashboards: the first screen of a perspective, computed from the whole
+//! board (its canvases too), so it never needs keeping up to date.
+//!
+//! Each perspective answers its audience's first question at a glance
+//! (Delivery: are we on plan? Business: when does it sell, and what do we
+//! need to decide?) with a headline and a few tables: milestones with a
+//! traffic light and the reason for it, blockers, decisions, top risks,
+//! what changed since an earlier version. Every row stands for an element
+//! of the board: its id is [`row_id`], and the editor opens that element
+//! when the row is clicked.
+//!
+//! A milestone's light:
+//! - **red**: the work planned to end by it is forecast to end after it,
+//!   or is late; the milestone itself is forecast late; a blocker or a risk
+//!   scoring 20 of 25 or more is linked to it by an arrow;
+//! - **amber**: work before it is behind; it is the next milestone and the
+//!   board has open blockers, a risk scoring 12 or more or overdue to-dos
+//!   that no arrow ties to another milestone;
+//! - **green** otherwise.
+use crate::gantt;
+use crate::model::{Document, Group, LayoutKind, Node, Perspective};
+
+/// A traffic light.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Light {
+    Green,
+    Amber,
+    Red,
+}
+
+impl Light {
+    pub fn word(self) -> &'static str {
+        match self {
+            Light::Green => "On track",
+            Light::Amber => "At risk",
+            Light::Red => "Off track",
+        }
+    }
+    fn color(self) -> &'static str {
+        match self {
+            Light::Green => "green",
+            Light::Amber => "orange",
+            Light::Red => "red",
+        }
+    }
+}
+
+/// Where an element is: the canvas path (empty for the top board) and its id.
+#[derive(Debug, Clone, PartialEq)]
+pub struct At {
+    pub path: Vec<String>,
+    pub id: String,
+}
+
+/// An upcoming milestone and how it stands.
+#[derive(Debug, Clone)]
+pub struct Milestone {
+    pub at: At,
+    pub label: String,
+    /// Planned day (a day number, see [`gantt::parse_date`]).
+    pub due: i64,
+    pub light: Light,
+    /// Why, in a line ("" when on track).
+    pub reason: String,
+}
+
+/// A blocker, a decision or a risk.
+#[derive(Debug, Clone)]
+pub struct Item {
+    pub at: At,
+    pub label: String,
+    pub owner: String,
+    /// A due date, as written.
+    pub due: String,
+    /// Risks: probability × impact, out of 25.
+    pub score: f64,
+    /// Where it is on the board ("Blockers & risks").
+    pub place: String,
+}
+
+/// The id of a dashboard row that stands for element `at` (`tile` keeps
+/// rows of different tables apart): `@dash/TILE/PATH:ID`.
+pub fn row_id(tile: &str, at: &At) -> String {
+    format!("@dash/{tile}/{}:{}", at.path.join("/"), at.id)
+}
+
+/// The element a dashboard row stands for: (canvas path, id).
+pub fn target(row: &str) -> Option<(Vec<String>, String)> {
+    let rest = row.strip_prefix("@dash/")?;
+    let (_, rest) = rest.split_once('/')?;
+    let (path, id) = rest.rsplit_once(':')?;
+    let path = path
+        .split('/')
+        .filter(|p| !p.is_empty())
+        .map(String::from)
+        .collect();
+    Some((path, id.to_string()))
+}
+
+/// Every document of the board with its canvas path, the top board first.
+fn docs(doc: &Document) -> Vec<(Vec<String>, &Document)> {
+    fn walk<'a>(d: &'a Document, path: Vec<String>, out: &mut Vec<(Vec<String>, &'a Document)>) {
+        out.push((path.clone(), d));
+        for c in &d.canvases {
+            let mut p = path.clone();
+            p.push(c.id.clone());
+            walk(&c.doc, p, out);
+        }
+    }
+    let mut out = Vec::new();
+    walk(doc, Vec::new(), &mut out);
+    out
+}
+
+fn place(doc: &Document, path: &[String], d: &Document, n: &Node) -> String {
+    let block = n
+        .group
+        .as_deref()
+        .and_then(|g| d.group(g))
+        .map(|g| g.display().to_string());
+    let canvas = (!path.is_empty())
+        .then(|| {
+            doc.at(&path[..path.len() - 1])
+                .and_then(|p| p.canvas(path.last().unwrap()))
+        })
+        .flatten()
+        .map(|c| c.display().to_string());
+    match (canvas, block) {
+        (Some(c), Some(b)) if c != b => format!("{c} › {b}"),
+        (Some(c), _) => c,
+        (None, Some(b)) => b,
+        (None, None) => String::new(),
+    }
+}
+
+/// The groups `n` is in, innermost first.
+fn ancestors<'a>(d: &'a Document, n: &Node) -> Vec<&'a Group> {
+    let mut out = Vec::new();
+    let mut g = n.group.as_deref().and_then(|g| d.group(g));
+    while let Some(x) = g {
+        out.push(x);
+        g = x.parent.as_deref().and_then(|p| d.group(p));
+    }
+    out
+}
+
+fn word_in(text: &str, words: &[&str]) -> bool {
+    let t = text.to_lowercase();
+    words.iter().any(|w| t.contains(w))
+}
+
+fn done(n: &Node) -> bool {
+    n.done.is_some_and(|d| d >= 100.0)
+}
+
+/// Open blockers: cards of a blockers kanban (not in a done column),
+/// what sits in a section about blockers or what is at risk, and anything
+/// tagged `blocker`.
+pub fn blockers(doc: &Document) -> Vec<Item> {
+    let mut out = Vec::new();
+    for (path, d) in docs(doc) {
+        for n in &d.nodes {
+            if done(n) || n.column.is_some() {
+                continue;
+            }
+            let up = ancestors(d, n);
+            if up.iter().any(|g| g.risks || g.gantt || g.plotted()) {
+                continue;
+            }
+            let closed = up.iter().any(|g| {
+                word_in(
+                    g.display(),
+                    &["done", "solved", "closed", "resolved", "fixed"],
+                )
+            });
+            let about = n.tags.iter().any(|t| t == "blocker" || t == "blocked")
+                || up
+                    .iter()
+                    .any(|g| word_in(g.display(), &["blocker", "blocked", "at risk"]));
+            if about && !closed {
+                out.push(item(doc, &path, d, n));
+            }
+        }
+    }
+    out
+}
+
+/// Open decisions: proposed decision records, what sits in a section of
+/// asks or decisions, and anything tagged `decision`.
+pub fn decisions(doc: &Document) -> Vec<Item> {
+    let mut out = Vec::new();
+    for (path, d) in docs(doc) {
+        for g in &d.groups {
+            if g.adr.as_deref() == Some("proposed") {
+                let mut it = Item {
+                    at: At {
+                        path: path.clone(),
+                        id: g.id.clone(),
+                    },
+                    label: g.display().to_string(),
+                    owner: String::new(),
+                    due: String::new(),
+                    score: 0.0,
+                    place: String::new(),
+                };
+                it.place = path
+                    .last()
+                    .and_then(|c| doc.at(&path[..path.len() - 1]).and_then(|p| p.canvas(c)))
+                    .map(|c| c.display().to_string())
+                    .unwrap_or_default();
+                out.push(it);
+            }
+        }
+        for n in &d.nodes {
+            if done(n) {
+                continue;
+            }
+            let up = ancestors(d, n);
+            if up.iter().any(|g| g.adr.is_some() || g.gantt || g.risks) {
+                continue;
+            }
+            let about = n.tags.iter().any(|t| t == "decision" || t == "ask")
+                || up.iter().any(|g| {
+                    word_in(
+                        g.display(),
+                        &[
+                            "need from",
+                            "decision",
+                            "to decide",
+                            "asks",
+                            "approval",
+                            "sign-off",
+                            "sign off",
+                        ],
+                    )
+                });
+            if about {
+                out.push(item(doc, &path, d, n));
+            }
+        }
+    }
+    out.sort_by(|a, b| (a.due.is_empty(), a.due.clone()).cmp(&(b.due.is_empty(), b.due.clone())));
+    out
+}
+
+/// Risks from the risk matrices, worst first.
+pub fn risks(doc: &Document) -> Vec<Item> {
+    let mut out = Vec::new();
+    for (path, d) in docs(doc) {
+        for n in &d.nodes {
+            let Some(g) = n
+                .group
+                .as_deref()
+                .and_then(|g| d.group(g))
+                .filter(|g| g.risks)
+            else {
+                continue;
+            };
+            let (Some(p), Some(i)) = (n.probability, n.impact) else {
+                continue;
+            };
+            let levels = f64::from(g.levels.unwrap_or(5));
+            let mut it = item(doc, &path, d, n);
+            it.score = f64::from(p) * f64::from(i) * 25.0 / (levels * levels);
+            out.push(it);
+        }
+    }
+    out.sort_by(|a, b| b.score.total_cmp(&a.score));
+    out
+}
+
+/// To-do items past their due date and not done.
+pub fn overdue(doc: &Document, today: i64) -> Vec<Item> {
+    let mut out = Vec::new();
+    for (path, d) in docs(doc) {
+        for n in &d.nodes {
+            let in_list = n
+                .group
+                .as_deref()
+                .and_then(|g| d.group(g))
+                .is_some_and(|g| g.todo);
+            let due = n.date.as_deref().and_then(gantt::parse_date);
+            if in_list && !done(n) && due.is_some_and(|z| z < today) {
+                out.push(item(doc, &path, d, n));
+            }
+        }
+    }
+    out
+}
+
+fn item(doc: &Document, path: &[String], d: &Document, n: &Node) -> Item {
+    Item {
+        at: At {
+            path: path.to_vec(),
+            id: n.id.clone(),
+        },
+        label: n.display().to_string(),
+        owner: n.owner.clone().unwrap_or_default(),
+        due: n.date.clone().unwrap_or_default(),
+        score: 0.0,
+        place: place(doc, path, d, n),
+    }
+}
+
+/// Is `a` tied to `b` by an arrow (either way, also through the groups they are in)?
+fn linked(d: &Document, a: &str, b: &str) -> bool {
+    let around = |id: &str| -> Vec<String> {
+        let mut v = vec![id.to_string()];
+        if let Some(n) = d.node(id) {
+            v.extend(ancestors(d, n).into_iter().map(|g| g.id.clone()));
+        }
+        v
+    };
+    let (xa, xb) = (around(a), around(b));
+    d.edges.iter().any(|e| {
+        (xa.contains(&e.from) && xb.contains(&e.to)) || (xb.contains(&e.from) && xa.contains(&e.to))
+    })
+}
+
+/// The upcoming milestones of every gantt chart (or a chart's end, when it
+/// has none), soonest first, with their lights.
+pub fn milestones(doc: &Document, today: i64) -> Vec<Milestone> {
+    let mut out = Vec::new();
+    for (path, d) in docs(doc) {
+        for g in d.groups.iter().filter(|g| g.gantt) {
+            let tracks = gantt::track(d, &g.id, today);
+            let day = |s: &str| gantt::parse_date(s).unwrap_or(i64::MIN);
+            let mut marks: Vec<&gantt::Track> = tracks.iter().filter(|t| t.milestone).collect();
+            let end_row;
+            if marks.is_empty() {
+                // a chart without milestones: its end
+                let Some(last) = tracks.iter().max_by_key(|t| day(&t.end)) else {
+                    continue;
+                };
+                end_row = gantt::Track {
+                    id: g.id.clone(),
+                    ..last.clone()
+                };
+                marks.push(&end_row);
+            }
+            marks.sort_by_key(|m| day(&m.end));
+            let mut prev = today - 60;
+            for m in marks {
+                let due = day(&m.end);
+                let from = std::mem::replace(&mut prev, due);
+                if due < today || m.status == "done" {
+                    continue;
+                }
+                let label = d
+                    .node(&m.id)
+                    .map(|n| n.display().to_string())
+                    .unwrap_or_else(|| format!("{} done", g.display()));
+                let mut light = Light::Green;
+                let mut why: Vec<(Light, String)> = Vec::new();
+                if m.slip > 0 {
+                    why.push((
+                        Light::Red,
+                        format!(
+                            "forecast {}, {} days late",
+                            gantt::short_date(day(&m.forecast_end)),
+                            m.slip
+                        ),
+                    ));
+                }
+                // the work planned to be done by then (since the milestone before)
+                for t in tracks.iter().filter(|t| {
+                    !t.milestone && t.status != "done" && day(&t.end) <= due && day(&t.end) > from
+                }) {
+                    let name = d
+                        .node(&t.id)
+                        .map(|n| n.display().to_string())
+                        .unwrap_or_default();
+                    let pct = t
+                        .done
+                        .map(|p| format!(", {p:.0}% done"))
+                        .unwrap_or_default();
+                    if t.status == "late" {
+                        why.push((Light::Red, format!("{name} is late{pct}")));
+                    } else if day(&t.forecast_end) > due {
+                        why.push((
+                            Light::Red,
+                            format!(
+                                "{name} forecast to end {}{pct}",
+                                gantt::short_date(day(&t.forecast_end))
+                            ),
+                        ));
+                    } else if t.status == "behind" {
+                        why.push((Light::Amber, format!("{name} is behind{pct}")));
+                    }
+                }
+                for b in blockers(doc)
+                    .iter()
+                    .filter(|b| b.at.path == path && linked(d, &b.at.id, &m.id))
+                {
+                    why.push((Light::Red, format!("blocked: {}", b.label)));
+                }
+                for r in risks(doc)
+                    .iter()
+                    .filter(|r| r.at.path == path && linked(d, &r.at.id, &m.id) && r.score >= 12.0)
+                {
+                    let l = if r.score >= 20.0 {
+                        Light::Red
+                    } else {
+                        Light::Amber
+                    };
+                    why.push((l, format!("risk: {}", r.label)));
+                }
+                why.sort_by(|a, b| b.0.cmp(&a.0));
+                if let Some((l, _)) = why.first() {
+                    light = *l;
+                }
+                out.push(Milestone {
+                    at: At {
+                        path: path.clone(),
+                        id: m.id.clone(),
+                    },
+                    label,
+                    due,
+                    light,
+                    reason: why
+                        .into_iter()
+                        .map(|(_, s)| s)
+                        .take(2)
+                        .collect::<Vec<_>>()
+                        .join("; "),
+                });
+            }
+        }
+    }
+    out.sort_by_key(|m| m.due);
+    // what no arrow ties to a milestone weighs on the next one
+    if let Some(next) = out.first_mut() {
+        let mut why = Vec::new();
+        let tied = |at: &At| {
+            doc.at(&at.path).is_some_and(|d| {
+                d.groups.iter().any(|g| g.gantt)
+                    && d.edges.iter().any(|e| e.from == at.id || e.to == at.id)
+            })
+        };
+        let open: Vec<Item> = blockers(doc).into_iter().filter(|b| !tied(&b.at)).collect();
+        if !open.is_empty() {
+            why.push(format!(
+                "{} open {}",
+                open.len(),
+                if open.len() == 1 {
+                    "blocker"
+                } else {
+                    "blockers"
+                }
+            ));
+        }
+        let high = risks(doc)
+            .into_iter()
+            .filter(|r| r.score >= 12.0 && !tied(&r.at))
+            .count();
+        if high > 0 {
+            why.push(format!(
+                "{high} high {}",
+                if high == 1 { "risk" } else { "risks" }
+            ));
+        }
+        let late = overdue(doc, today).len();
+        if late > 0 {
+            why.push(format!(
+                "{late} overdue {}",
+                if late == 1 { "to-do" } else { "to-dos" }
+            ));
+        }
+        if !why.is_empty() {
+            if next.light == Light::Green {
+                next.light = Light::Amber;
+            }
+            let more = why.join(", ");
+            next.reason = if next.reason.is_empty() {
+                more
+            } else {
+                format!("{}; {more}", next.reason)
+            };
+        }
+    }
+    out
+}
+
+/// "in 9 days", "tomorrow", "today".
+fn countdown(days: i64) -> String {
+    match days {
+        0 => "today".into(),
+        1 => "tomorrow".into(),
+        n => format!("in {n} days"),
+    }
+}
+
+/// What changed between `old` and `new`, in a few lines: (what, where).
+pub fn since(old: &Document, new: &Document) -> Vec<(At, String)> {
+    let mut out = Vec::new();
+    for (path, d) in docs(new) {
+        let Some(o) = old.at(&path) else {
+            continue;
+        };
+        for e in crate::diff::diff(o, d).entries {
+            if e.kind != "node" {
+                continue;
+            }
+            let label = d
+                .node(&e.id)
+                .or_else(|| o.node(&e.id))
+                .map(|n| n.display().to_string())
+                .unwrap_or_else(|| e.id.clone());
+            let what = match e.change {
+                crate::render::Change::Added => format!("Added: {label}"),
+                crate::render::Change::Removed => format!("Removed: {label}"),
+                _ => {
+                    let f: Vec<&str> = e.fields.iter().map(|(k, _, _)| k.as_str()).collect();
+                    if f.iter().any(|k| matches!(*k, "start" | "days" | "after")) {
+                        format!("Moved: {label}")
+                    } else if f.iter().any(|k| matches!(*k, "probability" | "impact")) {
+                        format!("Re-rated: {label}")
+                    } else if f.contains(&"done") {
+                        format!("Progress: {label}")
+                    } else {
+                        format!("Changed: {label}")
+                    }
+                }
+            };
+            out.push((
+                At {
+                    path: path.clone(),
+                    id: e.id,
+                },
+                what,
+            ));
+        }
+    }
+    out
+}
+
+/// The tiles a perspective shows, in order.
+fn tiles(id: &str) -> &'static [&'static str] {
+    match id {
+        "delivery" => &["milestones", "blockers", "decisions", "risks", "since"],
+        "business" => &["milestones", "decisions", "money", "risks", "since"],
+        "marketing" => &["milestones", "todos", "decisions", "risks"],
+        "product" => &["milestones", "decisions", "screens", "risks", "since"],
+        "design" => &["screens", "decisions", "comments"],
+        "tech" => &["records", "blockers", "risks", "milestones"],
+        "legal" => &["records", "decisions", "risks"],
+        "users" => &["screens", "comments", "decisions"],
+        _ => &["milestones", "decisions", "risks", "blockers"],
+    }
+}
+
+fn row(id: String, group: &str, label: &str, cells: &[String], color: Option<&str>) -> Node {
+    let mut n = Node::new(&id);
+    n.label = label.to_string();
+    n.group = Some(group.to_string());
+    n.cells = cells.to_vec();
+    n.color = color.map(String::from);
+    n
+}
+
+fn table(id: &str, label: &str, columns: &[&str]) -> Group {
+    Group {
+        id: id.to_string(),
+        label: label.to_string(),
+        table: true,
+        columns: columns.iter().map(|c| c.to_string()).collect(),
+        ..Default::default()
+    }
+}
+
+/// The dashboard of perspective `p` for the whole board `doc`, as of day
+/// `today`; `before` is an earlier version, for what changed since.
+pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Document>) -> Document {
+    let mut out = Document {
+        title: Some(p.label.clone()),
+        ..Default::default()
+    };
+    out.settings.layout = LayoutKind::Grid;
+    let mut money_found = false;
+    let ms = milestones(doc, today);
+    let worst = ms.iter().take(3).map(|m| m.light).max();
+    let next = ms.first();
+    // the headline: the answer first
+    let (head, color, detail) = match (p.id.as_str(), next) {
+        ("business" | "marketing", Some(m)) => (
+            format!(
+                "Next launch: {} {}, {}",
+                m.label,
+                countdown(m.due - today),
+                m.light.word().to_lowercase()
+            ),
+            m.light.color(),
+            m.reason.clone(),
+        ),
+        (_, Some(m))
+            if matches!(p.id.as_str(), "delivery" | "product" | "tech")
+                || tiles(&p.id).contains(&"milestones") =>
+        {
+            (
+                format!(
+                    "{}: {} {}",
+                    worst.unwrap_or(Light::Green).word(),
+                    m.label,
+                    countdown(m.due - today)
+                ),
+                worst.unwrap_or(Light::Green).color(),
+                m.reason.clone(),
+            )
+        }
+        _ => (
+            doc.title.clone().unwrap_or_else(|| p.label.clone()),
+            "gray",
+            crate::perspectives::purpose(&p.id)
+                .unwrap_or_default()
+                .to_string(),
+        ),
+    };
+    let mut h = Node::new("@dash/head/:");
+    h.label = head;
+    h.color = Some(color.into());
+    if !detail.is_empty() {
+        h.detail = Some(detail);
+    }
+    h.w = Some(720.0);
+    out.nodes.push(h);
+
+    for tile in tiles(&p.id) {
+        match *tile {
+            "milestones" if !ms.is_empty() => {
+                out.groups.push(table(
+                    "milestones",
+                    "Milestones",
+                    &["Milestone", "When", "Status", "Why"],
+                ));
+                for m in ms.iter().take(6) {
+                    out.nodes.push(row(
+                        row_id("ms", &m.at),
+                        "milestones",
+                        &m.label,
+                        &[
+                            format!(
+                                "{} ({})",
+                                gantt::short_date(m.due),
+                                countdown(m.due - today)
+                            ),
+                            m.light.word().into(),
+                            m.reason.clone(),
+                        ],
+                        Some(m.light.color()),
+                    ));
+                }
+            }
+            "blockers" => {
+                let list = blockers(doc);
+                if list.is_empty() {
+                    continue;
+                }
+                out.groups.push(table(
+                    "blockers",
+                    &format!("Open blockers ({})", list.len()),
+                    &["Blocker", "Owner", "Where"],
+                ));
+                for b in list.iter().take(6) {
+                    out.nodes.push(row(
+                        row_id("bl", &b.at),
+                        "blockers",
+                        &b.label,
+                        &[b.owner.clone(), b.place.clone()],
+                        None,
+                    ));
+                }
+            }
+            "decisions" => {
+                let list = decisions(doc);
+                if list.is_empty() {
+                    continue;
+                }
+                out.groups.push(table(
+                    "decisions",
+                    &format!("Decisions needed ({})", list.len()),
+                    &["Decision", "Who", "By", "Where"],
+                ));
+                for x in list.iter().take(6) {
+                    let late = x.due.as_str() != ""
+                        && gantt::parse_date(&x.due).is_some_and(|z| z < today);
+                    out.nodes.push(row(
+                        row_id("de", &x.at),
+                        "decisions",
+                        &x.label,
+                        &[x.owner.clone(), x.due.clone(), x.place.clone()],
+                        late.then_some("red"),
+                    ));
+                }
+            }
+            "risks" => {
+                let list = risks(doc);
+                if list.is_empty() {
+                    continue;
+                }
+                out.groups
+                    .push(table("risks", "Top risks", &["Risk", "Score", "Owner"]));
+                for r in list.iter().take(5) {
+                    let c = if r.score >= 20.0 {
+                        Some("red")
+                    } else if r.score >= 12.0 {
+                        Some("orange")
+                    } else {
+                        None
+                    };
+                    out.nodes.push(row(
+                        row_id("ri", &r.at),
+                        "risks",
+                        &r.label,
+                        &[format!("{:.0}", r.score), r.owner.clone()],
+                        c,
+                    ));
+                }
+            }
+            "todos" => {
+                let mut rows = Vec::new();
+                for (path, d) in docs(doc) {
+                    for g in d.groups.iter().filter(|g| g.todo) {
+                        let (n, all) = crate::todo::progress(d, &g.id);
+                        let at = At {
+                            path: path.clone(),
+                            id: g.id.clone(),
+                        };
+                        rows.push((
+                            at,
+                            g.display().to_string(),
+                            format!("{n} of {all} done"),
+                            n == all,
+                        ));
+                    }
+                }
+                if rows.is_empty() {
+                    continue;
+                }
+                out.groups
+                    .push(table("todos", "Checklists", &["List", "Progress"]));
+                for (at, label, prog, all) in rows {
+                    out.nodes.push(row(
+                        row_id("td", &at),
+                        "todos",
+                        &label,
+                        &[prog],
+                        all.then_some("green"),
+                    ));
+                }
+            }
+            "screens" | "records" => {
+                let screens = *tile == "screens";
+                let mut rows = Vec::new();
+                for (path, d) in docs(doc) {
+                    for g in &d.groups {
+                        let what = if screens {
+                            g.screen.map(|s| s.as_str().to_string())
+                        } else {
+                            g.adr.clone()
+                        };
+                        if let Some(w) = what {
+                            rows.push((
+                                At {
+                                    path: path.clone(),
+                                    id: g.id.clone(),
+                                },
+                                g.display().to_string(),
+                                w,
+                            ));
+                        }
+                    }
+                }
+                if rows.is_empty() {
+                    continue;
+                }
+                let (id, title, col) = if screens {
+                    ("screens", "Screens", "Device")
+                } else {
+                    ("records", "Decision records", "Status")
+                };
+                out.groups.push(table(
+                    id,
+                    title,
+                    &[if screens { "Screen" } else { "Decision" }, col],
+                ));
+                for (at, label, w) in rows.into_iter().take(8) {
+                    out.nodes
+                        .push(row(row_id(&id[..2], &at), id, &label, &[w], None));
+                }
+            }
+            "comments" => {
+                let mut rows = Vec::new();
+                for (path, d) in docs(doc) {
+                    for c in d
+                        .comments
+                        .iter()
+                        .filter(|c| c.status != crate::model::Status::Resolved)
+                    {
+                        let at = At {
+                            path: path.clone(),
+                            id: c.on.clone().unwrap_or_default(),
+                        };
+                        rows.push((at, c.text.clone(), c.author.clone().unwrap_or_default()));
+                    }
+                }
+                if rows.is_empty() {
+                    continue;
+                }
+                out.groups.push(table(
+                    "comments",
+                    &format!("Open comments ({})", rows.len()),
+                    &["Comment", "By"],
+                ));
+                for (i, (at, text, by)) in rows.into_iter().take(6).enumerate() {
+                    let mut at = at;
+                    at.id = if at.id.is_empty() {
+                        format!("#{i}")
+                    } else {
+                        at.id
+                    };
+                    out.nodes.push(row(
+                        row_id(&format!("co{i}"), &at),
+                        "comments",
+                        &text,
+                        &[by],
+                        None,
+                    ));
+                }
+            }
+            "money" => {
+                // charts about money, as they are on the board
+                for (path, d) in docs(doc) {
+                    for g in d.groups.iter().filter(|g| g.chart.is_some()) {
+                        let t = g.display();
+                        let money = word_in(
+                            t,
+                            &[
+                                "revenue", "mrr", "arr", "income", "sales", "margin", "money", "£",
+                                "$", "€",
+                            ],
+                        ) || g
+                            .unit
+                            .as_deref()
+                            .is_some_and(|u| word_in(u, &["£", "$", "€"]));
+                        if !money || word_in(t, &["superseded", "obsolete", "old "]) {
+                            continue;
+                        }
+                        let id = format!("money-{}", g.id);
+                        let mut copy = g.clone();
+                        copy.id = id.clone();
+                        copy.parent = None;
+                        copy.x = None;
+                        copy.y = None;
+                        out.groups.push(copy);
+                        money_found = true;
+                        for n in d
+                            .nodes
+                            .iter()
+                            .filter(|n| n.group.as_deref() == Some(g.id.as_str()))
+                        {
+                            let mut c = n.clone();
+                            c.id = row_id(
+                                "mo",
+                                &At {
+                                    path: path.clone(),
+                                    id: n.id.clone(),
+                                },
+                            );
+                            c.group = Some(id.clone());
+                            out.nodes.push(c);
+                        }
+                    }
+                }
+                if !money_found {
+                    out.groups
+                        .push(table("money", "Money", &["Money", "What would show it"]));
+                    let mut n = row("@dash/money/:".into(), "money", "Nothing about money on this board yet", &["Add a revenue chart (revenue now and by month), or tell the AI the price and how many customers to expect".into()], Some("gray"));
+                    n.cells = vec![n.cells[0].clone()];
+                    out.nodes.push(n);
+                }
+            }
+            "since" => {
+                let Some(old) = before else { continue };
+                let list = since(old, doc);
+                if list.is_empty() {
+                    continue;
+                }
+                out.groups.push(table(
+                    "since",
+                    &format!("Changed since ({})", list.len()),
+                    &["What"],
+                ));
+                for (at, what) in list.into_iter().take(8) {
+                    out.nodes
+                        .push(row(row_id("si", &at), "since", &what, &[], None));
+                }
+            }
+            _ => {}
+        }
+    }
+    drop_empty_columns(&mut out);
+    arrange(&mut out);
+    out
+}
+
+/// A column nobody filled in (no owners, no dates) is left out.
+fn drop_empty_columns(d: &mut Document) {
+    for g in d.groups.iter_mut().filter(|g| g.table) {
+        let rows: Vec<&mut Node> = d
+            .nodes
+            .iter_mut()
+            .filter(|n| n.group.as_deref() == Some(g.id.as_str()))
+            .collect();
+        let mut keep: Vec<bool> = (0..g.columns.len()).map(|c| c == 0).collect();
+        for r in &rows {
+            for (k, cell) in r.cells.iter().enumerate() {
+                if !cell.trim().is_empty() {
+                    if let Some(x) = keep.get_mut(k + 1) {
+                        *x = true;
+                    }
+                }
+            }
+        }
+        if keep.iter().all(|k| *k) {
+            continue;
+        }
+        g.columns = g
+            .columns
+            .iter()
+            .zip(&keep)
+            .filter(|(_, k)| **k)
+            .map(|(c, _)| c.clone())
+            .collect();
+        for r in rows {
+            r.cells = r
+                .cells
+                .iter()
+                .enumerate()
+                .filter(|(k, _)| keep.get(k + 1).copied().unwrap_or(false))
+                .map(|(_, c)| c.clone())
+                .collect();
+        }
+    }
+}
+
+/// The headline across the top, milestones under it, the other tiles in two
+/// columns, each going under the shorter one.
+fn arrange(d: &mut Document) {
+    const GAP: f64 = 28.0;
+    // a block's frame around what it draws: its title and padding
+    let size = |d: &Document, g: &Group| {
+        let p = crate::charts::plot_any(d, g);
+        (p.w + 40.0, p.h + 76.0)
+    };
+    let sizes: Vec<(String, f64, f64)> = d
+        .groups
+        .iter()
+        .map(|g| {
+            let (w, h) = size(d, g);
+            (g.id.clone(), w, h)
+        })
+        .collect();
+    let first = sizes
+        .first()
+        .filter(|(id, _, _)| id == "milestones")
+        .cloned();
+    let rest: Vec<&(String, f64, f64)> = sizes
+        .iter()
+        .filter(|(id, _, _)| first.as_ref().is_none_or(|f| f.0 != *id))
+        .collect();
+    let col_w = rest.iter().map(|(_, w, _)| *w).fold(0.0_f64, f64::max);
+    let width = first
+        .as_ref()
+        .map(|f| f.1)
+        .unwrap_or(0.0)
+        .max(2.0 * col_w + GAP)
+        .max(720.0);
+    let head_h = 72.0;
+    if let Some(h) = d.nodes.first_mut() {
+        h.x = Some(0.0);
+        h.y = Some(0.0);
+        h.w = Some(width);
+    }
+    let mut y = head_h + GAP;
+    let place = |d: &mut Document, id: &str, x: f64, y: f64| {
+        if let Some(g) = d.group_mut(id) {
+            g.x = Some(x);
+            g.y = Some(y);
+        }
+    };
+    if let Some((id, _, h)) = &first {
+        place(d, id, 0.0, y);
+        y += h + GAP;
+    }
+    let mut cols = [y, y];
+    let xs = [0.0, (width - GAP) / 2.0 + GAP];
+    for (id, _, h) in rest {
+        let c = if cols[0] <= cols[1] { 0 } else { 1 };
+        place(d, id, xs[c], cols[c]);
+        cols[c] += h + GAP;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const BOARD: &str = "title: Launch\ntype: project\n\n\
+        canvas plan: Plan {\n\
+        \x20 gantt road: Roadmap [start: 2026-10-01] {\n\
+        \x20   Build [2026-10-01, 3w, done: 30%, owner: ana]\n\
+        \x20   Beta [2026-10-22, milestone]\n\
+        \x20   Docs [2026-10-23, 1w]\n\
+        \x20   Launch [2026-11-20, milestone]\n\
+        \x20 }\n\
+        \x20 risks r: Risks {\n\
+        \x20   Vendor review slips [p: 4, i: 5, owner: sam]\n\
+        \x20   Scope creep [p: 2, i: 2]\n\
+        \x20 }\n\
+        \x20 kanban k: Blockers {\n\
+        \x20   column open: Open {\n\
+        \x20     key: No signing key [owner: ana]\n\
+        \x20   }\n\
+        \x20   column done: Solved {\n\
+        \x20     old: Old thing\n\
+        \x20   }\n\
+        \x20 }\n\
+        }\n\
+        group asks: What we need from you {\n\
+        \x20 price: Set the price [owner: cfo, date: 2026-10-25]\n\
+        }\n";
+
+    #[test]
+    fn delivery_answers_are_we_on_plan() {
+        let doc = crate::dsl::parse(BOARD).unwrap();
+        let today = gantt::parse_date("2026-10-15").unwrap();
+        let ms = milestones(&doc, today);
+        assert_eq!(
+            ms.iter().map(|m| m.label.as_str()).collect::<Vec<_>>(),
+            vec!["Beta", "Launch"]
+        );
+        // the work before the beta is 30% done with 6 of 21 days left: it ends after it
+        assert_eq!(ms[0].light, Light::Red);
+        assert!(
+            ms[0].reason.starts_with("Build forecast to end"),
+            "{}",
+            ms[0].reason
+        );
+        assert!(
+            ms[0].reason.contains("1 open blocker") && ms[0].reason.contains("1 high risk"),
+            "{}",
+            ms[0].reason
+        );
+        assert_eq!(ms[1].light, Light::Green);
+        assert_eq!(
+            blockers(&doc)
+                .iter()
+                .map(|b| b.label.as_str())
+                .collect::<Vec<_>>(),
+            vec!["No signing key"]
+        );
+        assert_eq!(decisions(&doc)[0].label, "Set the price");
+        assert_eq!(risks(&doc)[0].score, 20.0);
+
+        let p = crate::perspectives::all(&doc)
+            .into_iter()
+            .find(|p| p.id == "delivery")
+            .unwrap();
+        let dash = build(&doc, &p, today, None);
+        assert_eq!(dash.nodes[0].label, "Off track: Beta in 7 days");
+        let tables: Vec<&str> = dash.groups.iter().map(|g| g.id.as_str()).collect();
+        assert_eq!(tables, vec!["milestones", "blockers", "decisions", "risks"]);
+        let beta = dash.nodes.iter().find(|n| n.label == "Beta").unwrap();
+        assert_eq!(beta.color.as_deref(), Some("red"));
+        assert_eq!(
+            target(&beta.id),
+            Some((vec!["plan".to_string()], "beta".to_string()))
+        );
+        // it renders
+        let svg = crate::render::render(&dash, &Default::default()).svg;
+        assert!(svg.contains("Off track"));
+    }
+
+    #[test]
+    fn what_changed_since_an_earlier_version() {
+        let old = crate::dsl::parse(BOARD).unwrap();
+        let new = crate::dsl::parse(
+            &BOARD
+                .replace(
+                    "Build [2026-10-01, 3w, done: 30%",
+                    "Build [2026-10-01, 4w, done: 30%",
+                )
+                .replace("[p: 2, i: 2]", "[p: 4, i: 2]"),
+        )
+        .unwrap();
+        let s: Vec<String> = since(&old, &new).into_iter().map(|(_, w)| w).collect();
+        assert!(
+            s.contains(&"Moved: Build".to_string())
+                && s.contains(&"Re-rated: Scope creep".to_string()),
+            "{s:?}"
+        );
+    }
+}

@@ -80,15 +80,15 @@ try {
   await p.evaluate(() => window.diagramEditor.apply([
     { op: "add_canvas", title: "Notes" },
     { op: "add_node", id: "notes-link", label: "Notes", canvas: "notes" },
-    { op: "in", canvas: "notes", ops: [{ op: "add_node", id: "n1", label: "Old scope" }, { op: "add_comment", on: "n1", text: "Two card products now" }] }
+    { op: "in", canvas: "notes", ops: [{ op: "add_node", id: "n1", label: "Old scope" }, { op: "add_comment", on: "n1", text: "Two plans now" }] }
   ])); await sleep(700);
   await p.locator(".dge-ai-fab").click();
   await p.locator(".dge-ai-item", { hasText: "Rethink" }).click();
   await p.waitForSelector(".dge-preview-bar");
-  assert.match(await p.locator(".dge-preview-bar").textContent(), /Scope now has both card products\. \(1 op\)/);
+  assert.match(await p.locator(".dge-preview-bar").textContent(), /Scope now has both plans\. \(1 op\)/);
   await p.locator(".dge-preview-bar button.primary").click(); await sleep(700);
-  assert.match(saved(), /n1: Two products: virtual cards and spend cards/);
-  assert.match(saved(), /comment c1 on n1: Two card products now \[resolved, resolution: Scope updated\]/);
+  assert.match(saved(), /n1: Two plans: free and team/);
+  assert.match(saved(), /comment c1 on n1: Two plans now \[resolved, resolution: Scope updated\]/);
 
   // Ask: the answer is a temporary canvas drawn for the question; nothing is saved
   const before = saved();

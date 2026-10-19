@@ -21,6 +21,7 @@
 pub mod adr;
 pub mod charts;
 pub mod cycle;
+pub mod dashboard;
 pub mod diff;
 pub mod dsl;
 pub mod entities;
@@ -458,6 +459,17 @@ impl Session {
     pub fn render(&self, opts: &RenderOptions) -> Rendered {
         let mut o = opts.clone();
         o.themes.extend(self.themes.iter().cloned());
+        // a perspective's dashboard: computed from the whole board
+        if let (Some(p), true) = (&o.perspective, o.dashboard) {
+            let today = o
+                .today
+                .as_deref()
+                .and_then(gantt::parse_date)
+                .unwrap_or_else(|| gantt::parse_date("2026-01-01").unwrap_or(0));
+            let before = o.before.as_deref().and_then(|s| parse(s).ok());
+            let doc = dashboard::build(&self.whole(), p, today, before.as_ref());
+            return render::render(&doc, &o);
+        }
         // a perspective shows its part of the board (and of the base, to compare)
         // starting high level: folded but for what is opened
         let seen = |d: &Document| match (&o.perspective, &o.open) {

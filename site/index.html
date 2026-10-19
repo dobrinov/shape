@@ -182,13 +182,21 @@ The board below describes what to build…
     <h2>One board, every audience</h2>
     <p>The same board tells the story differently to different people. Nobody keeps a separate copy for the board meeting.</p>
     <ul class="checks">
-      <li><b>Perspectives</b>: Business sees decisions, risks and the timeline. Delivery sees who does what by when. Design sees the screens and the user journey. Each view is one click away, and the AI tags the board for them.</li>
+      <li><b>Perspectives</b> open on a summary Shape works out from the board: Delivery gets a traffic light per milestone and why, the blockers and the decisions it waits on; Product, Marketing, Business and Design get theirs. Click any row to see what is behind it. Nothing to keep up to date.</li>
       <li><b>Presentation mode</b>: pick the sections, add speaker notes, and present. The view glides across the board from slide to slide, with no deck to keep in sync.</li>
       <li><b>Wireframes</b>: sketch phone and web screens as text and draw the flow with arrows from the buttons.</li>
       <li><b>Comments with names</b> on any box or arrow, and a full history to go back to.</li>
     </ul>
   </div>
-  <figure class="shot"><img src="tour/timeline.svg" alt="A timeline with the important moments starred" loading="lazy"><figcaption>What Business opens: Shape so far, and the moments that mattered.</figcaption></figure>
+  <figure class="shot persp-demo">
+    <div class="persp-tabs" role="tablist" aria-label="Perspectives">
+      <button type="button" role="tab" aria-selected="true" data-p="delivery">Delivery</button>
+      <button type="button" role="tab" aria-selected="false" data-p="product">Product</button>
+      <button type="button" role="tab" aria-selected="false" data-p="marketing">Marketing</button>
+    </div>
+    <img id="persp-img" src="tour/persp-delivery.svg" alt="Delivery's summary of Shape's own board: v1.0 off track and why, the open blocker, the decision needed, the top risks" loading="lazy">
+    <figcaption id="persp-cap">Shape's own board, as Delivery sees it: is v1.0 on plan, and if not, why.</figcaption>
+  </figure>
 </section>
 
 <section id="features" class="features">
@@ -374,6 +382,22 @@ make install</pre>
 
 <script src="shape.embed.js"></script>
 <script>
+  // One board, every audience: switch between the perspectives' summaries
+  var caps = {
+    delivery: ["Shape's own board, as Delivery sees it: is v1.0 on plan, and if not, why.", "Delivery's summary of Shape's own board: v1.0 off track and why, the open blocker, the decision needed, the top risks"],
+    product: ["The same board, as Product sees it: the dates, the open decisions, the screens.", "Product's summary of Shape's own board: milestones, decisions needed, screens, top risks"],
+    marketing: ["The same board, as Marketing sees it: the next launch, the checklist, what is still open.", "Marketing's summary of Shape's own board: the next launch, the release checklist, decisions needed, top risks"]
+  };
+  document.querySelectorAll(".persp-tabs button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var p = b.getAttribute("data-p");
+      document.querySelectorAll(".persp-tabs button").forEach(function (x) { x.setAttribute("aria-selected", String(x === b)); });
+      var img = document.getElementById("persp-img");
+      img.src = "tour/persp-" + p + ".svg";
+      img.alt = caps[p][1];
+      document.getElementById("persp-cap").textContent = caps[p][0];
+    });
+  });
   // the install one-liner in the hero: copy on click
   var brewCopy = document.getElementById("brew-copy");
   if (brewCopy) brewCopy.addEventListener("click", function () {

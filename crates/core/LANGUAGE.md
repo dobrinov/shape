@@ -358,7 +358,11 @@ fraud: Fraud reporting API [tags: tech exec]
 
 - A perspective is a way of looking at the board: it shows the elements tagged for it (`tags`), the blocks of the kinds it names whole (`show`: mindmap, timeline, adr, risks, kanban, gantt, table, chart, entity, sequence, lanes, sticky), the sections around them and the arrows and comments between them. `details: off` shows titles only. It changes what you see, never the board.
 - The board's `type:` brings built-in ones. A product board: Product (`product`), Technical (`tech`), Users (`user`). A project board: Delivery (`delivery`, also `team`), Product, Technical. Both also: Legal (`legal`), Business (`business`, also `finance` and `commercial`), Marketing (`marketing`), Design (`design`). A sketch has none. `perspective id: Name [...]` adds one, or overrides a built-in with the same id.
-- A perspective starts high level: its top-level sections and blocks are folded into cards (title, what is inside, the first few items), except the ones that role looks at first (charts for Business, the timeline for Delivery, Product and Marketing). In the editor, click a card to open it in place; *Expand all* opens everything.
+- **A perspective opens on its summary**, computed from the whole board (its canvases too), so nothing needs keeping up to date. A headline answers the role's first question (Delivery: *Off track: Beta in 7 days* and why; Business: the next launch), then tables, laid out in two columns:
+  - **Milestones**: every gantt milestone ahead (or a chart's end), with a light. *Off track* (red): work planned to end by it is forecast to end after it or is late, it is forecast late itself, or an arrow ties a blocker or a risk scoring 20 or more (of 25) to it. *At risk* (amber): work before it is behind, or it is the next milestone and the board has open blockers, risks scoring 12 or more or overdue to-dos that no arrow ties to another one. *On track* (green) otherwise. Each says why.
+  - **Open blockers**: cards in a blockers kanban (not in a done/solved column), what sits in a section about blockers or what is at risk, anything tagged `blocker`. **Decisions needed**: proposed decision records, what sits in a section of asks or decisions (*What we need from you*), anything tagged `decision`. **Top risks**: the risk matrices' worst. **Changed since**: what moved, was re-rated, progressed, was added or removed since a week ago (the editor takes the version from the history; exports take `--base`).
+  - By role: Delivery (milestones, blockers, decisions, risks, changes), Business (milestones, decisions, money: the board's revenue charts, risks, changes), Marketing (milestones, checklists, decisions, risks), Product (milestones, decisions, screens, risks, changes), Design (screens, decisions, open comments), Technical (decision records, blockers, risks, milestones), Legal (decision records, decisions, risks), a board's own perspective (milestones, decisions, risks, blockers).
+- In the editor a summary is read-only: click a row to open what it stands for on the full board (*← Delivery* goes back); *Details* shows the blocks behind it, as on the board. `shape svg|png FILE --perspective delivery [--as-of DATE] [--base REF]` exports a summary.
 - An element shows in a perspective when it has the perspective's tag (`tags: tech exec`); mindmap topics go with their centre. In the editor, pick one in the top bar; new elements get its tag. *✦ Sort into perspectives* has the AI tag the board. Ops: `{"op":"perspective","id":"legal","label":"Legal","tags":["legal"],"show":["adr"]}` (`remove: true` takes it off).
 
 ### To-do lists
@@ -424,12 +428,12 @@ presentation: Launch review [transition: glide, instructions: "For the exec sync
 
 ```shape
 timeline history: How we got here {
-  Dec 2024: Airwallex: no markup on issuing
-  18 Jun 2025: Push provisioning priced at £15k per region
-  7–14 May 2026: Visa approves use cases and card art [blue]
+  Dec 2024: Supplier: no markup on parts
+  18 Jun 2025: Store listing priced at £5k per region
+  7–14 May 2026: Regulator approves the design [blue]
   ~6 Aug 2026: First demo
   2026-10-28: Open beta [important]
-  mid Dec 2026: Spend Cards beta
+  mid Dec 2026: Public beta
 }
 ```
 

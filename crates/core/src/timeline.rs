@@ -1,10 +1,10 @@
 //! Timelines: a group whose nodes are events on a line of time.
 //!
 //! ```text
-//! timeline history: Spend Cards {
-//!   Dec 2024: Airwallex: no markup on issuing
-//!   18 Jun 2025: Push provisioning priced at £15k per region
-//!   7–14 May 2026: Visa approves use cases and card art
+//! timeline history: Field kit {
+//!   Dec 2024: Supplier: no markup on parts
+//!   18 Jun 2025: Store listing priced at £5k per region
+//!   7–14 May 2026: Regulator approves the design
 //!   2026-10-28: Open beta [important, red]
 //! }
 //! ```
@@ -676,7 +676,7 @@ mod tests {
 
     #[test]
     fn the_language_round_trips_and_ops_check_dates() {
-        let src = "title: T\n\ntimeline history: Spend Cards [blue] {\n  Dec 2024: Airwallex: no markup on issuing\n  18 Jun 2025: Push provisioning [detail: £15k per region]\n  7–14 May 2026: Visa approves [id: visa]\n  2026-10-28: Open beta [important, red]\n  2027:\n}\n";
+        let src = "title: T\n\ntimeline history: Field kit [blue] {\n  Dec 2024: Supplier: no markup on parts\n  18 Jun 2025: Store listing [detail: £5k per region]\n  7–14 May 2026: Regulator approves [id: visa]\n  2026-10-28: Open beta [important, red]\n  2027:\n}\n";
         let doc = crate::dsl::parse(src).unwrap();
         let g = doc.group("history").unwrap();
         assert!(g.timeline && g.color.as_deref() == Some("blue"));
@@ -689,9 +689,9 @@ mod tests {
                 ev[0].label.as_str()
             ),
             (
-                "history.airwallex-no-markup-on-issuing",
+                "history.supplier-no-markup-on-parts",
                 Some("Dec 2024"),
-                "Airwallex: no markup on issuing"
+                "Supplier: no markup on parts"
             )
         );
         assert_eq!(ev[2].id, "visa");
@@ -701,7 +701,7 @@ mod tests {
             (Some("2027"), "")
         );
         let out = crate::dsl::print(&doc);
-        assert!(out.contains("timeline history: Spend Cards [blue] {\n  Dec 2024: Airwallex: no markup on issuing\n"), "{out}");
+        assert!(out.contains("timeline history: Field kit [blue] {\n  Dec 2024: Supplier: no markup on parts\n"), "{out}");
         assert_eq!(crate::dsl::parse(&out).unwrap(), doc, "{out}");
         // as JSON, and through the patcher (rewriting only the block)
         assert_eq!(crate::from_json(&crate::to_json(&doc)).unwrap(), doc);
@@ -713,7 +713,7 @@ mod tests {
         );
         let out = s.source("dsl").unwrap();
         assert!(
-            out.contains("  May 2026: Visa approves [id: visa, important]\n")
+            out.contains("  May 2026: Regulator approves [id: visa, important]\n")
                 && out.starts_with("title: T\n"),
             "{out}"
         );
@@ -742,7 +742,7 @@ mod tests {
 
     #[test]
     fn connectors_never_cross_a_label() {
-        let doc = crate::dsl::parse("timeline t: T {\n  Dec 2024: Airwallex: no markup on issuing, only monthly rebates\n  18 Jun 2025: Apple/Google push provisioning priced at £15k per region (UK+EU one region)\n  20 Apr 2026: Sophie's prototype teased at the global product update; Claude Design mock with card policies\n  7–14 May 2026: Visa approves use cases and card art: NZ, AU, CA, UK\n  10 Jul 2026: Stephen: virtual cards are easier; spend cards need more controls\n  17 Jul 2026: Rado takes the lead on virtual cards\n  28 Jul 2026: Employee cards pushed to Q4: expenses revamp first\n  ~6 Aug 2026: First virtual cards demo; free batch-of-20 pricing\n  17–19 Aug 2026: Spend cards spike (Filip); Sukh's pricing discussion\n  31 Aug 2026: #cards-dev created\n  3 Sep 2026: Google Pay SDK rejects the Dext app (allowlist)\n  30 Sep 2026: Merchant Cards rename thread (42 replies)\n  1–8 Oct 2026: Card foundation PRs; live behind a feature flag\n  13 Oct 2026: Production reveal fails; fraud reporting named a blocker\n  14 Oct 2026: First card payment in production [green]\n  15 Oct 2026: Naming deck approved (naming superseded 17 Oct); one user per cardholder\n  16 Oct 2026: Beta moved 19 → 28 Oct [red]\n  17 Oct 2026: Scope clarified: 28 Oct ships virtual cards; Spend Cards are personalised, charged per card, with push provisioning [purple]\n}\n").unwrap();
+        let doc = crate::dsl::parse("timeline t: T {\n  Dec 2024: Supplier: no markup on parts, only monthly rebates\n  18 Jun 2025: App store review priced at £5k per region (UK+EU one region)\n  20 Apr 2026: Mia's prototype teased at the company all-hands; a design mock with the new settings\n  7–14 May 2026: Regulator approves the design: NZ, AU, CA, UK\n  10 Jul 2026: Sam: the basic kit is easier; the pro kit needs more checks\n  17 Jul 2026: Ana takes the lead on the basic kit\n  28 Jul 2026: Pro kit pushed to Q4: the app revamp first\n  ~6 Aug 2026: First basic kit demo; free batch-of-20 pricing\n  17–19 Aug 2026: Pro kit spike (Lee); Kai's pricing discussion\n  31 Aug 2026: #kit-dev created\n  3 Sep 2026: The app store rejects the companion app (allowlist)\n  30 Sep 2026: Product rename thread (42 replies)\n  1–8 Oct 2026: Foundation PRs; live behind a feature flag\n  13 Oct 2026: Production check fails; safety reporting named a blocker\n  14 Oct 2026: First real order in production [green]\n  15 Oct 2026: Naming deck approved (naming superseded 17 Oct); one owner per kit\n  16 Oct 2026: Beta moved 19 → 28 Oct [red]\n  17 Oct 2026: Scope clarified: 28 Oct ships the basic kit; the pro kit is personalised, charged per kit, with remote setup [purple]\n}\n").unwrap();
         let p = plot(&doc, doc.group("t").unwrap());
         let lines: Vec<(f64, f64, f64)> = p
             .marks

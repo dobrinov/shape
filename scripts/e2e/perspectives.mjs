@@ -48,21 +48,26 @@ try {
   assert.deepEqual(names.slice(0, 5), ["Full board", "Delivery", "Product", "Technical", "Legal"]);
   assert.equal(await shown(p), "api,beta,fraud,note");
   assert.ok(!(await p.locator('[data-act="folds"]').isVisible()), "nothing to fold on the full board");
-  // Delivery starts high level: what is tagged for it, the risks folded into a card; the file does not change
+  // Delivery opens on its summary: computed from the board, read-only; the file does not change
   const before = saved();
   await p.selectOption(".dge-persp", "delivery"); await sleep(400);
-  assert.equal(await shown(p), "@fold/r,beta");
-  assert.match(await p.locator('.dg-node[data-id="@fold/r"]').textContent(), /Risks[\s\S]*1 risk · Fraud/);
-  if (process.env.SHOTS) await p.screenshot({ path: process.env.SHOTS + "/folded.png" });
-  // a card opens in place; Fold all folds it again, Expand all opens everything
-  await p.locator('.dg-node[data-id="@fold/r"]').click(); await sleep(400);
-  assert.equal(await shown(p), "beta,fraud");
-  assert.equal(await p.locator('[data-act="folds"]').innerText(), "Expand all");
+  assert.equal(await shown(p), "@dash/head/:,@dash/ri/:fraud");
+  assert.match(await p.locator('[data-id="@dash/ri/:fraud"]').textContent(), /Fraud — Score 12/);
+  assert.ok(!(await p.locator(".dge-tools").isVisible()), "no drawing tools on a summary");
+  if (process.env.SHOTS) await p.screenshot({ path: process.env.SHOTS + "/summary.png" });
+  // Details: the blocks behind it, as on the board; Summary goes back
+  assert.equal(await p.locator('[data-act="folds"]').innerText(), "Details");
   await p.locator('[data-act="folds"]').click(); await sleep(300);
-  assert.equal(await p.locator('[data-act="folds"]').innerText(), "Fold all");
   assert.equal(await shown(p), "beta,fraud");
+  assert.equal(await p.locator('[data-act="folds"]').innerText(), "Summary");
   await p.locator('[data-act="folds"]').click(); await sleep(300);
-  assert.equal(await shown(p), "@fold/r,beta");
+  // a row opens what it stands for on the full board, with a way back
+  await p.locator('[data-id="@dash/ri/:fraud"]').click(); await sleep(400);
+  assert.equal(await p.locator(".dge-persp").inputValue(), "");
+  assert.equal(await p.locator(".dge-back").innerText(), "← Delivery");
+  await p.locator(".dge-back").click(); await sleep(400);
+  assert.equal(await p.locator(".dge-persp").inputValue(), "delivery");
+  assert.ok(!(await p.locator(".dge-back").isVisible()));
   assert.equal(saved(), before);
 
   // a new perspective is written to the board and picked; kept on reload
@@ -77,9 +82,11 @@ try {
   assert.match(await p.locator(".dge-persp-card.on").innerText(), /Support[\s\S]*last time/);
   await p.locator(".dge-persp-card.on").click(); await sleep(300);
   assert.equal(await p.locator(".dge-persp").inputValue(), "support");
-  assert.equal(await shown(p), "");
+  assert.equal(await shown(p), "@dash/head/:,@dash/ri/:fraud");
 
-  // a box made while looking through it gets its tag, and stays in view
+  // in its details, a box made while looking through it gets its tag, and stays in view
+  await p.locator('[data-act="folds"]').click(); await sleep(300);
+  assert.equal(await shown(p), "");
   await p.locator('.dge-tool[data-tool="node"]').click();
   await p.mouse.click(600, 400); await sleep(300);
   await p.keyboard.type("Terms"); await p.keyboard.press("Enter"); await sleep(600);

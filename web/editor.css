@@ -515,7 +515,9 @@
 .dge-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .dge .dge-empty-actions button { height: 32px; min-height: 0; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 13px; }
 .dge .dge-empty-actions button.primary { border-color: transparent; background: var(--accent); color: var(--accent-fg, #fff); font-weight: 600; }
-.dge .dge-folds[hidden] { display: none; }
+.dge .dge-folds[hidden], .dge .dge-back[hidden] { display: none; }
+/* a summary is read-only: no drawing tools */
+.dge.dge-dash .dge-tools { display: none; }
 /* resizing a box from its corner */
 .dge-overlay .dge-grip { fill: var(--bg); stroke: var(--accent); stroke-width: 1.5; cursor: nwse-resize; pointer-events: all; }
 .dge-overlay .dge-size { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4; }

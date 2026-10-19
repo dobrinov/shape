@@ -39,6 +39,11 @@ cp "$ROOT/site/site.css" "$ROOT/site/og.png" "$ROOT/site/apple-touch-icon.png" "
 # the feature tour: a picture per feature, drawn from site/tour/*.shape
 "$ROOT/scripts/render-tour.sh" "$BIN" "$OUT/tour"
 
+# One board, every audience: the example's summaries, as of a fixed day
+for p in delivery product marketing; do
+  "$BIN" svg "$ROOT/examples/example.shape" --perspective "$p" --dark --as-of 2026-10-24 -o "$OUT/tour/persp-$p.svg" 2>/dev/null
+done
+
 # one bundle (JS + inlined WASM + the editor) for every embedded board
 "$BIN" embed -o "$OUT/shape.embed.js" 2>/dev/null
 

@@ -17,7 +17,7 @@ const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/M
 const port = 6490 + Math.floor(Math.random() * 100);
 const dir = mkdtempSync(join(tmpdir(), "diagram-e2e-"));
 const file = join(dir, "board.shape");
-writeFileSync(file, "title: History\n\ntable log: Log [x: 0, y: 400] {\n  date | event\n  Dec 2024 | Deal signed\n  7–14 May 2026 | Visa approves\n}\n");
+writeFileSync(file, "title: History\n\ntable log: Log [x: 0, y: 400] {\n  date | event\n  Dec 2024 | Deal signed\n  7–14 May 2026 | Regulator approves\n}\n");
 const server = spawn(bin, [file, "--no-open", "--port", String(port)], {
   env: { ...process.env, SHAPE_WEB_DIR: join(root, "web"), SHAPE_NO_UPDATE_CHECK: "1" },
   stdio: "ignore",
@@ -39,7 +39,7 @@ try {
   const table = await p.locator('.dg-group[data-id="log"]').first().boundingBox();
   await p.mouse.click(table.x + 20, table.y + 8, { button: "right" });
   await p.locator(".dge-menu button", { hasText: "Show as timeline" }).click(); await sleep(700);
-  assert.match(saved(), /timeline log: Log \[x: 0, y: 400\] \{\n  Dec 2024: Deal signed\n  7–14 May 2026: Visa approves\n\}/);
+  assert.match(saved(), /timeline log: Log \[x: 0, y: 400\] \{\n  Dec 2024: Deal signed\n  7–14 May 2026: Regulator approves\n\}/);
 
   // the Timeline tool, then an event added from its menu, then starred
   await p.locator(".dge-blocks-btn").click(); await p.locator('[data-block="timeline"]').click(); await sleep(300);
@@ -64,15 +64,15 @@ try {
   // edit as text: lines become events, matched by position
   await p.mouse.click(tl.x + 20, tl.y + 8, { button: "right" });
   await p.locator(".dge-menu button", { hasText: "Edit as text…" }).click();
-  await p.locator(".dge-modal textarea").fill("Q1 2026: Kick-off\n28 Oct 2026: Open beta [important]\nmid Dec 2026: Spend Cards beta");
+  await p.locator(".dge-modal textarea").fill("Q1 2026: Kick-off\n28 Oct 2026: Open beta [important]\nmid Dec 2026: Public beta");
   await p.locator(".dge-modal button.primary").click(); await sleep(700);
-  assert.match(saved(), /timeline launch: Launch \{\n  Q1 2026: Kick-off\n  28 Oct 2026: Open beta \[important\]\n  mid Dec 2026: Spend Cards beta\n\}/);
+  assert.match(saved(), /timeline launch: Launch \{\n  Q1 2026: Kick-off\n  28 Oct 2026: Open beta \[important\]\n  mid Dec 2026: Public beta\n\}/);
 
   // an event with a detail shows it on hover
-  await p.evaluate(() => window.diagramEditor.apply([{ op: "update_node", id: "launch.open-beta", detail: "Virtual cards for everyone" }])); await sleep(500);
+  await p.evaluate(() => window.diagramEditor.apply([{ op: "update_node", id: "launch.open-beta", detail: "The basic kit for everyone" }])); await sleep(500);
   await p.mouse.move(5, 5);
   await p.locator('.dg-node[data-id="launch.open-beta"]').hover(); await sleep(800);
-  assert.match(await p.locator(".dge-tip").textContent(), /Open beta.*Virtual cards for everyone/s);
+  assert.match(await p.locator(".dge-tip").textContent(), /Open beta.*The basic kit for everyone/s);
   await p.screenshot({ path: join(dir, "timeline.png") });
   assert.deepEqual(errors, []);
   await browser.close();

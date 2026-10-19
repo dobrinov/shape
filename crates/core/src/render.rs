@@ -60,6 +60,14 @@ pub struct RenderOptions {
     /// None: everything open.
     #[serde(default)]
     pub open: Option<Vec<String>>,
+    /// With a perspective: its dashboard, the first screen computed from
+    /// the whole board (see [`crate::dashboard`]), instead of its blocks.
+    #[serde(default)]
+    pub dashboard: bool,
+    /// An earlier version of the board (its source), for the dashboard's
+    /// "changed since".
+    #[serde(default)]
+    pub before: Option<String>,
     /// Diff status per element id (see `diff::merge`).
     #[serde(skip)]
     pub changes: HashMap<String, Change>,
