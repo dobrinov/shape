@@ -333,6 +333,7 @@
       var pb = toolbar.querySelector("[data-act=panel]");
       if (pb) pb.classList.toggle("on", showPanel);
       canvas.setAttribute("data-tool", st.tool);
+      canvas.classList.toggle("zooming", st.tool === "zoom");
     }
 
     function btn(attrs, label) {
@@ -1843,11 +1844,16 @@
           var c = svgEl("circle", { cx: p[0], cy: p[1], r: r, class: "dge-handle", "data-node": id });
           overlay.appendChild(c);
         });
+        // the one selected box (not a task, a screen's part or a list's item): its corner resizes it
+        if (st.sel.length === 1 && st.sel[0] === id && !chartOf(id) && !screenOf(id) && !todoOf(id) && !(st.drag && st.drag.type === "size")) {
+          var gs = 9 / Math.max(st.zoom, 0.5);
+          overlay.appendChild(svgEl("rect", { class: "dge-grip", "data-node": id, x: g.x + g.w - gs * 0.6, y: g.y + g.h - gs * 0.6, width: gs, height: gs, rx: gs * 0.25 }));
+        }
       });
       var d = st.drag;
       if (d && d.type === "connect" && d.to) {
-        var g0 = geom(d.from);
-        overlay.appendChild(svgEl("path", { class: "dge-rubber", d: "M" + (g0.x + g0.w / 2) + "," + (g0.y + g0.h / 2) + " L" + d.to.x + "," + d.to.y }));
+        var g0 = geom(d.from), s0 = d.start || { x: g0.x + g0.w / 2, y: g0.y + g0.h / 2 };
+        overlay.appendChild(svgEl("path", { class: "dge-rubber", d: "M" + s0.x + "," + s0.y + " L" + d.to.x + "," + d.to.y }));
         if (d.target) {
           var gt = geom(d.target);
           overlay.appendChild(svgEl("rect", { class: "dge-target", x: gt.x - 4, y: gt.y - 4, width: gt.w + 8, height: gt.h + 8, rx: 8 }));
@@ -1864,7 +1870,10 @@
           overlay.appendChild(svgEl("path", { class: "dge-drop", d: "M" + (tg.x - 4) + "," + ly + " L" + (tg.x + tg.w + 4) + "," + ly }));
         }
       }
-      if (d && d.type === "marquee" && d.rect) {
+      if (d && d.type === "size") {
+        overlay.appendChild(svgEl("rect", { class: "dge-size", x: d.x0, y: d.y0, width: d.w, height: d.h, rx: 6 }));
+      }
+      if (d && (d.type === "marquee" || d.type === "zoombox") && d.rect) {
         overlay.appendChild(svgEl("rect", { class: "dge-marquee", x: d.rect.x, y: d.rect.y, width: d.rect.w, height: d.rect.h }));
       }
       // dragging a task: its dates above the bar
@@ -1887,12 +1896,12 @@
 
     // ---------------------------------------------------------- interaction
     function setTool(t) {
-      if (view) t = "select";
+      if (view && t !== "zoom") t = "select";
       st.tool = t;
       st.drag = null;
       applyChrome();
       drawOverlay();
-      var tips = { mindmap: "Click to start a mindmap", node: "Click to place a box", decision: "Click to place a decision", sticky: "Click to place a sticky note", connect: "Drag from one node to another (or to empty space)", comment: "Click a block to comment on it, or anywhere on the canvas" };
+      var tips = { mindmap: "Click to start a mindmap", node: "Click to place a box", decision: "Click to place a decision", sticky: "Click to place a sticky note", connect: "Drag from one node to another (or to empty space)", comment: "Click a block to comment on it, or anywhere on the canvas", zoom: "Click to zoom in · ⌥-click to zoom out · drag a box to zoom to it · Z or Esc to leave" };
       if (tips[t]) flash(tips[t]);
     }
 
@@ -1913,6 +1922,8 @@
 
     function hit(target) {
       if (!target || !target.closest) return null;
+      var gr0 = target.closest(".dge-grip");
+      if (gr0) return { type: "grip", id: gr0.getAttribute("data-node") };
       var h1 = target.closest(".dge-handle");
       if (h1) return { type: "handle", id: h1.getAttribute("data-node") };
       var ctl = target.closest(".dge-ctl");
@@ -1972,13 +1983,50 @@
     }
 
     var raf = 0;
+    /* Dragging boxes: what moves follows the pointer at once (its drawing is
+       shifted), and the board catches up (arrows, sections around it) when
+       the pointer rests, and on the drop. */
+    function glide(d) {
+      if (!d.els) {
+        var ids = {};
+        d.items.forEach(function (m) {
+          ids[m.id] = true;
+          if (group(m.id)) {
+            membersOf(m.id).forEach(function (x) { ids[x] = true; });
+            (st.doc.groups || []).forEach(function (g) { var c = g; while (c && c.parent) { if (c.parent === m.id) { ids[g.id] = true; break; } c = group(c.parent); } });
+          }
+        });
+        d.moving = ids;
+        d.els = [];
+        Object.keys(ids).forEach(function (id) {
+          stage.querySelectorAll('[data-id="' + cssEsc(id) + '"], [data-group="' + cssEsc(id) + '"], [data-fold="' + cssEsc(id) + '"]').forEach(function (el2) { d.els.push(el2); });
+        });
+        // the arrows to what moves are redrawn when it rests: faded till then
+        d.edges = [];
+        (st.doc.edges || []).forEach(function (ed) {
+          if (ids[ed.from] || ids[ed.to]) stage.querySelectorAll('[data-id="' + cssEsc(ed.id) + '"]').forEach(function (el2) { d.edges.push(el2); });
+        });
+      }
+      var ox = d.dx - (d.cx || 0), oy = d.dy - (d.cy || 0);
+      d.els.forEach(function (el2) { el2.setAttribute("transform", "translate(" + ox + "," + oy + ")"); });
+      d.edges.forEach(function (el2) { el2.style.opacity = "0.25"; });
+      overlay.style.opacity = "0";
+      clearTimeout(d.rest);
+      d.rest = setTimeout(function () {
+        if (st.drag !== d) return;
+        applyOps(d.items.map(function (m) { return { op: "move", id: m.id, x: m.x + d.dx, y: m.y + d.dy }; }), true);
+        d.cx = d.dx; d.cy = d.dy;
+        d.els = null; // drawn anew where it rests
+        overlay.style.opacity = "";
+      }, 160);
+    }
     function liveMove() {
       if (raf) return;
       raf = requestAnimationFrame(function () {
         raf = 0;
         var d = st.drag;
         if (!d || d.type !== "move") return;
-        if (!d.tasks) return applyOps(d.items.map(function (m) { return { op: "move", id: m.id, x: m.x + d.dx, y: m.y + d.dy }; }), true);
+        if (!d.tasks) return glide(d);
         // a task: show where it lands (snapped to its chart, the tasks after it following) and when
         st.session.set_source(d.before);
         refreshDoc();
@@ -2472,6 +2520,13 @@
       }
       // a folded block in a perspective: it opens in place
       if (t && t.type === "node" && /^@fold\//.test(t.id)) { e.preventDefault(); if (e.button === 0) unfold(t.id.slice(6)); return; }
+      // the magnifier (Z): a click zooms in, ⌥-click out, a box zooms to it
+      if (st.tool === "zoom" && e.button === 0 && !st.space) {
+        e.preventDefault();
+        st.drag = { type: "zoombox", sx: p.x, sy: p.y, out: e.altKey };
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
       if (st.linking && e.button === 0) {
         // Link to…: the next click picks the target
         var from = st.linking, to = t && (t.type === "node" || t.type === "group") ? t.id : null;
@@ -2514,8 +2569,26 @@
         setTool("select");
         return;
       }
+      if (t && t.type === "grip" && !view) {
+        // the corner of a box: drag to resize it
+        var sg = geom(t.id);
+        st.drag = { type: "size", id: t.id, sx: p.x, sy: p.y, x0: sg.x, y0: sg.y, w0: sg.w, h0: sg.h, w: sg.w, h: sg.h };
+        canvas.setPointerCapture(e.pointerId);
+        drawOverlay();
+        return;
+      }
       if (t && (t.type === "handle" || (st.tool === "connect" && t.type === "node"))) {
         st.drag = { type: "connect", from: t.id, to: p };
+        // from a handle: the line starts there, and a click (no drag) puts a
+        // new box on that side
+        if (t.type === "handle") {
+          var hg = geom(t.id);
+          var sides = [["top", hg.x + hg.w / 2, hg.y], ["right", hg.x + hg.w, hg.y + hg.h / 2], ["bottom", hg.x + hg.w / 2, hg.y + hg.h], ["left", hg.x, hg.y + hg.h / 2]];
+          var near = sides.reduce(function (a, b) { return Math.hypot(b[1] - p.x, b[2] - p.y) < Math.hypot(a[1] - p.x, a[2] - p.y) ? b : a; });
+          st.drag.start = { x: near[1], y: near[2] };
+          st.drag.side = near[0];
+          st.drag.sx = p.x; st.drag.sy = p.y;
+        }
         canvas.setPointerCapture(e.pointerId);
         drawOverlay();
         return;
@@ -2591,6 +2664,12 @@
         if (days !== d.now) { d.now = days; applyOps([{ op: "update_node", id: d.id, days: days }], true); }
         return;
       }
+      if (d.type === "size") {
+        d.w = Math.max(40, Math.round(d.w0 + p.x - d.sx));
+        d.h = Math.max(24, Math.round(d.h0 + p.y - d.sy));
+        drawOverlay();
+        return;
+      }
       if (d.type === "move") {
         d.dx = Math.round(p.x - d.sx);
         d.dy = Math.round(p.y - d.sy);
@@ -2628,7 +2707,7 @@
         var t2 = hit(under);
         d.target = t2 && (t2.type === "node" || t2.type === "group" || t2.type === "handle") && t2.id !== d.from ? t2.id : null;
         drawOverlay();
-      } else if (d.type === "marquee") {
+      } else if (d.type === "marquee" || d.type === "zoombox") {
         d.rect = { x: Math.min(d.sx, p.x), y: Math.min(d.sy, p.y), w: Math.abs(p.x - d.sx), h: Math.abs(p.y - d.sy) };
         drawOverlay();
       }
@@ -2668,8 +2747,15 @@
         }
         return;
       }
+      if (d.type === "size") {
+        if (d.w !== d.w0 || d.h !== d.h0) applyOps([{ op: "update_node", id: d.id, w: d.w, h: d.h }]);
+        select([d.id]);
+        return;
+      }
       if (d.type === "move" && d.moved) {
         if (raf) { cancelAnimationFrame(raf); raf = 0; }
+        clearTimeout(d.rest);
+        overlay.style.opacity = "";
         st.session.set_source(d.before);
         st.text = d.before;
         refreshDoc();
@@ -2677,6 +2763,21 @@
         if (!applyOps(ops).ok) { refreshDoc(); render(); }
       } else if (d.type === "connect" && e) {
         var p = toDiagram(e.clientX, e.clientY);
+        var clicked = d.side && Math.hypot(p.x - d.sx, p.y - d.sy) < 6;
+        if (clicked) {
+          // a click on a handle: a new box on that side, joined to this one
+          var fg = geom(d.from), gap = 90, bw = 140, bh = 44;
+          var at = d.side === "right" ? { x: fg.x + fg.w + gap, y: fg.y + fg.h / 2 - bh / 2 }
+            : d.side === "left" ? { x: fg.x - gap - bw, y: fg.y + fg.h / 2 - bh / 2 }
+            : d.side === "bottom" ? { x: fg.x + fg.w / 2 - bw / 2, y: fg.y + fg.h + gap * 0.7 }
+            : { x: fg.x + fg.w / 2 - bw / 2, y: fg.y - gap * 0.7 - bh };
+          var src0 = node(d.from), nid = freshId("node");
+          var ops0 = [{ op: "add_node", id: nid, label: "New box", x: Math.round(at.x), y: Math.round(at.y), group: src0 && src0.group && !plotOf(d.from) && !screenOf(d.from) && !todoOf(d.from) ? src0.group : undefined }];
+          ops0.push({ op: "add_edge", from: d.from, to: nid });
+          if (applyOps(ops0).ok) { select([nid]); editLabel(nid, true); }
+          drawOverlay();
+          return;
+        }
         if (d.target && chartOf(d.from) && chartOf(d.target)) dependOn(d.target, d.from);
         else if (d.target) applyOps([{ op: "add_edge", from: d.from, to: d.target }]);
         else if (Math.hypot(p.x - (geom(d.from).x + geom(d.from).w / 2), p.y - (geom(d.from).y + geom(d.from).h / 2)) > 60) {
@@ -2714,6 +2815,14 @@
             select([id]);
             editLabel(id, true);
           } else flash(res.error, true);
+        }
+        drawOverlay();
+      } else if (d.type === "zoombox") {
+        var zr = d.rect;
+        if (zr && zr.w * st.zoom > 8 && zr.h * st.zoom > 8) focusOn(zr, 4, 4, 0.95);
+        else {
+          var zs = toScreen(d.sx, d.sy);
+          zoomTo(st.zoom * (d.out || (e && e.altKey) ? 1 / 1.6 : 1.6), zs.x, zs.y);
         }
         drawOverlay();
       } else if (d.type === "marquee" && d.rect && (d.rect.w > 3 || d.rect.h > 3)) {
@@ -4485,6 +4594,7 @@
       }
       if (mod && e.key === "/" && hasCode) { e.preventDefault(); showCode = !showCode; applyChrome(); syncCode(true); return; }
       if (typing || !el.contains(document.activeElement) && document.activeElement !== document.body) return;
+      if (e.key === "Alt") canvas.classList.add("out");
       if (e.key === " " && !st.space) { st.space = true; canvas.classList.add("space"); e.preventDefault(); return; }
       if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
       if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); return; }
@@ -4532,6 +4642,7 @@
         case "d": case "D": setTool("decision"); break;
         case "f": fit(); break;
         case "m": case "M": toggleMinimap(); break;
+        case "z": case "Z": setTool(st.tool === "zoom" ? "select" : "zoom"); break;
         case "0": zoomTo(1); break;
         case "+": case "=": zoomTo(st.zoom * 1.2); break;
         case "-": zoomTo(st.zoom / 1.2); break;
@@ -4542,12 +4653,13 @@
         case "ArrowRight": e.preventDefault(); nudge(e.shiftKey ? 40 : 8, 0); break;
         case "ArrowUp": e.preventDefault(); nudge(0, e.shiftKey ? -40 : -8); break;
         case "ArrowDown": e.preventDefault(); nudge(0, e.shiftKey ? 40 : 8); break;
-        case "?": flash("V select · H hand · T mindmap · N box · S sticky · X connect · C comment · double-click to add/edit · " + MOD + "G section · " + MOD + "⇧C copy as prompt · " + MOD + "D duplicate · F fit · M minimap · space+drag pan. Mindmaps: Tab branch · Enter sibling · ⇧Tab outdent (on the centre: a new centre above it) · right-click for more · F2 rename · . fold · arrows move · ⌥↑↓ reorder · paste a list", false, 9000); break;
+        case "?": flash("V select · H hand · T mindmap · N box · S sticky · X connect · C comment · double-click to add/edit · " + MOD + "G section · " + MOD + "⇧C copy as prompt · " + MOD + "D duplicate · F fit · M minimap · Z magnifier · space+drag pan. Mindmaps: Tab branch · Enter sibling · ⇧Tab outdent (on the centre: a new centre above it) · right-click for more · F2 rename · . fold · arrows move · ⌥↑↓ reorder · paste a list", false, 9000); break;
         default: return;
       }
     }
     function onKeyUp(e) {
       if (e.key === " ") { st.space = false; canvas.classList.remove("space"); }
+      if (e.key === "Alt") canvas.classList.remove("out");
     }
     document.addEventListener("keydown", onKey);
     document.addEventListener("keyup", onKeyUp);

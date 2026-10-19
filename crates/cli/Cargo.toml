@@ -27,7 +27,11 @@ rfd = { version = "=0.17.2", optional = true }
 # macOS: an app menu, so ⌘Q / ⌘C / ⌘V / ⌘Z reach the webview
 [target.'cfg(target_os = "macos")'.dependencies]
 muda = { version = "=0.20.0", optional = true }
+# the Dock shows Shape's icon for the window (the binary is not an app bundle)
+objc2 = { version = "=0.6.5", optional = true }
+objc2-app-kit = { version = "=0.3.2", optional = true, default-features = false, features = ["std", "NSApplication", "NSImage", "NSResponder"] }
+objc2-foundation = { version = "=0.3.2", optional = true, default-features = false, features = ["std", "NSData", "NSString", "NSProcessInfo"] }
 
 [features]
 default = ["window"]
-window = ["dep:tao", "dep:wry", "dep:rfd", "dep:muda"]
+window = ["dep:tao", "dep:wry", "dep:rfd", "dep:muda", "dep:objc2", "dep:objc2-app-kit", "dep:objc2-foundation"]

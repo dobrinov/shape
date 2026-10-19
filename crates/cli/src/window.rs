@@ -273,7 +273,10 @@ mod native {
                 match event {
                     Event::NewEvents(StartCause::Init) => {
                         #[cfg(target_os = "macos")]
-                        menu.init_for_nsapp();
+                        {
+                            menu.init_for_nsapp();
+                            mac::dock_icon();
+                        }
                     }
                     Event::WindowEvent {
                         event: WindowEvent::CloseRequested,
@@ -320,6 +323,28 @@ mod native {
         use muda::{Menu, MenuEvent, MenuItem, PredefinedMenuItem as P, Submenu};
 
         use super::{Ev, EventLoopProxy};
+
+        /// Shape's icon and name in the Dock: the binary runs outside an app
+        /// bundle, so macOS would show a plain program icon (and "exec").
+        pub fn dock_icon() {
+            use objc2::AnyThread;
+            use objc2_app_kit::{NSApplication, NSImage};
+            use objc2_foundation::{MainThreadMarker, NSData, NSProcessInfo, NSString};
+            let Some(mtm) = MainThreadMarker::new() else {
+                return;
+            };
+            let svg = include_str!("../icons/app.svg");
+            let Ok(png) = crate::png::render(svg, 0.5) else {
+                return;
+            };
+            let data = NSData::with_bytes(&png);
+            let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) else {
+                return;
+            };
+            let app = NSApplication::sharedApplication(mtm);
+            unsafe { app.setApplicationIconImage(Some(&image)) };
+            NSProcessInfo::processInfo().setProcessName(&NSString::from_str("Shape"));
+        }
 
         pub fn menu(proxy: EventLoopProxy<Ev>) -> Menu {
             let cmd = |key| Some(Accelerator::new(Modifiers::META, key));

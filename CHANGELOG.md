@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.59.0 — 2026-10-19
+
+From a beta tester's notes:
+
+- **Resize from the corner:** a selected box has a grip in its bottom-right corner; drag it to make the box bigger or smaller.
+- **Click a dot to add a box:** a click (not a drag) on one of a box's four dots puts a new box on that side, joined to it, ready to name.
+- **Connectors start where you grab them:** while dragging a new connector, its line starts at the dot you dragged from, not the box's centre.
+- **Smooth dragging:** boxes, images and sections follow the pointer smoothly; the board lays itself out when you pause or let go.
+- **Z for the magnifier:** click to zoom in, ⌥-click to zoom out, drag a box to zoom to it; Z or Esc leaves it.
+- The native window shows Shape's icon and name in the Dock instead of a generic "exec".
+
 ## 0.58.0 — 2026-10-19
 
 - **To-do lists:** `todo launch: Launch checklist { … }`, one item per line, `[x]` done and `[ ]` to do (Markdown-style `- [ ]` works too). Two more spaces make a sub-item. An item can have an owner, a due date (`due:`) and details.
