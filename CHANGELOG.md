@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.62.0 — 2026-10-19
+
+- **Delivery shows what is being delivered now.** Its summary leads with the next milestone and its traffic light (*Now delivering: v1.0 · At risk · due Nov 13, in 25 days* and why), then the board's own blocks:
+  - a **burndown** of the work left before it: as planned, and from today as forecast (or the board's own burndown chart, when it has one);
+  - the **kanban boards**, with their cards per column, one click away;
+  - the **gantt chart** the delivery is on, when it depends on more than one piece of work;
+  - the **risk matrices**, as they are.
+- Click a bar, a risk or a board to open the real one on the full board; *← Delivery* comes back.
+
 ## 0.61.0 — 2026-10-19
 
 - **Perspectives open on a summary.** Instead of the board's blocks folded into cards, each perspective opens on a first screen Shape works out from the whole board (the boards inside it too), so it never needs keeping up to date:

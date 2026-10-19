@@ -182,7 +182,7 @@ The board below describes what to build…
     <h2>One board, every audience</h2>
     <p>The same board tells the story differently to different people. Nobody keeps a separate copy for the board meeting.</p>
     <ul class="checks">
-      <li><b>Perspectives</b> open on a summary Shape works out from the board: Delivery gets a traffic light per milestone and why, the blockers and the decisions it waits on; Product, Marketing, Business and Design get theirs. Click any row to see what is behind it. Nothing to keep up to date.</li>
+      <li><b>Perspectives</b> open on a summary Shape works out from the board: Delivery sees what is being delivered now, with a traffic light and why, the burndown to its due date, the plan it depends on and the risks; Product, Marketing, Business and Design get theirs. Click any row to see what is behind it. Nothing to keep up to date.</li>
       <li><b>Presentation mode</b>: pick the sections, add speaker notes, and present. The view glides across the board from slide to slide, with no deck to keep in sync.</li>
       <li><b>Wireframes</b>: sketch phone and web screens as text and draw the flow with arrows from the buttons.</li>
       <li><b>Comments with names</b> on any box or arrow, and a full history to go back to.</li>
@@ -194,8 +194,8 @@ The board below describes what to build…
       <button type="button" role="tab" aria-selected="false" data-p="product">Product</button>
       <button type="button" role="tab" aria-selected="false" data-p="marketing">Marketing</button>
     </div>
-    <img id="persp-img" src="tour/persp-delivery.svg" alt="Delivery's summary of Shape's own board: v1.0 off track and why, the open blocker, the decision needed, the top risks" loading="lazy">
-    <figcaption id="persp-cap">Shape's own board, as Delivery sees it: is v1.0 on plan, and if not, why.</figcaption>
+    <img id="persp-img" src="tour/persp-delivery.svg" alt="Delivery's summary of Shape's own board: now delivering v1.0, at risk and why, the burndown, the kanban, the plan and the risk matrix" loading="lazy">
+    <figcaption id="persp-cap">Shape's own board, as Delivery sees it: what is being delivered now, is it on plan, and what it depends on.</figcaption>
   </figure>
 </section>
 
@@ -384,7 +384,7 @@ make install</pre>
 <script>
   // One board, every audience: switch between the perspectives' summaries
   var caps = {
-    delivery: ["Shape's own board, as Delivery sees it: is v1.0 on plan, and if not, why.", "Delivery's summary of Shape's own board: v1.0 off track and why, the open blocker, the decision needed, the top risks"],
+    delivery: ["Shape's own board, as Delivery sees it: what is being delivered now, is it on plan, and what it depends on.", "Delivery's summary of Shape's own board: now delivering v1.0, at risk and why, the burndown, the kanban, the plan and the risk matrix"],
     product: ["The same board, as Product sees it: the dates, the open decisions, the screens.", "Product's summary of Shape's own board: milestones, decisions needed, screens, top risks"],
     marketing: ["The same board, as Marketing sees it: the next launch, the checklist, what is still open.", "Marketing's summary of Shape's own board: the next launch, the release checklist, decisions needed, top risks"]
   };

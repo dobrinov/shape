@@ -62,6 +62,9 @@ pub struct Milestone {
     pub light: Light,
     /// Why, in a line ("" when on track).
     pub reason: String,
+    /// The gantt chart it is on, and the work planned to end by it (ids).
+    pub chart: String,
+    pub work: Vec<String>,
 }
 
 /// A blocker, a decision or a risk.
@@ -362,6 +365,11 @@ pub fn milestones(doc: &Document, today: i64) -> Vec<Milestone> {
                         ),
                     ));
                 }
+                let work: Vec<String> = tracks
+                    .iter()
+                    .filter(|t| !t.milestone && day(&t.end) <= due && day(&t.end) > from)
+                    .map(|t| t.id.clone())
+                    .collect();
                 // the work planned to be done by then (since the milestone before)
                 for t in tracks.iter().filter(|t| {
                     !t.milestone && t.status != "done" && day(&t.end) <= due && day(&t.end) > from
@@ -417,6 +425,8 @@ pub fn milestones(doc: &Document, today: i64) -> Vec<Milestone> {
                     label,
                     due,
                     light,
+                    chart: g.id.clone(),
+                    work,
                     reason: why
                         .into_iter()
                         .map(|(_, s)| s)
@@ -537,7 +547,7 @@ pub fn since(old: &Document, new: &Document) -> Vec<(At, String)> {
 /// The tiles a perspective shows, in order.
 fn tiles(id: &str) -> &'static [&'static str] {
     match id {
-        "delivery" => &["milestones", "blockers", "decisions", "risks", "since"],
+        "delivery" => &["burndown", "kanban", "gantt", "matrix"],
         "business" => &["milestones", "decisions", "money", "risks", "since"],
         "marketing" => &["milestones", "todos", "decisions", "risks"],
         "product" => &["milestones", "decisions", "screens", "risks", "since"],
@@ -582,6 +592,21 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
     let next = ms.first();
     // the headline: the answer first
     let (head, color, detail) = match (p.id.as_str(), next) {
+        ("delivery", Some(m)) => (
+            format!("Now delivering: {}", m.label),
+            m.light.color(),
+            format!(
+                "{} · due {}, {}{}",
+                m.light.word(),
+                gantt::short_date(m.due),
+                countdown(m.due - today),
+                if m.reason.is_empty() {
+                    String::new()
+                } else {
+                    format!(" · {}", m.reason)
+                }
+            ),
+        ),
         ("business" | "marketing", Some(m)) => (
             format!(
                 "Next launch: {} {}, {}",
@@ -879,6 +904,71 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                     out.nodes.push(n);
                 }
             }
+            "burndown" => {
+                let Some(m) = next else { continue };
+                if let Some(chart) = burndown(doc, m, today) {
+                    out.groups.push(chart.0);
+                    out.nodes.extend(chart.1);
+                }
+            }
+            "kanban" => {
+                let mut rows = Vec::new();
+                for (path, d) in docs(doc) {
+                    for k in d.groups.iter().filter(|g| g.kanban) {
+                        let counts: Vec<String> = d
+                            .groups
+                            .iter()
+                            .filter(|c| c.parent.as_deref() == Some(k.id.as_str()))
+                            .map(|c| {
+                                let n = d
+                                    .nodes
+                                    .iter()
+                                    .filter(|n| n.group.as_deref() == Some(c.id.as_str()))
+                                    .count();
+                                format!("{n} {}", c.display().to_lowercase())
+                            })
+                            .collect();
+                        rows.push((
+                            At {
+                                path: path.clone(),
+                                id: k.id.clone(),
+                            },
+                            k.display().to_string(),
+                            counts.join(" · "),
+                        ));
+                    }
+                }
+                if rows.is_empty() {
+                    continue;
+                }
+                out.groups
+                    .push(table("kanban", "Kanban boards", &["Board", "Cards"]));
+                for (at, label, counts) in rows {
+                    out.nodes.push(row(
+                        row_id("kb", &at),
+                        "kanban",
+                        &format!("{label} ↗"),
+                        &[counts],
+                        None,
+                    ));
+                }
+            }
+            "gantt" => {
+                // the plan the current delivery is on, when it waits on more than one thing
+                let Some(m) = next.filter(|m| m.work.len() > 1) else {
+                    continue;
+                };
+                if let Some(d) = doc.at(&m.at.path) {
+                    copy_block(&mut out, d, &m.at.path, &m.chart, "gantt", "ga");
+                }
+            }
+            "matrix" => {
+                for (path, d) in docs(doc) {
+                    for g in d.groups.iter().filter(|g| g.risks) {
+                        copy_block(&mut out, d, &path, &g.id, &format!("matrix-{}", g.id), "ri");
+                    }
+                }
+            }
             "since" => {
                 let Some(old) = before else { continue };
                 let list = since(old, doc);
@@ -901,6 +991,122 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
     drop_empty_columns(&mut out);
     arrange(&mut out);
     out
+}
+
+/// A block of the board, as it is, under id `id`: its items get dashboard
+/// ids (tile `tile`), so a click opens them, and keep their links to each other.
+fn copy_block(out: &mut Document, d: &Document, path: &[String], gid: &str, id: &str, tile: &str) {
+    let Some(g) = d.group(gid) else { return };
+    let mut copy = g.clone();
+    copy.id = id.to_string();
+    copy.parent = None;
+    copy.x = None;
+    copy.y = None;
+    let new_id = |old: &str| {
+        row_id(
+            tile,
+            &At {
+                path: path.to_vec(),
+                id: old.to_string(),
+            },
+        )
+    };
+    out.groups.push(copy);
+    for n in d.nodes.iter().filter(|n| n.group.as_deref() == Some(gid)) {
+        let mut c = n.clone();
+        c.id = new_id(&n.id);
+        c.group = Some(id.to_string());
+        c.after = n.after.iter().map(|a| new_id(a)).collect();
+        c.x = None;
+        c.y = None;
+        out.nodes.push(c);
+    }
+}
+
+/// The work left before milestone `m`, in days of work: as planned (each
+/// task burning down over its planned days) and, from today, as forecast
+/// (what is left now, done by the latest forecast end). A chart on the
+/// board called a burndown is shown instead, when there is one.
+fn burndown(doc: &Document, m: &Milestone, today: i64) -> Option<(Group, Vec<Node>)> {
+    for (path, d) in docs(doc) {
+        if let Some(g) = d.groups.iter().find(|g| {
+            g.chart.is_some()
+                && word_in(
+                    &format!("{} {}", g.id, g.display()),
+                    &["burndown", "burn-down", "burn down"],
+                )
+        }) {
+            let mut tmp = Document::default();
+            copy_block(&mut tmp, d, &path, &g.id, "burndown", "bu");
+            let group = tmp.groups.pop()?;
+            return Some((group, tmp.nodes));
+        }
+    }
+    let d = doc.at(&m.at.path)?;
+    let tracks = gantt::track(d, &m.chart, today);
+    let day = |s: &str| gantt::parse_date(s).unwrap_or(today);
+    let work: Vec<&gantt::Track> = tracks.iter().filter(|t| m.work.contains(&t.id)).collect();
+    if work.is_empty() {
+        return None;
+    }
+    let from = work.iter().map(|t| day(&t.start)).min()?;
+    let fend = work.iter().map(|t| day(&t.forecast_end)).max()?.max(today);
+    let to = m.due.max(fend);
+    let planned = |x: i64| -> f64 {
+        work.iter()
+            .map(|t| {
+                let (s, e) = (day(&t.start), day(&t.end) + 1);
+                let left = ((e - x) as f64 / (e - s).max(1) as f64).clamp(0.0, 1.0);
+                t.days * left
+            })
+            .sum()
+    };
+    let now: f64 = work
+        .iter()
+        .map(|t| t.days * (1.0 - t.done.unwrap_or(0.0) / 100.0).max(0.0))
+        .sum();
+    let forecast = |x: i64| -> Option<f64> {
+        (x >= today)
+            .then(|| now * ((fend - x) as f64 / (fend - today).max(1) as f64).clamp(0.0, 1.0))
+    };
+    let mut days: Vec<i64> = (0..=8).map(|k| from + (to - from) * k / 8).collect();
+    days.extend([today, m.due]);
+    days.retain(|x| *x >= from && *x <= to);
+    days.sort();
+    days.dedup();
+    let mut g = Group {
+        id: "burndown".into(),
+        label: format!(
+            "Work left before {} (due {})",
+            m.label,
+            gantt::short_date(m.due)
+        ),
+        chart: Some(crate::model::ChartKind::Line),
+        series: vec!["Planned".into(), "Forecast".into()],
+        unit: Some("d".into()),
+        ..Default::default()
+    };
+    g.w = Some(520.0);
+    let rows = days
+        .into_iter()
+        .map(|x| {
+            let mut n = Node::new(&format!("@dash/bu/:{x}"));
+            n.label = if x == m.due {
+                format!("{} due", gantt::short_date(x))
+            } else if x == today {
+                "today".into()
+            } else {
+                gantt::short_date(x)
+            };
+            n.group = Some("burndown".into());
+            n.values = vec![
+                Some((planned(x) * 10.0).round() / 10.0),
+                forecast(x).map(|v| (v * 10.0).round() / 10.0),
+            ];
+            n
+        })
+        .collect();
+    Some((g, rows))
 }
 
 /// A column nobody filled in (no owners, no dates) is left out.
@@ -994,7 +1200,14 @@ fn arrange(d: &mut Document) {
     }
     let mut cols = [y, y];
     let xs = [0.0, (width - GAP) / 2.0 + GAP];
-    for (id, _, h) in rest {
+    for (id, w, h) in rest {
+        // a block wider than a column (a gantt chart) takes the whole width
+        if *w > (width - GAP) / 2.0 {
+            let y = cols[0].max(cols[1]);
+            place(d, id, 0.0, y);
+            cols = [y + h + GAP, y + h + GAP];
+            continue;
+        }
         let c = if cols[0] <= cols[1] { 0 } else { 1 };
         place(d, id, xs[c], cols[c]);
         cols[c] += h + GAP;
@@ -1067,18 +1280,56 @@ mod tests {
             .find(|p| p.id == "delivery")
             .unwrap();
         let dash = build(&doc, &p, today, None);
-        assert_eq!(dash.nodes[0].label, "Off track: Beta in 7 days");
-        let tables: Vec<&str> = dash.groups.iter().map(|g| g.id.as_str()).collect();
-        assert_eq!(tables, vec!["milestones", "blockers", "decisions", "risks"]);
-        let beta = dash.nodes.iter().find(|n| n.label == "Beta").unwrap();
-        assert_eq!(beta.color.as_deref(), Some("red"));
-        assert_eq!(
-            target(&beta.id),
-            Some((vec!["plan".to_string()], "beta".to_string()))
+        // what is being delivered now, its light and why; the work left; the
+        // boards; the risks (the plan only when it waits on more than one thing)
+        assert_eq!(dash.nodes[0].label, "Now delivering: Beta");
+        assert_eq!(dash.nodes[0].color.as_deref(), Some("red"));
+        let detail = dash.nodes[0].detail.clone().unwrap();
+        assert!(
+            detail.starts_with("Off track · due Oct 22, in 7 days · Build forecast"),
+            "{detail}"
         );
+        let blocks: Vec<&str> = dash.groups.iter().map(|g| g.id.as_str()).collect();
+        assert_eq!(blocks, vec!["burndown", "kanban", "matrix-r"]);
+        let rows: Vec<&Node> = dash
+            .nodes
+            .iter()
+            .filter(|n| n.group.as_deref() == Some("burndown"))
+            .collect();
+        assert_eq!(
+            rows.first().unwrap().values[0],
+            Some(21.0),
+            "all of Build left at its start"
+        );
+        assert_eq!(rows.last().unwrap().values, vec![Some(0.0), Some(0.0)]);
+        let board = dash
+            .nodes
+            .iter()
+            .find(|n| n.group.as_deref() == Some("kanban"))
+            .unwrap();
+        assert_eq!(
+            target(&board.id),
+            Some((vec!["plan".to_string()], "k".to_string()))
+        );
+        let risk = dash
+            .nodes
+            .iter()
+            .find(|n| n.label == "Vendor review slips")
+            .unwrap();
+        assert_eq!(
+            target(&risk.id),
+            Some((vec!["plan".to_string()], "vendor-review-slips".to_string()))
+        );
+        // with two things to wait on, the plan comes too
+        let two = crate::dsl::parse(
+            &BOARD.replace("    Docs [2026-10-23, 1w]\n", "    Docs [2026-10-10, 1w]\n"),
+        )
+        .unwrap();
+        let dash2 = build(&two, &p, today, None);
+        assert!(dash2.groups.iter().any(|g| g.id == "gantt" && g.gantt));
         // it renders
         let svg = crate::render::render(&dash, &Default::default()).svg;
-        assert!(svg.contains("Off track"));
+        assert!(svg.contains("Now delivering"));
     }
 
     #[test]

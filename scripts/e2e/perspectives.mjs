@@ -48,11 +48,11 @@ try {
   assert.deepEqual(names.slice(0, 5), ["Full board", "Delivery", "Product", "Technical", "Legal"]);
   assert.equal(await shown(p), "api,beta,fraud,note");
   assert.ok(!(await p.locator('[data-act="folds"]').isVisible()), "nothing to fold on the full board");
-  // Delivery opens on its summary: computed from the board, read-only; the file does not change
+  // Delivery opens on its summary: computed from the board (here: the risk matrix, as it is), read-only; the file does not change
   const before = saved();
   await p.selectOption(".dge-persp", "delivery"); await sleep(400);
   assert.equal(await shown(p), "@dash/head/:,@dash/ri/:fraud");
-  assert.match(await p.locator('[data-id="@dash/ri/:fraud"]').textContent(), /Fraud — Score 12/);
+  assert.match(await p.locator('[data-id="@dash/ri/:fraud"]').textContent(), /Fraud[\s\S]*= 12 \(high\)/);
   assert.ok(!(await p.locator(".dge-tools").isVisible()), "no drawing tools on a summary");
   if (process.env.SHOTS) await p.screenshot({ path: process.env.SHOTS + "/summary.png" });
   // Details: the blocks behind it, as on the board; Summary goes back
