@@ -424,7 +424,7 @@ impl Parser {
         };
         let word = match word {
             "group" | "gantt" | "risks" | "chart" | "table" | "entity" | "adr" | "mindmap"
-            | "timeline" | "cycle" | "schema"
+            | "timeline" | "cycle" | "schema" | "forecast"
                 if !opens =>
             {
                 ""
@@ -542,6 +542,11 @@ impl Parser {
             "cycle" if c.rest()[5..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(5);
                 return self.timeline_decl(c, true);
+            }
+            // a forecast: `now: 12k`, then one launch per line
+            "forecast" if c.rest()[8..].starts_with(|ch: char| ch.is_whitespace()) => {
+                c.advance(8);
+                return self.forecast_decl(c);
             }
             // a to-do list: one item per line, `[x]` for done
             "todo"
@@ -1301,6 +1306,90 @@ impl Parser {
         Ok(())
     }
 
+    fn forecast_decl(&mut self, mut c: Cursor) -> Result<(), String> {
+        c.skip_ws();
+        let (id, qlabel) = c.reference()?;
+        let (label, attrs) = label_and_attrs_until_brace(&mut c)?;
+        c.skip_ws();
+        if !c.eat('{') {
+            return Err("a forecast needs a body: `forecast id: Title [unit: £] {`, `now: 12k`, then one launch per line (`Launch [adds: 3k, ramp: 3]`), `}`".into());
+        }
+        c.skip_ws();
+        let closes_inline = c.eat('}');
+        if !c.at_end() {
+            return Err("put the forecast's lines on the following lines".into());
+        }
+        if self.doc.node(&id).is_some() {
+            return Err(format!("`{id}` is already a node"));
+        }
+        let parent = self.group();
+        if self.doc.group(&id).is_none() {
+            self.doc.groups.push(Group {
+                id: id.clone(),
+                ..Default::default()
+            });
+        }
+        let g = self.doc.group_mut(&id).unwrap();
+        g.parent = parent;
+        g.forecast = true;
+        if let Some(l) = label.or(qlabel) {
+            g.label = l;
+        }
+        for (k, v) in &attrs {
+            match (k.as_str(), v) {
+                ("unit", Some(v)) => g.unit = Some(v.clone()),
+                ("color" | "colour", Some(v)) => g.color = Some(color(v)?),
+                (c, None) if valid_color(c) => g.color = Some(c.to_string()),
+                ("x", Some(v)) => g.x = Some(num("x", v)?),
+                ("y", Some(v)) => g.y = Some(num("y", v)?),
+                ("w" | "width", Some(v)) => g.w = Some(num("w", v)?),
+                (k, _) => return Err(format!("unknown forecast attribute `{k}` (unit, color, x, y, w)")),
+            }
+        }
+        self.touched.push(Elem::Group(id.clone()));
+        if !closes_inline {
+            self.gantt = Some((id, self.line));
+        }
+        Ok(())
+    }
+
+    /// A line of a forecast: `now: 12k`, or a launch, `Phase 1 GA [adds: 3k,
+    /// ramp: 3]` (`on: DATE` for one that is not a gantt milestone).
+    fn forecast_line(&mut self, block: &str, t: &str) -> Result<(), String> {
+        let t = crate::mindmap::strip_bullet(t);
+        if let Some(v) = t.strip_prefix("now:") {
+            let v = crate::forecast::parse_amount(v).ok_or_else(|| format!("`now:` wants a number, like `12k` (got `{}`)", v.trim()))?;
+            self.doc.group_mut(block).unwrap().now = Some(v);
+            self.touched.push(Elem::Group(block.to_string()));
+            return Ok(());
+        }
+        let (text, attrs) = split_attrs(t);
+        let label = unescape_label(text.trim());
+        if label.is_empty() {
+            return Err("a launch needs a name: `Phase 1 GA [adds: 3k, ramp: 3]`".into());
+        }
+        let mut n = Node::new(&row_id(block, &label));
+        n.label = label;
+        n.group = Some(block.to_string());
+        let mut rest = Vec::new();
+        for (k, v) in parse_attrs(attrs.unwrap_or(""))? {
+            match (k.as_str(), &v) {
+                ("id", Some(x)) => n.id = x.clone(),
+                ("adds", Some(x)) => n.adds = Some(crate::forecast::parse_amount(x).ok_or_else(|| format!("`adds:` wants a number, like `3k` (got `{x}`)"))?),
+                ("ramp", Some(x)) => n.ramp = Some(num("ramp", x.trim_end_matches(['m', 'o', 's', ' ']))?),
+                ("on", Some(x)) => n.date = Some(x.clone()),
+                _ => rest.push((k, v)),
+            }
+        }
+        apply_node_attrs(&mut n, &rest)?;
+        if self.doc.id_taken(&n.id) {
+            return Err(format!("id `{}` is already used", n.id));
+        }
+        self.touched.push(Elem::Node(n.id.clone()));
+        self.doc.nodes.push(n);
+        Ok(())
+    }
+
     /// An item of a to-do list: `[x] Release notes [owner: ana, due: 28 Oct]`,
     /// indented two spaces per level under the item it belongs to.
     fn todo_line(&mut self, list: &str, raw: &str) -> Result<(), String> {
@@ -1784,6 +1873,9 @@ impl Parser {
         }
         if self.doc.group(&block).is_some_and(|g| g.adr.is_some()) {
             return self.adr_line(&block, t);
+        }
+        if self.doc.group(&block).is_some_and(|g| g.forecast) {
+            return self.forecast_line(&block, t);
         }
         let t = crate::mindmap::strip_bullet(t);
         let (text, attrs) = split_attrs(t);
@@ -3049,6 +3141,52 @@ pub(crate) fn cycle_block(doc: &Document, g: &Group, pad: &str, out: &mut String
 }
 
 /// `todo id: Title {` … `[x] item [owner: …, due: …]` per item … `}`.
+pub(crate) fn forecast_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
+    let mut head = id_text(&g.id);
+    if !g.label.is_empty() && g.label != g.id {
+        head.push_str(": ");
+        head.push_str(&label_text(&g.label));
+    }
+    let mut a = Vec::new();
+    if let Some(u) = &g.unit {
+        a.push(format!("unit: {u}"));
+    }
+    if let Some(c) = &g.color {
+        a.push(if c.starts_with('#') {
+            format!("color: {c}")
+        } else {
+            c.clone()
+        });
+    }
+    if let Some(w) = g.w {
+        a.push(format!("w: {}", fmt_num(w)));
+    }
+    a.extend(group_pos(g));
+    head.push_str(&attrs_text(&a));
+    out.push_str(&format!("{pad}forecast {head} {{\n"));
+    if let Some(v) = g.now {
+        out.push_str(&format!("{pad}  now: {}\n", crate::forecast::format_amount(v)));
+    }
+    for n in crate::forecast::launches(doc, &g.id) {
+        let mut a = Vec::new();
+        if row_id(&g.id, n.display()) != n.id {
+            a.push(format!("id: {}", attr_value(&n.id)));
+        }
+        if let Some(v) = n.adds {
+            a.push(format!("adds: {}", crate::forecast::format_amount(v)));
+        }
+        if let Some(r) = n.ramp {
+            a.push(format!("ramp: {}", fmt_num(r)));
+        }
+        a.extend(node_attrs(n).into_iter().map(|x| match x.strip_prefix("date: ") {
+            Some(d) => format!("on: {d}"),
+            None => x,
+        }));
+        out.push_str(&format!("{pad}  {}{}\n", label_text(n.display()), attrs_text(&a)));
+    }
+    out.push_str(&format!("{pad}}}\n"));
+}
+
 pub(crate) fn todo_block(doc: &Document, g: &Group, pad: &str, out: &mut String) {
     let mut head = id_text(&g.id);
     if !g.label.is_empty() && g.label != g.id {
@@ -3885,6 +4023,10 @@ pub(crate) fn group_block(
     }
     if g.todo {
         todo_block(doc, g, &pad, out);
+        return;
+    }
+    if g.forecast {
+        forecast_block(doc, g, &pad, out);
         return;
     }
     if g.entity {

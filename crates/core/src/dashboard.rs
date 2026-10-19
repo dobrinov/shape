@@ -65,6 +65,9 @@ pub struct Milestone {
     /// The gantt chart it is on, and the work planned to end by it (ids).
     pub chart: String,
     pub work: Vec<String>,
+    /// When it is forecast to happen: its own forecast, or later when the
+    /// work planned to end by it is forecast to end after it.
+    pub forecast: i64,
 }
 
 /// A blocker, a decision or a risk.
@@ -370,6 +373,13 @@ pub fn milestones(doc: &Document, today: i64) -> Vec<Milestone> {
                     .filter(|t| !t.milestone && day(&t.end) <= due && day(&t.end) > from)
                     .map(|t| t.id.clone())
                     .collect();
+                let forecast = tracks
+                    .iter()
+                    .filter(|t| work.contains(&t.id) && t.status != "done")
+                    .map(|t| day(&t.forecast_end))
+                    .chain([day(&m.forecast_end), due])
+                    .max()
+                    .unwrap_or(due);
                 // the work planned to be done by then (since the milestone before)
                 for t in tracks.iter().filter(|t| {
                     !t.milestone && t.status != "done" && day(&t.end) <= due && day(&t.end) > from
@@ -426,6 +436,7 @@ pub fn milestones(doc: &Document, today: i64) -> Vec<Milestone> {
                     due,
                     light,
                     chart: g.id.clone(),
+                    forecast,
                     work,
                     reason: why
                         .into_iter()
@@ -548,11 +559,11 @@ pub fn since(old: &Document, new: &Document) -> Vec<(At, String)> {
 fn tiles(id: &str) -> &'static [&'static str] {
     match id {
         "delivery" => &["burndown", "kanban", "gantt", "matrix"],
-        "business" => &["milestones", "decisions", "money", "risks", "since"],
+        "business" => &["money", "milestones", "decisions", "risks"],
         "marketing" => &["milestones", "todos", "decisions", "risks"],
-        "product" => &["milestones", "decisions", "screens", "risks", "since"],
+        "product" => &["scope", "plan", "decisions", "screens"],
         "design" => &["screens", "decisions", "comments"],
-        "tech" => &["records", "blockers", "risks", "milestones"],
+        "tech" => &["records", "unrecorded", "blockers", "risks"],
         "legal" => &["records", "decisions", "risks"],
         "users" => &["screens", "comments", "decisions"],
         _ => &["milestones", "decisions", "risks", "blockers"],
@@ -606,6 +617,71 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                     format!(" · {}", m.reason)
                 }
             ),
+        ),
+        ("business", _) if first_forecast(doc).is_some() => {
+            let (d, g) = first_forecast(doc).unwrap();
+            let s = crate::forecast::series(doc, d, g, today);
+            let slipping = s.forecast.iter().zip(&s.planned).any(|(f, p)| f + 0.5 < *p);
+            (
+                format!(
+                    "{}: {}",
+                    g.display(),
+                    crate::forecast::headline(&s, g.unit.as_deref(), g.now.unwrap_or(0.0))
+                ),
+                if slipping { "orange" } else { "green" },
+                next.map(|m| {
+                    format!(
+                        "Next launch: {} {}, {}{}",
+                        m.label,
+                        countdown(m.due - today),
+                        m.light.word().to_lowercase(),
+                        if m.reason.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" · {}", m.reason)
+                        }
+                    )
+                })
+                .unwrap_or_default(),
+            )
+        }
+        ("tech", _) => {
+            let records = docs(doc)
+                .iter()
+                .map(|(_, d)| d.groups.iter().filter(|g| g.adr.is_some()).count())
+                .sum::<usize>();
+            let missing = decisions(doc)
+                .into_iter()
+                .filter(|x| {
+                    doc.at(&x.at.path)
+                        .and_then(|d| d.group(&x.at.id))
+                        .is_none_or(|g| g.adr.is_none())
+                })
+                .count();
+            (
+                format!(
+                    "Architecture decisions: {records} recorded{}",
+                    if missing > 0 {
+                        format!(", {missing} not written down yet")
+                    } else {
+                        String::new()
+                    }
+                ),
+                if missing > 0 { "orange" } else { "green" },
+                if missing > 0 {
+                    "Each decision taken belongs in a decision record (Blocks → Decision record): context, options, decision, consequences".to_string()
+                } else {
+                    String::new()
+                },
+            )
+        }
+        ("product", _) => (
+            format!(
+                "What we are building: {}",
+                doc.title.clone().unwrap_or_else(|| p.label.clone())
+            ),
+            "blue",
+            doc.description.clone().unwrap_or_default(),
         ),
         ("business" | "marketing", Some(m)) => (
             format!(
@@ -808,7 +884,8 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                     title,
                     &[if screens { "Screen" } else { "Decision" }, col],
                 ));
-                for (at, label, w) in rows.into_iter().take(8) {
+                let most = if screens { 8 } else { 40 };
+                for (at, label, w) in rows.into_iter().take(most) {
                     out.nodes
                         .push(row(row_id(&id[..2], &at), id, &label, &[w], None));
                 }
@@ -850,6 +927,27 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                         &[by],
                         None,
                     ));
+                }
+            }
+            "money" if first_forecast(doc).is_some() => {
+                for (path, d) in docs(doc) {
+                    for g in d.groups.iter().filter(|g| g.forecast) {
+                        let (mut chart, rows) = crate::forecast::as_chart(doc, d, g, today);
+                        let id = format!("forecast-{}", g.id);
+                        chart.id = id.clone();
+                        out.groups.push(chart);
+                        for (i, mut n) in rows.into_iter().enumerate() {
+                            n.id = row_id(
+                                &format!("fc{i}"),
+                                &At {
+                                    path: path.clone(),
+                                    id: g.id.clone(),
+                                },
+                            );
+                            n.group = Some(id.clone());
+                            out.nodes.push(n);
+                        }
+                    }
                 }
             }
             "money" => {
@@ -902,6 +1000,136 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                     let mut n = row("@dash/money/:".into(), "money", "Nothing about money on this board yet", &["Add a revenue chart (revenue now and by month), or tell the AI the price and how many customers to expect".into()], Some("gray"));
                     n.cells = vec![n.cells[0].clone()];
                     out.nodes.push(n);
+                }
+            }
+            "scope" => {
+                // the whole product: its mindmaps (those tagged for this
+                // perspective, else all), two levels open, deeper ones folded
+                let mut maps: Vec<(Vec<String>, &Document, &Node)> = Vec::new();
+                for (path, d) in docs(doc) {
+                    for n in d
+                        .nodes
+                        .iter()
+                        .filter(|n| n.mindmap.is_some() && n.parent.is_none())
+                    {
+                        maps.push((path.clone(), d, n));
+                    }
+                }
+                // the map most about this perspective: tagged for it, and the
+                // fewest tags of the roles that have their own (a status or
+                // pricing map is shared with Delivery and Business)
+                let score = |n: &Node| {
+                    let mine = n.tags.iter().any(|t| p.tags.contains(t)) as i32 * 10;
+                    let shared = n
+                        .tags
+                        .iter()
+                        .filter(|t| {
+                            matches!(
+                                t.as_str(),
+                                "delivery" | "business" | "legal" | "team" | "finance"
+                            )
+                        })
+                        .count() as i32;
+                    mine - shared
+                };
+                if let Some((path, d, centre)) = maps.iter().max_by_key(|(_, _, n)| score(n)) {
+                    copy_map(&mut out, d, path, &centre.id);
+                }
+            }
+            "plan" => {
+                // how the scope gets delivered: the plans, the boards, the dates
+                let mut rows: Vec<(At, String, String, Option<&str>)> = Vec::new();
+                for (path, d) in docs(doc) {
+                    for g in d.groups.iter().filter(|g| g.gantt) {
+                        let n = d
+                            .nodes
+                            .iter()
+                            .filter(|n| n.group.as_deref() == Some(g.id.as_str()))
+                            .count();
+                        rows.push((
+                            At {
+                                path: path.clone(),
+                                id: g.id.clone(),
+                            },
+                            format!("{} ↗", g.display()),
+                            format!("plan · {n} tasks"),
+                            None,
+                        ));
+                    }
+                    for g in d.groups.iter().filter(|g| g.kanban) {
+                        let n = d
+                            .nodes
+                            .iter()
+                            .filter(|n| ancestors(d, n).iter().any(|a| a.id == g.id))
+                            .count();
+                        rows.push((
+                            At {
+                                path: path.clone(),
+                                id: g.id.clone(),
+                            },
+                            format!("{} ↗", g.display()),
+                            format!("kanban · {n} cards"),
+                            None,
+                        ));
+                    }
+                }
+                for m in ms.iter().take(6) {
+                    rows.push((
+                        m.at.clone(),
+                        m.label.clone(),
+                        format!(
+                            "{} · {}, {}",
+                            m.light.word(),
+                            gantt::short_date(m.due),
+                            countdown(m.due - today)
+                        ),
+                        Some(m.light.color()),
+                    ));
+                }
+                if rows.is_empty() {
+                    continue;
+                }
+                out.groups
+                    .push(table("plan", "How we deliver it", &["", ""]));
+                for (i, (at, label, what, color)) in rows.into_iter().enumerate() {
+                    out.nodes.push(row(
+                        row_id(&format!("pl{i}"), &at),
+                        "plan",
+                        &label,
+                        &[what],
+                        color,
+                    ));
+                }
+                if let Some(g) = out.group_mut("plan") {
+                    g.columns = vec!["Plan, board or milestone".into(), "".into()];
+                }
+            }
+            "unrecorded" => {
+                // decisions talked about but not written down as a record
+                let list: Vec<Item> = decisions(doc)
+                    .into_iter()
+                    .filter(|x| {
+                        doc.at(&x.at.path)
+                            .and_then(|d| d.group(&x.at.id))
+                            .is_none_or(|g| g.adr.is_none())
+                    })
+                    .collect();
+                if list.is_empty() {
+                    continue;
+                }
+                out.groups.push(table(
+                    "unrecorded",
+                    &format!("Decisions without a record ({})", list.len()),
+                    &["Decision", "Where"],
+                ));
+                for x in list.iter().take(8) {
+                    out.nodes.push(row(
+                        row_id("un", &x.at),
+                        "unrecorded",
+                        &x.label,
+                        &[x.place.clone()],
+                        Some("orange"),
+                    ));
                 }
             }
             "burndown" => {
@@ -991,6 +1219,59 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
     drop_empty_columns(&mut out);
     arrange(&mut out);
     out
+}
+
+/// The first forecast on the board (in the top board or a canvas).
+fn first_forecast(doc: &Document) -> Option<(&Document, &Group)> {
+    docs(doc)
+        .into_iter()
+        .find_map(|(_, d)| d.groups.iter().find(|g| g.forecast).map(|g| (d, g)))
+}
+
+/// Mindmap `centre` of `d`, its centre and two levels below open (what is
+/// deeper folded), with dashboard ids so a click opens the topic.
+fn copy_map(out: &mut Document, d: &Document, path: &[String], centre: &str) {
+    let new_id = |old: &str| {
+        row_id(
+            "mm",
+            &At {
+                path: path.to_vec(),
+                id: old.to_string(),
+            },
+        )
+    };
+    let mut level = vec![(centre.to_string(), 0usize)];
+    while let Some((id, depth)) = level.pop() {
+        let Some(n) = d.node(&id) else { continue };
+        let kids: Vec<&Node> = d
+            .nodes
+            .iter()
+            .filter(|k| k.parent.as_deref() == Some(id.as_str()))
+            .collect();
+        let mut c = n.clone();
+        c.id = new_id(&n.id);
+        c.parent = n.parent.as_deref().map(new_id);
+        c.group = None;
+        c.x = None;
+        c.y = None;
+        c.collapsed = n.collapsed || (depth >= 2 && !kids.is_empty());
+        out.nodes.push(c);
+        if depth < 2 && !n.collapsed {
+            for k in kids.iter().rev() {
+                level.push((k.id.clone(), depth + 1));
+            }
+        }
+    }
+    // the topics keep their order: the walk went depth first
+    let start = out
+        .nodes
+        .iter()
+        .position(|n| n.id == new_id(centre))
+        .unwrap_or(0);
+    let mut part: Vec<Node> = out.nodes.split_off(start);
+    let order: Vec<String> = d.nodes.iter().map(|n| new_id(&n.id)).collect();
+    part.sort_by_key(|n| order.iter().position(|o| *o == n.id).unwrap_or(usize::MAX));
+    out.nodes.extend(part);
 }
 
 /// A block of the board, as it is, under id `id`: its items get dashboard
@@ -1330,6 +1611,72 @@ mod tests {
         // it renders
         let svg = crate::render::render(&dash, &Default::default()).svg;
         assert!(svg.contains("Now delivering"));
+    }
+
+    #[test]
+    fn product_business_and_technical_lead_with_their_question() {
+        let src = format!(
+            "{BOARD}\nmindmap status: Where we are [tags: delivery business] {{\n  Built\n}}\n\
+             mindmap what: Launch app [tags: product design] {{\n  Accounts\n    Sign up\n      With Google\n  Billing\n}}\n\
+             forecast revenue: Revenue [unit: £] {{\n  now: 1k\n  Launch [adds: 4k, ramp: 2]\n}}\n\
+             adr db: Use Postgres [accepted] {{\n  decision: One database.\n}}\n"
+        );
+        let doc = crate::dsl::parse(&src).unwrap();
+        let today = gantt::parse_date("2026-10-15").unwrap();
+        let get = |id: &str| {
+            crate::perspectives::all(&doc)
+                .into_iter()
+                .find(|p| p.id == id)
+                .unwrap()
+        };
+
+        // Product: the whole product (the map most about it), and how it gets delivered
+        let d = build(&doc, &get("product"), today, None);
+        assert_eq!(d.nodes[0].label, "What we are building: Launch");
+        assert!(d
+            .nodes
+            .iter()
+            .any(|n| n.label == "Launch app" && n.mindmap.is_some()));
+        assert!(!d.nodes.iter().any(|n| n.label == "Where we are"));
+        // two levels open, what is deeper folded
+        let signup = d.nodes.iter().find(|n| n.label == "Sign up").unwrap();
+        assert!(signup.collapsed);
+        let plan: Vec<String> = d
+            .nodes
+            .iter()
+            .filter(|n| n.group.as_deref() == Some("plan"))
+            .map(|n| n.label.clone())
+            .collect();
+        assert_eq!(plan, vec!["Roadmap ↗", "Blockers ↗", "Beta", "Launch"]);
+
+        // Business: money now, where it gets to, what the slips cost
+        let d = build(&doc, &get("business"), today, None);
+        assert!(
+            d.nodes[0]
+                .label
+                .starts_with("Revenue: £1k a month now → £5k by "),
+            "{}",
+            d.nodes[0].label
+        );
+        assert!(d
+            .groups
+            .iter()
+            .any(|g| g.chart.is_some() && g.id == "forecast-revenue"));
+
+        // Technical: every decision record, and the decisions without one
+        let d = build(&doc, &get("tech"), today, None);
+        assert_eq!(
+            d.nodes[0].label,
+            "Architecture decisions: 1 recorded, 1 not written down yet"
+        );
+        assert!(d
+            .nodes
+            .iter()
+            .any(|n| n.group.as_deref() == Some("records") && n.label == "Use Postgres"));
+        assert!(d
+            .nodes
+            .iter()
+            .any(|n| n.group.as_deref() == Some("unrecorded") && n.label == "Set the price"));
     }
 
     #[test]

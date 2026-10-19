@@ -25,6 +25,7 @@ pub mod dashboard;
 pub mod diff;
 pub mod dsl;
 pub mod entities;
+pub mod forecast;
 pub mod gantt;
 pub mod layout;
 pub mod merge;

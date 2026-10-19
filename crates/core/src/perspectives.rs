@@ -154,7 +154,7 @@ fn kind_of(g: &Group) -> &'static str {
         "kanban"
     } else if g.table {
         "table"
-    } else if g.chart.is_some() {
+    } else if g.chart.is_some() || g.forecast {
         "chart"
     } else if g.entity || g.schema {
         "entity"

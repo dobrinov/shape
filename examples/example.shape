@@ -349,6 +349,11 @@ canvas metrics: Metrics {
   layout: grid
   theme: paper
 
+  forecast boards: Boards in use, a guess [unit: boards] {
+    now: 40
+    v1.0 [adds: 200, ramp: 3]
+  }
+
   chart releases: Releases per day [bar] {
     day    | releases
     Oct 7  | 1

@@ -371,6 +371,12 @@ pub struct Node {
     /// Gantt task: how much is done, in percent (0–100).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub done: Option<f64>,
+    /// Forecast launch: what it adds a month once it has ramped up.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adds: Option<f64>,
+    /// Forecast launch: how many months it takes to add all of it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ramp: Option<f64>,
     /// Gantt task: who does it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
@@ -547,6 +553,13 @@ pub struct Group {
     /// A to-do list: its nodes are items (`done` ticks one), in order.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub todo: bool,
+    /// A forecast: revenue (or any monthly number, in `unit`) now, and what
+    /// each launch adds; its nodes are the launches (see [`crate::forecast`]).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub forecast: bool,
+    /// Forecast: the number today (a month's revenue).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub now: Option<f64>,
     /// A wireframe screen, drawn as this device: its nodes are components,
     /// top to bottom.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -615,6 +628,7 @@ impl Group {
             || self.cycle
             || self.screen.is_some()
             || self.todo
+            || self.forecast
     }
 
     pub fn display(&self) -> &str {

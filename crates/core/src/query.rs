@@ -130,6 +130,7 @@ fn pick(doc: &Document, sel: &str) -> Result<Vec<String>, String> {
                     "group" | "section" => doc.groups.iter().map(|g| g.id.clone()).collect(),
                     "chart" | "gantt" => doc.groups.iter().filter(|g| g.gantt).map(|g| g.id.clone()).collect(),
                     "matrix" | "risks" => doc.groups.iter().filter(|g| g.risks).map(|g| g.id.clone()).collect(),
+                    "forecast" => doc.groups.iter().filter(|g| g.forecast).map(|g| g.id.clone()).collect(),
                     "plot" | "graph" | "data" => doc.groups.iter().filter(|g| g.chart.is_some()).map(|g| g.id.clone()).collect(),
                     "table" => doc.groups.iter().filter(|g| g.table).map(|g| g.id.clone()).collect(),
                     "timeline" => doc.groups.iter().filter(|g| g.timeline).map(|g| g.id.clone()).collect(),

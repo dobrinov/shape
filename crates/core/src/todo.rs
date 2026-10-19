@@ -40,6 +40,11 @@ pub fn with_today<T>(today: Option<i64>, f: impl FnOnce() -> T) -> T {
     out
 }
 
+/// Today while a board is drawn (see [`with_today`]).
+pub fn today() -> Option<i64> {
+    TODAY.with(|t| t.get())
+}
+
 /// The to-do list a node is an item of.
 pub fn todo_of<'a>(doc: &'a Document, n: &Node) -> Option<&'a Group> {
     n.group

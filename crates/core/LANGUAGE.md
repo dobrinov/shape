@@ -362,7 +362,10 @@ fraud: Fraud reporting API [tags: tech exec]
   - **Milestones**: every gantt milestone ahead (or a chart's end), with a light. *Off track* (red): work planned to end by it is forecast to end after it or is late, it is forecast late itself, or an arrow ties a blocker or a risk scoring 20 or more (of 25) to it. *At risk* (amber): work before it is behind, or it is the next milestone and the board has open blockers, risks scoring 12 or more or overdue to-dos that no arrow ties to another one. *On track* (green) otherwise. Each says why.
   - **Open blockers**: cards in a blockers kanban (not in a done/solved column), what sits in a section about blockers or what is at risk, anything tagged `blocker`. **Decisions needed**: proposed decision records, what sits in a section of asks or decisions (*What we need from you*), anything tagged `decision`. **Top risks**: the risk matrices' worst. **Changed since**: what moved, was re-rated, progressed, was added or removed since a week ago (the editor takes the version from the history; exports take `--base`).
   - **Delivery** is about what is being delivered now: the next milestone, its light and why, in the headline (*Now delivering: Beta · Off track · due Oct 22, in 7 days · …*); a **burndown** of the work left before it (as planned, and from today as forecast; a chart on the board called a burndown instead, when there is one); the **kanban boards**, each with its cards per column, to open; the **gantt chart** it is on, when it waits on more than one piece of work; the **risk matrices** as they are. Their bars, dots and rows open the real ones.
-  - Other roles: Business (milestones, decisions, money: the board's revenue charts, risks, changes), Marketing (milestones, checklists, decisions, risks), Product (milestones, decisions, screens, risks, changes), Design (screens, decisions, open comments), Technical (decision records, blockers, risks, milestones), Legal (decision records, decisions, risks), a board's own perspective (milestones, decisions, risks, blockers).
+  - **Business** leads with the money: the forecast (see *Forecasts*) now and where it gets to, and what the plan's slips cost (*Revenue: £12k a month now → £23k by Jun 2027 · the slips cost £4k by then*), its chart, then the launches with their lights, decisions needed and top risks. Without a forecast, the board's revenue charts, or a note that there is no money on the board yet.
+  - **Product** shows what is being built, whole: the board's title and description, the mindmap most about the product (tagged for it, and the least for Delivery or Business), two levels open and deeper ones folded, and **How we deliver it**: each gantt chart, kanban board and milestone (with its light), one click away; then decisions needed and the screens.
+  - **Technical** is about the architecture decisions: how many are recorded, every decision record with its status, and the **decisions without a record** (what sits in a section of asks or decisions, or is tagged `decision`, but is not a decision record yet); then blockers and risks.
+  - Other roles: Marketing (milestones, checklists, decisions, risks), Design (screens, decisions, open comments), Legal (decision records, decisions, risks), a board's own perspective (milestones, decisions, risks, blockers).
 - In the editor a summary is read-only: click a row to open what it stands for on the full board (*← Delivery* goes back); *Details* shows the blocks behind it, as on the board. `shape svg|png FILE --perspective delivery [--as-of DATE] [--base REF]` exports a summary.
 - An element shows in a perspective when it has the perspective's tag (`tags: tech exec`); mindmap topics go with their centre. In the editor, pick one in the top bar; new elements get its tag. *✦ Sort into perspectives* has the AI tag the board. Ops: `{"op":"perspective","id":"legal","label":"Legal","tags":["legal"],"show":["adr"]}` (`remove: true` takes it off).
 
@@ -443,6 +446,21 @@ timeline history: How we got here {
 - An event's id comes from its label within the timeline (`history.open-beta`), as table rows do. On another node, `date:` and `important` are attributes like any other.
 - In the editor: the *Timeline* tool; right-click a timeline → *Add event…*, *Edit as text…*; right-click an event → *Change date…*, *Mark important*, details, *Colour…*. A table whose first column is dates turns into a timeline with *Show as timeline* (⌘Z turns it back).
 - Prompts list the events in time order. In JSON a timeline is a group with `timeline`; its events are nodes with a `date` (and `important`).
+
+### Forecasts
+
+```shape
+forecast revenue: Revenue [unit: £] {
+  now: 12k
+  Phase 1 GA [adds: 3k, ramp: 3]
+  Phase 2 GA [adds: 8k, ramp: 6]
+  Partners [adds: 2k, on: 2027-03-01]
+}
+```
+
+- A number a month (revenue, usually; `unit:` `£`, `$`, `€` or any word) as it is `now:`, and what each launch adds to it. A launch is a gantt milestone by its name (anywhere on the board, canvases too), or a date (`on:`). From its date it adds a share of `adds` each month, all of it after `ramp` months (at once without one). Numbers can be written `12k`, `1.5m`, `£3,000`.
+- Drawn as two lines, month by month: **as planned** (the milestones' planned dates) and **as forecast** (their forecast dates: when the work planned to end by a milestone is forecast to end after it, the milestone moves with it). A slip in the plan moves the curve, and the Business summary says what it costs.
+- In the editor: *Blocks → Revenue forecast* starts one with the board's milestones; right-click → *Edit as text…*. In JSON a forecast is a group with `"forecast": true` and `now`; its launches are nodes with `adds`, `ramp` and, without a milestone, `date`.
 
 ### Charts
 

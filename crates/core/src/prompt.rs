@@ -140,6 +140,7 @@ pub const OPS_REFERENCE: &str = r#"Operations (fields in [] are optional; ids ar
 - {"op":"merge","dsl":"cache: Redis [cylinder]\napi -> cache: reads\napi [red]"}   (statements in the Shape language, as if written at the end of the file: adds new elements; one written again by its id gets the attributes given. Cheapest for many changes)
 - Database table: {"op":"add_group","id":"users","label":"Users","entity":true}; its columns are add_node / update_node with "id":"users.email","label":"email","group":"users","column":{"type":"text",["pk":true,"unique":true,"null":true,"fk":"teams.id","default":"now()"]}. Or merge: "entity users: Users {\n  id: uuid [pk]\n  team_id: uuid [fk: teams]\n}"
 - Database schema: a section of tables from a schema file ({"op":"add_group","id":"db","label":"Database","schema":true,"file":"db/structure.sql"}). Its tables come from that file: change the file, not them (`shape schema BOARD` updates them).
+- Forecast: merge "forecast revenue: Revenue [unit: £] {\n  now: 12k\n  Phase 1 GA [adds: 3k, ramp: 3]\n}" (a launch is a gantt milestone by its name, or `on: DATE`); ops: add_group with "forecast":true,"now":12000, its launches add_node with "group":"revenue","label":"Phase 1 GA","adds":3000,"ramp":3.
 - Canvases: a box with "canvas":"payments" opens a board inside this one (not shown to you; keep the attribute when you rewrite a box). {"op":"add_canvas","title":"Payments"} adds one; removing the box that opens it removes it. {"op":"in","canvas":"payments","ops":[…]} applies ops inside canvas `payments` (`payments/fraud` for one inside it).
 - Images: a box with "image":"img1" shows asset img1 (its data is not shown to you); keep the image attribute when you rewrite a box.
 - Sequence diagram: {"op":"add_group","id":"login","label":"Sign in","sequence":true}; participants are nodes in it, messages are add_edge between them (in order; {"op":"update_edge","id":"web->api","index":0} moves one). Or merge: "sequence login: Sign in {\n  user: User\n  web: Web app\n  user -> web: opens /login\n  web ..> user: page\n}" (..> is a reply)
@@ -1088,6 +1089,8 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
             format!(" (decision record, {st})")
         } else if g.entity {
             format!(" (database table `{}`)", g.id)
+        } else if g.forecast {
+            format!(" (forecast in {}: now {}; each launch adds this much a month, reached after `ramp` months, from its gantt milestone's date)", g.unit.as_deref().unwrap_or("units"), crate::forecast::format_amount(g.now.unwrap_or(0.0)))
         } else if g.schema {
             match &g.file {
                 Some(f) => format!(" (database schema, from `{f}`: change the file, not these tables)"),

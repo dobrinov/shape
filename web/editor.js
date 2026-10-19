@@ -49,6 +49,7 @@
     tidy: '<path d="M4 6h7M4 12h11M4 18h16"/>',
     decision: '<path d="M12 3l9 9-9 9-9-9z"/>',
     present: '<rect x="3.5" y="5" width="17" height="12" rx="2"/><path d="M12 17v3M8.5 20h7M10.5 9v4l3.5-2z"/>',
+    forecast: '<path d="M3 20h18M4 16l5-5 4 3 7-8"/><path d="M15 6h5v5"/>',
     schema: '<ellipse cx="9" cy="5" rx="6" ry="2.2"/><path d="M3 5v9c0 1.2 2.7 2.2 6 2.2M15 5v4"/><rect x="11" y="11" width="10" height="9" rx="1.5"/><path d="M11 14.5h10"/>',
     entity: '<ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6"/>',
     table: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 5h16v4.5H4z" fill="currentColor" stroke="none"/><path d="M4 14.25h16M10 9.5V19M15 9.5V19"/>',
@@ -358,6 +359,7 @@
           ["todo", "To-do list", "Checkboxes, owners, due dates", go(addTodo)],
           ["kanban", "Kanban", "Cards in columns", go(addKanban)],
           ["gantt", "Gantt chart", "Tasks and forecast", go(addGantt)],
+          ["forecast", "Revenue forecast", "Money now, and as launches ship", go(addForecast)],
           ["table", "Table", "Rows and columns", go(addTable)],
           ["chart", "Chart", "Bars, lines, pie…", function (e) { closeBlocks(); chartMenu(blocksBtn); }]
         ]],
@@ -2294,6 +2296,13 @@
         "-",
         ["Delete", function () { applyOps([{ op: "remove", id: t.id, keep_members: false }]); select([]); }, "The list and its items"]
       ];
+      if (gr && !view && gr.forecast) return [
+        ["Rename", function () { editLabel(t.id); }],
+        ["Edit as text…", function () { editForecast(t.id); }, "now: 12k, then a launch per line"],
+        ["Colour…", function () { colourMenu(t.id, "update_group", gr.color); }],
+        "-",
+        ["Delete", function () { applyOps([{ op: "remove", id: t.id, keep_members: false }]); select([]); }, "The forecast and its launches"]
+      ];
       if (gr && !view && gr.schema) return [
         ["Rename", function () { editLabel(t.id); }],
         gr.file && opts.sources ? ["Update from " + gr.file, function () { updateFromFile(t.id); }, "Read the file again"] : null,
@@ -3581,6 +3590,31 @@
       });
     }
 
+    /* Forecasts: revenue now, and what each launch (a gantt milestone) adds;
+       drawn as planned against forecast, so a slip in the plan moves it. */
+    function addForecast() {
+      var gid = freshId("revenue");
+      var ms = st.doc.nodes.filter(function (n) { return n.milestone; }).slice(0, 2);
+      var lines = ms.length ? ms.map(function (n, i) { return "  " + (n.label || n.id) + " [adds: " + (i ? "5k" : "2k") + ", ramp: 3]"; }) : ["  Launch [adds: 2k, ramp: 3, on: " + isoDay(today() + 60) + "]"];
+      var res = applyOps([{ op: "merge", dsl: "forecast " + gid + ": Revenue [unit: £] {\n  now: 0\n" + lines.join("\n") + "\n}" }]);
+      if (res.ok) { select([gid]); reveal(gid); editForecast(gid); }
+    }
+    function editForecast(gid) {
+      var ta = h("textarea", { class: "dge-chart-data", spellcheck: "false", rows: "8" });
+      ta.value = st.session.forecast_text(gid);
+      var save = function () {
+        var r = JSON.parse(st.session.forecast_edit_ops(gid, ta.value));
+        if (!r.ok) return flash(r.error, true);
+        if (applyOps(r.ops).ok) closeModal();
+      };
+      ta.addEventListener("keydown", function (e) { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") save(); });
+      showModal("Forecast: " + (group(gid).label || gid), h("div", {}, [
+        h("p", { class: "dge-muted" }, ["`now: 12k` is this month's revenue. Then one launch per line: a gantt milestone by its name, what it adds a month once it has ramped up, and in how many months: `Phase 1 GA [adds: 3k, ramp: 3]` (`on: 2027-02-01` for one that is not on a gantt chart)."]),
+        ta
+      ]), [h("button", { onclick: closeModal }, ["Cancel"]), h("button", { class: "primary", onclick: save }, ["Save"])]);
+      setTimeout(function () { ta.focus(); }, 0);
+    }
+
     /* To-do lists: items with checkboxes, owners and due dates. */
     function todoOf(id) { var n = node(id), g = n && n.group && group(n.group); return g && g.todo ? g : null; }
     function doneOf(n) { return !!(n && n.done && n.done >= 100); }
@@ -4300,7 +4334,7 @@
       var g = group(t), n = node(t);
       if (n && n.canvas) return "canvas";
       if (n && n.mindmap) return "mindmap";
-      if (g) return g.todo ? "to-do list" : g.screen ? (g.screen === "web" ? "web page" : "screen") : g.timeline ? "timeline" : g.cycle ? "cycle" : g.kanban ? "kanban" : g.gantt ? "gantt" : g.risks ? "risks" : g.table ? "table" : g.chart ? "chart" : g.adr ? "decision" : g.sequence ? "sequence" : g.lanes ? "swimlanes" : g.entity ? "table" : g.schema ? "schema" : "section";
+      if (g) return g.todo ? "to-do list" : g.screen ? (g.screen === "web" ? "web page" : "screen") : g.timeline ? "timeline" : g.cycle ? "cycle" : g.kanban ? "kanban" : g.gantt ? "gantt" : g.risks ? "risks" : g.table ? "table" : g.chart ? "chart" : g.adr ? "decision" : g.sequence ? "sequence" : g.lanes ? "swimlanes" : g.entity ? "table" : g.schema ? "schema" : g.forecast ? "forecast" : "section";
       return "box";
     }
     // what can be a slide: the top-level sections and blocks, mindmaps and

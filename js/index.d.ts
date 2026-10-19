@@ -162,6 +162,10 @@ export interface Node {
   milestone?: boolean;
   /** Gantt task: percent done, 0–100. */
   done?: number;
+  /** Forecast launch: what it adds a month once ramped up. */
+  adds?: number;
+  /** Forecast launch: months to ramp up. */
+  ramp?: number;
   /** Gantt task: who does it. */
   owner?: string;
   /** Risk: how likely, 1–5. */
@@ -257,6 +261,10 @@ export interface Group {
   screen?: Device;
   /** A to-do list (its nodes are items; `done: 100` ticks one). */
   todo?: boolean;
+  /** A forecast (its nodes are launches: `adds`, `ramp`, a gantt milestone by name or `date`). */
+  forecast?: boolean;
+  /** Forecast: the number today (a month's revenue). */
+  now?: number;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -345,6 +353,10 @@ export interface AddNodeOp {
   milestone?: boolean;
   /** Gantt task: percent done, 0–100. */
   done?: number;
+  /** Forecast launch: what it adds a month once ramped up. */
+  adds?: number;
+  /** Forecast launch: months to ramp up. */
+  ramp?: number;
   /** Gantt task: who does it. */
   owner?: string;
   /** Risk: how likely, 1–5 (0 clears it in ops). */
@@ -402,6 +414,10 @@ export interface UpdateNodeOp {
   milestone?: boolean;
   /** Gantt task: percent done, 0–100 (0 clears it). */
   done?: number;
+  /** Forecast launch: what it adds a month once ramped up. */
+  adds?: number;
+  /** Forecast launch: months to ramp up. */
+  ramp?: number;
   /** Gantt task: who does it ("" clears it). */
   owner?: string;
   /** Risk: how likely, 1–5 (0 clears it in ops). */
@@ -595,6 +611,10 @@ export interface AddGroupOp {
   screen?: Device;
   /** A to-do list (its nodes are items; `done: 100` ticks one). */
   todo?: boolean;
+  /** A forecast (its nodes are launches: `adds`, `ramp`, a gantt milestone by name or `date`). */
+  forecast?: boolean;
+  /** Forecast: the number today (a month's revenue). */
+  now?: number;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */
@@ -651,6 +671,10 @@ export interface UpdateGroupOp {
   screen?: Device;
   /** A to-do list (its nodes are items; `done: 100` ticks one). */
   todo?: boolean;
+  /** A forecast (its nodes are launches: `adds`, `ramp`, a gantt milestone by name or `date`). */
+  forecast?: boolean;
+  /** Forecast: the number today (a month's revenue). */
+  now?: number;
   /** Table: the columns' names (the header). */
   columns?: string[];
   /** A database table (its nodes are columns). */

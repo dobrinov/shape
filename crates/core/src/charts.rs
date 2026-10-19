@@ -112,6 +112,8 @@ pub fn plot_any(doc: &Document, g: &Group) -> Plot {
         crate::screen::plot(doc, g)
     } else if g.todo {
         crate::todo::plot(doc, g)
+    } else if g.forecast {
+        crate::forecast::plot(doc, g)
     } else {
         plot(doc, g)
     }
@@ -173,6 +175,8 @@ pub fn format_value(v: f64, unit: Option<&str>) -> String {
                 format!("{u}{num}")
             }
         }
+        // a word goes after a space (`250 boards`), a sign right after (`40%`, `3d`)
+        Some(u) if u.chars().count() > 2 && u.chars().all(|c| c.is_alphabetic() || c == ' ') => format!("{num} {u}"),
         Some(u) => format!("{num}{u}"),
         None => num,
     }

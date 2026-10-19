@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.0 — 2026-10-19
+
+- **Revenue forecasts:** `forecast revenue: Revenue [unit: £] { now: 12k · Phase 1 GA [adds: 3k, ramp: 3] … }`. Revenue now, and what each launch adds a month once it has ramped up. A launch is a gantt milestone by its name, so its date comes from the plan (or `on: DATE`). Drawn month by month, as planned and as forecast: when the plan slips, the curve moves. *Blocks → Revenue forecast* starts one with the board's milestones; right-click → *Edit as text…*.
+- **Business leads with the money:** *Revenue: £12k a month now → £23k by Jun 2027 · the slips cost £4k by then*, the forecast's chart, then the launches with their lights, decisions needed and top risks.
+- **Product shows what is being built, whole:** the board's title and description, the product's mindmap (two levels open, deeper ones folded) and *How we deliver it*: each plan, kanban board and milestone with its light, one click away.
+- **Technical is about the architecture decisions:** how many are recorded, every decision record with its status, and the decisions talked about but not written down as a record yet.
+- Charts put a space before a word unit (*250 boards*, not *250boards*).
+
 ## 0.62.1 — 2026-10-19
 
 - Fixed: the editor could miss new versions for a day. It kept GitHub's answer for 24 hours (even one older than itself) and asked only when it started. Now it asks when it starts and every hour while it runs, keeps the answer for an hour, never believes one older than itself, and the *New: …* badge appears in an editor left open too.

@@ -90,6 +90,12 @@ pub enum Op {
         /// Gantt task: who does it ("" clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         owner: Option<String>,
+        /// Forecast launch: what it adds a month once ramped up.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        adds: Option<f64>,
+        /// Forecast launch: months to ramp up (0 clears it).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ramp: Option<f64>,
         /// Risk: probability, 1 to 5 (0 clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         probability: Option<u8>,
@@ -177,6 +183,12 @@ pub enum Op {
         /// Gantt task: who does it ("" clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         owner: Option<String>,
+        /// Forecast launch: what it adds a month once ramped up.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        adds: Option<f64>,
+        /// Forecast launch: months to ramp up (0 clears it).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ramp: Option<f64>,
         /// Risk: probability, 1 to 5 (0 clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         probability: Option<u8>,
@@ -404,6 +416,12 @@ pub enum Op {
         /// A database table (its nodes are columns).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         entity: Option<bool>,
+        /// A forecast (its nodes are launches).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        forecast: Option<bool>,
+        /// Forecast: the number today (a month's revenue).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        now: Option<f64>,
         /// A database schema: a section of tables from a schema file.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         schema: Option<bool>,
@@ -483,6 +501,12 @@ pub enum Op {
         /// A database table (its nodes are columns).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         entity: Option<bool>,
+        /// A forecast (its nodes are launches).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        forecast: Option<bool>,
+        /// Forecast: the number today (a month's revenue).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        now: Option<f64>,
         /// A database schema: a section of tables from a schema file.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         schema: Option<bool>,
@@ -874,6 +898,16 @@ fn need_container(doc: &Document, g: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// A forecast launch's numbers.
+fn launch(n: &mut Node, adds: &Option<f64>, ramp: &Option<f64>) {
+    if let Some(v) = adds {
+        n.adds = Some(*v);
+    }
+    if let Some(r) = ramp {
+        n.ramp = Some(*r).filter(|r| *r > 0.0);
+    }
+}
+
 fn new_id(doc: &Document, wanted: Option<&str>, label: &str) -> Result<String, String> {
     match wanted.filter(|s| !s.is_empty()) {
         Some(id) => {
@@ -969,6 +1003,8 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             level,
             done,
             owner,
+            adds,
+            ramp,
             probability,
             impact,
             values,
@@ -1008,6 +1044,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 n.mindmap = Some(map_layout(m)?);
             }
             task(&mut n, start, days, after, milestone, done, owner)?;
+            launch(&mut n, adds, ramp);
             event(&mut n, date, important)?;
             if let Some(w) = widget.as_deref().filter(|w| !w.is_empty()) {
                 n.widget = Some(widget_kind(w)?);
@@ -1079,6 +1116,8 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             level,
             done,
             owner,
+            adds,
+            ramp,
             probability,
             impact,
             values,
@@ -1149,6 +1188,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 n.collapsed = *c;
             }
             task(n, start, days, after, milestone, done, owner)?;
+            launch(n, adds, ramp);
             event(n, date, important)?;
             if let Some(l) = level {
                 n.level = (*l).min(8);
@@ -1847,6 +1887,8 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             screen,
             columns,
             entity,
+            forecast,
+            now,
             schema,
             file,
             only,
@@ -1887,6 +1929,8 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 None => None,
             };
             g.entity = entity.unwrap_or(false);
+            g.forecast = forecast.unwrap_or(false);
+            g.now = *now;
             g.schema = schema.unwrap_or(false);
             g.file = file.clone().filter(|f| !f.is_empty());
             g.only = only.clone().filter(|o| !o.is_empty());
@@ -1932,6 +1976,8 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             screen,
             columns,
             entity,
+            forecast,
+            now,
             schema,
             file,
             only,
@@ -1995,6 +2041,12 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             if let Some(e) = entity {
                 g.entity = *e;
+            }
+            if let Some(v) = forecast {
+                g.forecast = *v;
+            }
+            if let Some(v) = now {
+                g.now = Some(*v);
             }
             if let Some(v) = schema {
                 g.schema = *v;
