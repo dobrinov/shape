@@ -53,7 +53,8 @@ try {
   await p.selectOption(".dge-persp", "delivery"); await sleep(400);
   assert.equal(await shown(p), "@dash/head/:,@dash/ri/:fraud");
   assert.match(await p.locator('[data-id="@dash/ri/:fraud"]').textContent(), /Fraud[\s\S]*= 12 \(high\)/);
-  assert.ok(!(await p.locator(".dge-tools").isVisible()), "no drawing tools on a summary");
+  assert.ok(!(await p.locator('.dge-tool[data-tool="node"]').isVisible()), "no drawing tools on a summary");
+  assert.ok(await p.locator('.dge-tool[data-tool="comment"]').isVisible(), "but comments");
   if (process.env.SHOTS) await p.screenshot({ path: process.env.SHOTS + "/summary.png" });
   // Details: the blocks behind it, as on the board; Summary goes back
   assert.equal(await p.locator('[data-act="folds"]').innerText(), "Details");
@@ -69,6 +70,22 @@ try {
   assert.equal(await p.locator(".dge-persp").inputValue(), "delivery");
   assert.ok(!(await p.locator(".dge-back").isVisible()));
   assert.equal(saved(), before);
+
+  // a comment from the summary goes on the risk itself; its pin opens the thread on the board
+  await p.locator('.dge-tool[data-tool="comment"]').click();
+  await p.locator('[data-id="@dash/ri/:fraud"]').click({ force: true }); await sleep(300);
+  await p.locator(".dge-bubble textarea").fill("Who owns this?");
+  await p.keyboard.press("Enter"); await sleep(500);
+  assert.match(saved(), /comment c1 on fraud by .*: Who owns this\?/);
+  assert.equal(await p.locator(".dge-persp").inputValue(), "delivery");
+  const pin = p.locator('[data-comment^="@dash/"]').first();
+  assert.equal(await pin.count(), 1, "the comment shows on the summary");
+  await pin.click({ force: true }); await sleep(600);
+  assert.equal(await p.locator(".dge-persp").inputValue(), "");
+  assert.match(await p.locator(".dge-bubble").innerText(), /Who owns this\?/);
+  await p.keyboard.press("Escape");
+  await p.locator(".dge-back").click(); await sleep(400);
+  const withComment = saved();
 
   // a new perspective is written to the board and picked; kept on reload
   await p.selectOption(".dge-persp", "__new");

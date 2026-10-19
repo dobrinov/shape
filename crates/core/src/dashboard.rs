@@ -1216,6 +1216,30 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
             _ => {}
         }
     }
+    // the comments on what the summary shows, on its items (a pin opens the thread on the board)
+    let mut copies = Vec::new();
+    for (path, d) in docs(doc) {
+        for (i, c) in d.comments.iter().enumerate() {
+            let Some(on) = c.on.as_deref() else { continue };
+            let shown = out
+                .nodes
+                .iter()
+                .find(|n| target(&n.id).is_some_and(|(p, id)| p == path && id == on));
+            if let Some(n) = shown {
+                let mut copy = c.clone();
+                copy.id = row_id(
+                    &format!("cm{i}"),
+                    &At {
+                        path: path.clone(),
+                        id: on.to_string(),
+                    },
+                );
+                copy.on = Some(n.id.clone());
+                copies.push(copy);
+            }
+        }
+    }
+    out.comments.extend(copies);
     drop_empty_columns(&mut out);
     arrange(&mut out);
     out

@@ -443,7 +443,16 @@
        the whole board: see dashboard.rs); it is read-only, and a row opens
        what it stands for on the full board, with a way back. */
     function dashOn() { return !!(st.perspective && st.perspDash); }
-    function openFromDash(rowId) {
+    /* A comment from a summary goes on the element a row stands for, in its canvas. */
+    function commentOnDash(rowId, cx, cy) {
+      var m = /^@dash\/[^/]*\/(.*):(.*)$/.exec(rowId);
+      if (!m || !m[2] || m[2].charAt(0) === "#") return false;
+      var el0 = canvas.querySelector('[data-id="' + rowId.replace(/"/g, '\\"') + '"]');
+      var label = el0 ? (el0.textContent || "").trim().split("\n")[0].slice(0, 60) : m[2];
+      openComposer({ on: m[2], path: m[1] ? m[1].split("/") : [], label: label }, cx, cy);
+      return true;
+    }
+    function openFromDash(rowId, thread) {
       var m = /^@dash\/[^/]*\/(.*):(.*)$/.exec(rowId);
       if (!m || !m[2] || m[2].charAt(0) === "#") return;
       var path = m[1] ? m[1].split("/") : [], id = m[2];
@@ -453,7 +462,12 @@
       fillPerspectives();
       if (path.join("/") !== (st.canvasPath || []).join("/")) openCanvas(path); else render();
       showBack();
-      setTimeout(function () { if (node(id) || group(id)) { select([id]); reveal(id); } }, 0);
+      setTimeout(function () {
+        if (node(id) || group(id)) { select([id]); reveal(id); }
+        // from a comment's pin: open its thread
+        var c = thread && (st.doc.comments || []).find(function (x) { return x.on === id && x.status !== "resolved"; });
+        if (c) { var g = geom(id), p = g && toScreen(g.x + g.w, g.y), r = canvas.getBoundingClientRect(); openThread(c.id, p ? r.left + p.x : r.left + 200, p ? r.top + p.y : r.top + 200); }
+      }, 60);
     }
     function showBack() {
       if (!toolbar.back) return;
@@ -2593,6 +2607,13 @@
       // the summary: a row opens what it stands for; elsewhere it pans
       if (dashOn()) {
         e.preventDefault();
+        // a comment's pin: its thread, on the board
+        if (e.button === 0 && t && t.type === "pin" && /^@dash\//.test(t.id)) return openFromDash(t.id, true);
+        // the comment tool: a comment on what the item stands for, kept on the board
+        if (e.button === 0 && st.tool === "comment") {
+          if (t && t.id && /^@dash\//.test(t.id) && commentOnDash(t.id, e.clientX, e.clientY)) return;
+          return flash("Click an item to comment on it");
+        }
         if (e.button === 0 && t && t.id && /^@dash\//.test(t.id) && !st.space) return openFromDash(t.id);
         st.drag = { type: "pan", sx: e.clientX, sy: e.clientY, px: st.panX, py: st.panY };
         canvas.setPointerCapture(e.pointerId);
@@ -4791,7 +4812,7 @@
       if (mod && e.key === "/" && hasCode) { e.preventDefault(); showCode = !showCode; applyChrome(); syncCode(true); return; }
       if (typing || !el.contains(document.activeElement) && document.activeElement !== document.body) return;
       // the summary is read-only: moving around, finding and the AI, nothing that edits
-      if (dashOn() && (mod ? "fkcs".indexOf(e.key.toLowerCase()) < 0 : ["f", "F", "m", "M", "0", "+", "=", "-", "z", "Z", "Escape", " ", "?"].indexOf(e.key) < 0)) return;
+      if (dashOn() && (mod ? "fkcs".indexOf(e.key.toLowerCase()) < 0 : ["f", "F", "m", "M", "0", "+", "=", "-", "z", "Z", "c", "C", "v", "V", "Escape", " ", "?"].indexOf(e.key) < 0)) return;
       if (e.key === "Alt") canvas.classList.add("out");
       if (e.key === " " && !st.space) { st.space = true; canvas.classList.add("space"); e.preventDefault(); return; }
       if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
@@ -5155,13 +5176,15 @@
     }
     function openComposer(target, cx, cy) {
       bubble.innerHTML = "";
-      var box = commentBox(target.on ? "Comment on " + labelOf(target.on) + "…" : "Add a comment…", function (text) {
+      var box = commentBox(target.on ? "Comment on " + (target.label || labelOf(target.on)) + "…" : "Add a comment…", function (text) {
         var op = { op: "add_comment", text: text };
         if (target.on) op.on = target.on; else { op.x = target.x; op.y = target.y; }
         if (st.author) op.author = st.author;
         closeBubble();
         setTool("select");
-        applyOps([op]);
+        // from a summary: on the element itself, in whichever canvas it is
+        if (target.path) applyOps(target.path.length ? [{ op: "in", canvas: target.path.join("/"), ops: [op] }] : [op], false, true);
+        else applyOps([op]);
         canvas.focus({ preventScroll: true });
       }, "Comment");
       bubble.appendChild(box.el);

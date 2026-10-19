@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.1 — 2026-10-19
+
+- **Comment from a perspective's summary.** The comment tool (C) works there again: click a milestone, a risk, a topic or any row to comment on what it stands for. The comment is kept on that element on the board, in whichever canvas it is. The comments on what a summary shows appear on it, and clicking one opens its thread on the full board, to reply or resolve.
+
 ## 0.63.0 — 2026-10-19
 
 - **Revenue forecasts:** `forecast revenue: Revenue [unit: £] { now: 12k · Phase 1 GA [adds: 3k, ramp: 3] … }`. Revenue now, and what each launch adds a month once it has ramped up. A launch is a gantt milestone by its name, so its date comes from the plan (or `on: DATE`). Drawn month by month, as planned and as forecast: when the plan slips, the curve moves. *Blocks → Revenue forecast* starts one with the board's milestones; right-click → *Edit as text…*.
