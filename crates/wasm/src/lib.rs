@@ -323,6 +323,26 @@ impl Diagram {
         }
     }
 
+    /// The ops that bring schema block `gid` up to date with `src` (its
+    /// file's text): `{ok, ops, summary, added, changed, removed, warnings}`
+    /// or `{ok: false, error}`.
+    pub fn schema_sync_ops(&self, gid: &str, src: &str) -> String {
+        sync_json(shape_core::schemas::sync_ops(&self.inner.doc, gid, src))
+    }
+
+    /// The ops that add a schema block with the tables in `src`; `file`
+    /// (relative to the board) and `only` (globs) may be "".
+    pub fn schema_add_ops(&self, label: &str, file: &str, only: &str, src: &str) -> String {
+        let some = |s: &str| Some(s.to_string()).filter(|s| !s.is_empty());
+        sync_json(shape_core::schemas::add_ops(
+            &self.inner.doc,
+            label,
+            some(file).as_deref(),
+            some(only).as_deref(),
+            src,
+        ))
+    }
+
     /// Screen `gid`'s components as text, one per line ("" when it is not
     /// a screen).
     pub fn screen_text(&self, gid: &str) -> String {
@@ -668,4 +688,11 @@ pub fn json_schema() -> String {
 #[wasm_bindgen]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+fn sync_json(r: Result<shape_core::schemas::Sync, String>) -> String {
+    match r {
+        Ok(s) => serde_json::json!({ "ok": true, "ops": s.ops, "summary": s.summary(), "added": s.added, "changed": s.changed, "removed": s.removed, "warnings": s.warnings }).to_string(),
+        Err(e) => serde_json::json!({ "ok": false, "error": e }).to_string(),
+    }
 }

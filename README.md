@@ -93,6 +93,7 @@ Whiteboard tools are great for talking. Their output, though, ends up in a forma
   - Swimlanes (`lanes { lane … }`): bands the flow runs across, lined up step by step.
   - Gantt charts (`gantt { Design [5d]  Build [2w, after: design] }`): a timeline by day, week, month or quarter. Drag a bar to reschedule it, drag its end to change its duration, draw an arrow between bars to make one wait for the other. Milestones, progress and owners; a forecast from today shows late work and everything it pushes back (`shape schedule FILE` lists it).
   - Database tables (`entity users { id: uuid [pk]  team_id: uuid [fk: teams] }`): columns with types and keys, foreign keys drawn between columns, and schema changes reviewed column by column (`shape diff`, `--base`).
+  - Database schemas (`schema db: Database [file: db/structure.sql] { … }`): the tables of a Postgres `structure.sql`, a MySQL or SQLite dump or a Rails `schema.rb`, read by [schema](https://github.com/dobrinov/schema)'s parser and kept up to date from the file (`shape schema BOARD db/structure.sql`, or *Blocks → Database schema* in the editor).
   - Tables (`table { option | cost  Local | $0 }`): a header and rows of cells that wrap; rows can be commented on, linked and tinted. *Edit as text…* in the editor.
   - Themes (`theme: paper`, or your own `theme brand { … light { … } dark { … } }`, also from a shared `./brand.theme` file): colours, named colours, font and corner radius, each in a light and a dark mode that follows the viewer, for the board, its exports and the editor canvas. Pick one or *Edit theme…* in the toolbar.
   - Charts (`chart [bar] { quarter | EU | US  Q1 | 120 | 80 }`): bars (stacked, horizontal), lines, areas, pie, donut and scatter from a small table that diffs like text. Hover a bar for its values; *Edit data…* in the editor.
@@ -199,7 +200,7 @@ The full reference is in [LANGUAGE.md](crates/core/LANGUAGE.md), and `shape spec
 | `a -> b: label` | edge. `->` solid, `..>` dashed, `=>` thick, `--` / `..` / `==` no arrow, `<->` both |
 | `a -> b -> c`, `a -> b, c` | chains and fan-out |
 | `group id: Label [color] { … }` | groups, which can be nested |
-| `mindmap` · `lanes` · `kanban` · `sequence` · `gantt` · `risks` · `table` · `chart` · `entity` · `adr` · `timeline` · `cycle` `id: Title { … }` | blocks: mindmaps, swimlanes, kanban boards, sequence diagrams, gantt charts, risk matrices, tables, charts, database tables, decision records, timelines, cycles |
+| `mindmap` · `lanes` · `kanban` · `sequence` · `gantt` · `risks` · `table` · `chart` · `entity` · `schema` · `adr` · `timeline` · `cycle` `id: Title { … }` | blocks: mindmaps, swimlanes, kanban boards, sequence diagrams, gantt charts, risk matrices, tables, charts, database tables, database schemas (from a file), decision records, timelines, cycles |
 | `link: other.shape#id` | a link to an element on another board |
 | `comment [id] on TARGET by WHO: text` · `reply id: text` | review threads; add `[resolved, resolution: …]` to close one |
 | `title:` `direction:` `layout:` `routing:` `theme:` | settings |

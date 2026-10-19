@@ -69,6 +69,12 @@ PLANNING
   shape schedule FILE [CHART] [--as-of DATE] [--json]     gantt tasks planned vs forecast as of
                                      today (or DATE): late, behind, pushed back, how many days
 
+DATABASE SCHEMAS
+  shape schema FILE SCHEMA_FILE [--only 'users orders*'] [--label TEXT] [--into ID] [--dry-run]
+                                     put a schema file's tables on the board (Postgres
+                                     structure.sql, MySQL, SQLite, Rails schema.rb), or update them
+  shape schema FILE                  update every schema block from its file
+
 AI (your subscription's CLI: Claude Code, Codex, Gemini CLI)
   shape ask FILE "what to change" [--on ID,ID] [--dry-run] [--print]
                                      the model changes the board (ops; a reply that does not apply
@@ -137,6 +143,9 @@ const VALUE_FLAGS: &[&str] = &[
     "--as-of",
     "--in",
     "--canvas",
+    "--into",
+    "--only",
+    "--label",
 ];
 
 struct Args {
@@ -168,7 +177,7 @@ impl Args {
             "new", "open", "svg", "png", "html", "convert", "brief", "comments", "comment",
             "reply", "resolve", "prompt", "apply", "check", "fmt", "diff", "spec", "embed",
             "skills", "version", "help", "outline", "expand", "query", "add", "schedule", "ask",
-            "merge",
+            "merge", "schema",
         ];
         let cmd = match pos.first() {
             Some(c) if COMMANDS.contains(&c.as_str()) || c == "install-app" => pos.remove(0),
@@ -920,6 +929,82 @@ fn run(args: Args) -> Result<ExitCode, String> {
             write_out(args.val("-o"), text.as_bytes(), to)?;
             ok
         }
+        "schema" => {
+            let file = args.file(0)?;
+            let mut doc = load(file)?;
+            let dir = Path::new(file)
+                .parent()
+                .filter(|d| !d.as_os_str().is_empty())
+                .unwrap_or(Path::new("."))
+                .to_path_buf();
+            // (the canvas it is in, the block, its file's path from the board, the source)
+            let mut todo: Vec<(Vec<String>, Option<String>, String, String)> = Vec::new();
+            let blocks = schema_blocks(&doc, &[]);
+            match args.pos.get(1) {
+                Some(src) => {
+                    let rel = relative_to(&dir, Path::new(src));
+                    let found = match args.val("--into") {
+                        Some(id) => blocks.iter().find(|(_, g, _)| g == id),
+                        None => blocks.iter().find(|(_, _, f)| *f == rel),
+                    };
+                    let (at, into) = match found {
+                        Some((at, g, _)) => (at.clone(), Some(g.clone())),
+                        None => (Vec::new(), args.val("--into").map(String::from)),
+                    };
+                    todo.push((at, into, rel, read_text(src)?));
+                }
+                None => {
+                    for (at, id, f) in blocks {
+                        let text = read_text(&dir.join(&f).to_string_lossy())
+                            .map_err(|e| format!("schema `{id}`: {e}"))?;
+                        todo.push((at, Some(id), f, text));
+                    }
+                    if todo.is_empty() {
+                        return Err(format!(
+                            "{file} has no schema blocks with a file: add one with `shape schema {file} db/structure.sql`"
+                        ));
+                    }
+                }
+            }
+            let before = doc.clone();
+            for (at, into, rel, text) in todo {
+                let here = doc.at(&at).ok_or("no such canvas")?.clone();
+                let mut sync = match &into {
+                    Some(id) => {
+                        let mut with = here.clone();
+                        let mut first = Vec::new();
+                        if let Some(o) = args.val("--only") {
+                            first.push(serde_json::json!({"op": "update_group", "id": id, "only": o}));
+                            apply_json(&mut with, &first)?;
+                        }
+                        let s = shape_core::schemas::sync_ops(&with, id, &text)?;
+                        shape_core::schemas::Sync { ops: [first, s.ops].concat(), ..s }
+                    }
+                    None => shape_core::schemas::add_ops(
+                        &here,
+                        args.val("--label").unwrap_or("Database"),
+                        Some(&rel),
+                        args.val("--only"),
+                        &text,
+                    )?,
+                };
+                for w in &sync.warnings {
+                    eprintln!("{rel}: {w}");
+                }
+                eprintln!("{rel}: {}", sync.summary());
+                if !at.is_empty() {
+                    sync.ops = vec![serde_json::json!({"op": "in", "canvas": at.join("/"), "ops": sync.ops})];
+                }
+                apply_json(&mut doc, &sync.ops)?;
+            }
+            if args.flag("--dry-run") {
+                let d = shape_core::diff::diff(&before, &doc);
+                print!("{}", shape_core::diff::markdown(&d, &before, &doc));
+            } else if before != doc {
+                save(file, &doc)?;
+            }
+            ok
+        }
         "schedule" => {
             let file = args.file(0)?;
             let doc = load(file)?;
@@ -1513,4 +1598,41 @@ fn run(args: Args) -> Result<ExitCode, String> {
         }
         c => Err(format!("unknown command {c}")),
     }
+}
+
+/// Apply ops written as JSON values.
+fn apply_json(doc: &mut Document, ops: &[serde_json::Value]) -> Result<(), String> {
+    let ops = shape_core::ops::parse_ops(&serde_json::json!({ "ops": ops }).to_string())?;
+    shape_core::ops::apply(doc, &ops)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// `path` as seen from directory `dir` (`db/structure.sql`, `../api/db/schema.rb`),
+/// with `/` between the parts.
+pub(crate) fn relative_to(dir: &Path, path: &Path) -> String {
+    let abs = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    let (from, to) = (abs(dir), abs(path));
+    let a: Vec<_> = from.components().collect();
+    let b: Vec<_> = to.components().collect();
+    let common = a.iter().zip(&b).take_while(|(x, y)| x == y).count();
+    let mut parts: Vec<String> = vec!["..".into(); a.len() - common];
+    parts.extend(b[common..].iter().map(|c| c.as_os_str().to_string_lossy().into_owned()));
+    parts.join("/")
+}
+
+/// The schema blocks with a file, in the board and the canvases inside it:
+/// (the canvas's path, the block's id, its file).
+fn schema_blocks(doc: &Document, at: &[String]) -> Vec<(Vec<String>, String, String)> {
+    let mut out: Vec<_> = doc
+        .groups
+        .iter()
+        .filter(|g| g.schema)
+        .filter_map(|g| Some((at.to_vec(), g.id.clone(), g.file.clone()?)))
+        .collect();
+    for c in &doc.canvases {
+        let path = [at, &[c.id.clone()]].concat();
+        out.extend(schema_blocks(&c.doc, &path));
+    }
+    out
 }

@@ -156,7 +156,7 @@ fn kind_of(g: &Group) -> &'static str {
         "table"
     } else if g.chart.is_some() {
         "chart"
-    } else if g.entity {
+    } else if g.entity || g.schema {
         "entity"
     } else if g.sequence {
         "sequence"

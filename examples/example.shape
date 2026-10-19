@@ -264,23 +264,25 @@ canvas plan: Roadmap {
 }
 
 canvas data: Data & flows {
-  # Shape's own model as an ER diagram, an AI edit as a sequence, a release in swimlanes
+  # Shape's own model as an ER diagram (its tables from model.sql), an AI edit as a sequence, a release in swimlanes
 
-  entity boards: Boards {
-    path:  text [pk]
-    title: text
-    theme: text [null]
-  }
-  entity nodes: Nodes {
-    id:     text [pk]
-    board:  text [fk: boards, rel: drawn on]
-    parent: text [null]
-    label:  text [default: '']
-  }
-  entity edges: Edges {
-    id:   text [pk]
-    from: text [fk: nodes, rel: starts at]
-    to:   text [fk: nodes, rel: ends at]
+  schema model: Shape's model [file: model.sql] {
+    entity boards {
+      path:  text [pk]
+      title: text
+      theme: text [null]
+    }
+    entity nodes {
+      id:     text [pk]
+      board:  text [fk: boards, rel: drawn on]
+      parent: text [null]
+      label:  text [default: '']
+    }
+    entity edges {
+      id:   text [pk]
+      from: text [fk: nodes, rel: starts at]
+      to:   text [fk: nodes, rel: ends at]
+    }
   }
   entity comments: Comments {
     id [pk]

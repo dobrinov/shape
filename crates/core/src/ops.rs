@@ -404,6 +404,15 @@ pub enum Op {
         /// A database table (its nodes are columns).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         entity: Option<bool>,
+        /// A database schema: a section of tables from a schema file.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        schema: Option<bool>,
+        /// Schema: the file its tables come from, relative to the board ("" clears).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        file: Option<String>,
+        /// Schema: only the tables matching these globs ("" clears).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        only: Option<String>,
         /// A decision record with this status (proposed, accepted, rejected,
         /// superseded, deprecated); its nodes are its fields.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -474,6 +483,15 @@ pub enum Op {
         /// A database table (its nodes are columns).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         entity: Option<bool>,
+        /// A database schema: a section of tables from a schema file.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        schema: Option<bool>,
+        /// Schema: the file its tables come from, relative to the board ("" clears).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        file: Option<String>,
+        /// Schema: only the tables matching these globs ("" clears).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        only: Option<String>,
         /// A decision record with this status (proposed, accepted, rejected,
         /// superseded, deprecated); its nodes are its fields.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1829,6 +1847,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             screen,
             columns,
             entity,
+            schema,
+            file,
+            only,
             adr,
         } => {
             let id = new_id(
@@ -1866,6 +1887,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 None => None,
             };
             g.entity = entity.unwrap_or(false);
+            g.schema = schema.unwrap_or(false);
+            g.file = file.clone().filter(|f| !f.is_empty());
+            g.only = only.clone().filter(|o| !o.is_empty());
             g.adr = adr_status(adr)?;
             g.columns = columns.clone().unwrap_or_default();
             if let Some(c) = c.as_deref().filter(|c| !c.is_empty()) {
@@ -1908,6 +1932,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             screen,
             columns,
             entity,
+            schema,
+            file,
+            only,
             adr,
         } => {
             if let Some(Some(p)) = opt(parent) {
@@ -1968,6 +1995,15 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             if let Some(e) = entity {
                 g.entity = *e;
+            }
+            if let Some(v) = schema {
+                g.schema = *v;
+            }
+            if let Some(f) = file {
+                g.file = Some(f.clone()).filter(|f| !f.is_empty());
+            }
+            if let Some(o) = only {
+                g.only = Some(o.clone()).filter(|o| !o.is_empty());
             }
             if adr.is_some() {
                 g.adr = adr_status(adr)?;

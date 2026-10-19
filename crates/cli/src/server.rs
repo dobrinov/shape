@@ -104,6 +104,36 @@ fn target(url: &str, root: &Path) -> Option<Result<(PathBuf, String), String>> {
     })
 }
 
+/// Database schema files under the root (`structure.sql`, `schema.rb`,
+/// other `.sql` files), as paths from `dir`.
+fn schema_files(root: &Path, dir: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        let Ok(rd) = std::fs::read_dir(&d) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name.starts_with('.') || name == "target" || name == "node_modules" {
+                continue;
+            }
+            if p.is_dir() {
+                stack.push(p);
+            } else if name.ends_with(".sql") || name == "schema.rb" {
+                out.push(crate::relative_to(dir, &p));
+            }
+        }
+        if out.len() > 200 {
+            break;
+        }
+    }
+    // the usual places first
+    out.sort_by_key(|f| (!(f.ends_with("structure.sql") || f.ends_with("schema.rb")), f.clone()));
+    out
+}
+
 /// The boards under the root, for linking to one (hidden folders, `target`
 /// and `node_modules` left out).
 fn boards(root: &Path) -> Vec<String> {
@@ -342,6 +372,24 @@ fn listen(
                     200,
                     json!({ "ok": true, "staged": staged, "mtime": mtime(&file).to_string() }),
                 )
+            }
+            // a file the board reads (a schema block's), relative to the board
+            (Method::Get, "/api/source") => {
+                let rel = query_param(&url, "path").unwrap_or_default();
+                let dir = file.parent().unwrap_or(&root).to_path_buf();
+                match std::fs::canonicalize(dir.join(&rel)) {
+                    Ok(p) if p.starts_with(&root) && p.is_file() => match std::fs::read_to_string(&p) {
+                        Ok(source) => respond_json(req, 200, json!({ "ok": true, "path": rel, "source": source })),
+                        Err(e) => respond_json(req, 500, json!({ "ok": false, "error": format!("{rel}: {e}") })),
+                    },
+                    Ok(_) => respond_json(req, 403, json!({ "ok": false, "error": format!("{rel} is outside {}", root.display()) })),
+                    Err(_) => respond_json(req, 404, json!({ "ok": false, "error": format!("{rel} does not exist") })),
+                }
+            }
+            // database schema files in the project, relative to the board
+            (Method::Get, "/api/schemas") => {
+                let dir = file.parent().unwrap_or(&root).to_path_buf();
+                respond_json(req, 200, json!({ "files": schema_files(&root, &dir) }))
             }
             (Method::Get, "/api/boards") => respond_json(
                 req,

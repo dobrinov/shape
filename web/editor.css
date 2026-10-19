@@ -239,6 +239,11 @@
 .dge-toast { position: absolute; left: 50%; bottom: 66px; z-index: 40; display: flex; align-items: center; min-height: 30px; max-width: 70%; padding: 6px 12px; border-radius: var(--r-3); background: var(--fg); color: var(--bg); box-shadow: var(--shadow); font-size: 12px; opacity: 0; transform: translate(-50%, 8px); transition: .18s; pointer-events: none; }
 .dge-toast.show { opacity: 1; transform: translate(-50%, 0); }
 .dge-toast.error { background: var(--danger); color: #fff; }
+.dge-schema-field { display: block; margin: 12px 0 0; }
+.dge-schema-field > span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
+.dge .dge-schema-field .dge-select { width: 100%; }
+.dge-toast.act { pointer-events: auto; gap: 10px; }
+.dge .dge-toast-act { padding: 3px 10px; border: 0; border-radius: var(--r-2); background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 
 @media (max-width: 760px) {
   .dge-code { position: absolute; inset: 0 auto 0 0; z-index: 10; width: 88%; max-width: none; box-shadow: var(--shadow); }

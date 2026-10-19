@@ -122,6 +122,8 @@ fn fields_group(a: &Group, b: &Group) -> Vec<(String, String, String)> {
         ("color", opt(&a.color), opt(&b.color)),
         ("parent", opt(&a.parent), opt(&b.parent)),
         ("start", opt(&a.start), opt(&b.start)),
+        ("file", opt(&a.file), opt(&b.file)),
+        ("only", opt(&a.only), opt(&b.only)),
         (
             "levels",
             a.levels.map(|l| l.to_string()).unwrap_or_default(),

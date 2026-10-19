@@ -149,6 +149,16 @@
             });
           }
         },
+        // files the board reads: a schema block's structure.sql or schema.rb
+        sources: {
+          list: function () { return fetch(api("api/schemas")).then(function (r) { return r.json(); }).then(function (v) { return v.files || []; }); },
+          read: function (path) {
+            return fetch(api("api/source") + (FILE ? "&" : "?") + "path=" + encodeURIComponent(path)).then(function (r) { return r.json(); }).then(function (v) {
+              if (!v.ok) throw new Error(v.error);
+              return v.source;
+            });
+          }
+        },
         // a team's recipes (recipes/*.shape), for the AI and Insert recipe…
         recipes: function () {
           return fetch(api("api/recipes")).then(function (r) { return r.json(); }).then(function (v) { return v.ok ? v.recipes : {}; });

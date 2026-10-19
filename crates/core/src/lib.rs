@@ -45,6 +45,7 @@ pub mod tables;
 pub mod text;
 pub mod theme;
 pub mod timeline;
+pub mod schemas;
 pub mod todo;
 
 use serde::Serialize;

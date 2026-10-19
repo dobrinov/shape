@@ -49,6 +49,7 @@
     tidy: '<path d="M4 6h7M4 12h11M4 18h16"/>',
     decision: '<path d="M12 3l9 9-9 9-9-9z"/>',
     present: '<rect x="3.5" y="5" width="17" height="12" rx="2"/><path d="M12 17v3M8.5 20h7M10.5 9v4l3.5-2z"/>',
+    schema: '<ellipse cx="9" cy="5" rx="6" ry="2.2"/><path d="M3 5v9c0 1.2 2.7 2.2 6 2.2M15 5v4"/><rect x="11" y="11" width="10" height="9" rx="1.5"/><path d="M11 14.5h10"/>',
     entity: '<ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6"/>',
     table: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 5h16v4.5H4z" fill="currentColor" stroke="none"/><path d="M4 14.25h16M10 9.5V19M15 9.5V19"/>',
     chart: '<path d="M4 20h16"/><rect x="6" y="11" width="3" height="7" rx="0.5" fill="currentColor" stroke="none"/><rect x="11" y="6" width="3" height="12" rx="0.5" fill="currentColor" stroke="none"/><rect x="16" y="9" width="3" height="9" rx="0.5" fill="currentColor" stroke="none"/>',
@@ -369,6 +370,7 @@
         ["Specify", [
           ["sequence", "Sequence diagram", "Who talks to whom", go(addSequence)],
           ["entity", "Database table", "Columns and keys", go(addEntity)],
+          ["schema", "Database schema", "Tables from structure.sql, schema.rb…", go(addSchema)],
           ["lanes", "Swimlanes", "Steps across teams", go(addSwimlanes)],
           ["decision", "Decision point", "D · a diamond", go(function () { setTool("decision"); })],
           ["section", "Section", MOD + "G · around the selection", go(groupSelection)],
@@ -1845,9 +1847,10 @@
           overlay.appendChild(c);
         });
         // the one selected box (not a task, a screen's part or a list's item): its corner resizes it
+        // (the grip sits just outside it, clear of a link's or a canvas's badge)
         if (st.sel.length === 1 && st.sel[0] === id && !chartOf(id) && !screenOf(id) && !todoOf(id) && !(st.drag && st.drag.type === "size")) {
           var gs = 9 / Math.max(st.zoom, 0.5);
-          overlay.appendChild(svgEl("rect", { class: "dge-grip", "data-node": id, x: g.x + g.w - gs * 0.6, y: g.y + g.h - gs * 0.6, width: gs, height: gs, rx: gs * 0.25 }));
+          overlay.appendChild(svgEl("rect", { class: "dge-grip", "data-node": id, x: g.x + g.w + gs * 0.15, y: g.y + g.h + gs * 0.15, width: gs, height: gs, rx: gs * 0.25 }));
         }
       });
       var d = st.drag;
@@ -2100,7 +2103,9 @@
           ["Delete column", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
         ];
       }
+      var fromSchema = gr && gr.entity && gr.parent && schemaOf(gr.parent);
       if (gr && !view && gr.entity) return [
+        fromSchema && fromSchema.file && opts.sources ? ["Update from " + fromSchema.file, function () { updateFromFile(fromSchema.id); }, "Change the file, not the table: it is read again"] : null,
         ["Rename", function () { editLabel(t.id); }],
         ["Edit columns…", function () { editEntity(t.id); }, "name: type [pk, unique, null, fk: table.column]"],
         ["Add column", function () {
@@ -2112,7 +2117,7 @@
         }],
         "-",
         ["Delete", function () { applyOps([{ op: "remove", id: t.id, keep_members: false }]); select([]); }, "The table and its columns"]
-      ];
+      ].filter(Boolean);
       if (t.type === "node" && !view && recordOf(t.id)) {
         var rf = node(t.id), rg = recordOf(t.id);
         return [
@@ -2241,6 +2246,20 @@
         "-",
         ["Delete", function () { applyOps([{ op: "remove", id: t.id, keep_members: false }]); select([]); }, "The list and its items"]
       ];
+      if (gr && !view && gr.schema) return [
+        ["Rename", function () { editLabel(t.id); }],
+        gr.file && opts.sources ? ["Update from " + gr.file, function () { updateFromFile(t.id); }, "Read the file again"] : null,
+        ["Paste a new version…", function () { pasteSchema(t.id); }, "SQL or a Rails schema.rb"],
+        ["Tables to show…", function () {
+          askAt(st.menuAt, gr.only || "", "All, or e.g. users orders* billing.*", function (v) {
+            if (v === null || !applyOps([{ op: "update_group", id: t.id, only: v.trim() }]).ok) return;
+            if (gr.file && opts.sources) updateFromFile(t.id); else pasteSchema(t.id);
+          });
+        }, gr.only ? "Now: " + gr.only : "All of them now"],
+        ["Colour…", function () { colourMenu(t.id, "update_group", gr.color); }],
+        "-",
+        ["Delete", function () { applyOps([{ op: "remove", id: t.id, keep_members: false }]); select([]); }, "The schema and its tables"]
+      ].filter(Boolean);
       if (gr && !view && gr.screen) return [
         ["Rename", function () { editLabel(t.id); }],
         ["Edit as text…", function () { editScreen(t.id); }, "One component per line"],
@@ -3419,6 +3438,77 @@
       if (have.length) { select([have[0]]); reveal(have[0]); return flash("This board already has one: add to it (the AI does too)"); }
       if (applyOps([{ op: "merge", dsl: r.source }]).ok) { if (ids[0]) { select([ids[0]]); reveal(ids[0]); } flash("Inserted “" + r.name + "”: its rows are examples, write over them"); }
     }
+    /* Database schemas: a section of tables that come from a schema file
+       (structure.sql, a MySQL or SQLite dump, Rails' schema.rb), or from a
+       pasted one. The tables are ordinary tables on the board; updating
+       reads the file again and changes only what changed. */
+    function schemaOf(id) { var g = group(id); return g && g.schema ? g : null; }
+    function addSchema() {
+      var files = h("select", { class: "dge-select" }, [h("option", { value: "" }, ["Looking for schema files…"])]);
+      var only = h("input", { type: "text", placeholder: "All tables, or e.g. users orders* billing.*", spellcheck: "false" });
+      var ta = h("textarea", { class: "dge-chart-data", spellcheck: "false", rows: "8", placeholder: "CREATE TABLE users (\n  id uuid PRIMARY KEY,\n  email text NOT NULL UNIQUE\n);" });
+      if (opts.sources) Promise.resolve(opts.sources.list()).then(function (list) {
+        files.innerHTML = "";
+        files.appendChild(h("option", { value: "" }, [list.length ? "Choose a file…" : "No .sql or schema.rb files in this project"]));
+        list.forEach(function (f, i) { files.appendChild(h("option", { value: f, selected: i === 0 }, [f])); });
+      }, function () { files.innerHTML = ""; files.appendChild(h("option", { value: "" }, ["No schema files found"])); });
+      var add = function () {
+        var file = ta.value.trim() ? "" : files.value;
+        if (!file && !ta.value.trim()) return flash(opts.sources ? "Choose a file, or paste a schema" : "Paste a schema", true);
+        var make = function (src) {
+          var r = JSON.parse(st.session.schema_add_ops("Database", file, only.value.trim(), src));
+          if (!r.ok) return flash(r.error, true);
+          if (!applyOps(r.ops).ok) return;
+          closeModal();
+          var gid = r.ops[0].id;
+          select([gid]); reveal(gid);
+          flash((r.added.length === 1 ? "1 table" : r.added.length + " tables") + (file ? " from " + file : "") + (r.warnings.length ? " · " + r.warnings.length + " lines not understood" : ""), false, 3000);
+        };
+        if (file) opts.sources.read(file).then(make, function (e) { flash(e.message, true); });
+        else make(ta.value);
+      };
+      showModal("Database schema", h("div", {}, [
+        h("p", { class: "dge-muted" }, ["Its tables, keys and relationships go on the board as tables you can point arrows and comments at. Postgres structure.sql, MySQL and SQLite dumps and Rails' schema.rb work."]),
+        opts.sources ? h("label", { class: "dge-schema-field" }, [h("span", {}, ["From a file in this project (it stays the source: Update reads it again)"]), files]) : null,
+        h("label", { class: "dge-schema-field" }, [h("span", {}, [opts.sources ? "Or paste one" : "Paste the schema"]), ta]),
+        h("label", { class: "dge-schema-field" }, [h("span", {}, ["Only these tables (optional)"]), only])
+      ]), [
+        h("button", { onclick: closeModal }, ["Cancel"]),
+        h("button", { class: "primary", onclick: add }, ["Add tables"])
+      ]);
+    }
+    /* Bring schema `gid` up to date with `src`; `quiet` says nothing when it is. */
+    function syncSchema(gid, src, quiet) {
+      var r = JSON.parse(st.session.schema_sync_ops(gid, src));
+      if (!r.ok) return flash(r.error, true);
+      if (!r.ops.length) { if (!quiet) flash("The tables are up to date"); return; }
+      if (applyOps(r.ops).ok) flash("Updated: " + r.summary, false, 3000);
+    }
+    function updateFromFile(gid) {
+      var g = schemaOf(gid);
+      if (!g || !g.file || !opts.sources) return;
+      opts.sources.read(g.file).then(function (src) { syncSchema(gid, src); }, function (e) { flash(e.message, true); });
+    }
+    function pasteSchema(gid) {
+      var ta = h("textarea", { class: "dge-chart-data", spellcheck: "false", rows: "12", placeholder: "CREATE TABLE …" });
+      var go = function () { if (ta.value.trim()) { closeModal(); syncSchema(gid, ta.value); } };
+      ta.addEventListener("keydown", function (e) { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") go(); });
+      showModal("A new version of “" + (group(gid).label || gid) + "”", h("div", {}, [
+        h("p", { class: "dge-muted" }, ["Paste the schema (SQL or a Rails schema.rb): tables and columns that changed are updated, the rest stays as it is."]), ta
+      ]), [h("button", { onclick: closeModal }, ["Cancel"]), h("button", { class: "primary", onclick: go }, ["Update"])]);
+      setTimeout(function () { ta.focus(); }, 0);
+    }
+    /* On opening: a schema whose file changed since says so, with a button to update. */
+    function checkSchemas() {
+      if (view || !opts.sources || !st.doc) return;
+      (st.doc.groups || []).filter(function (g) { return g.schema && g.file; }).forEach(function (g) {
+        opts.sources.read(g.file).then(function (src) {
+          var r = JSON.parse(st.session.schema_sync_ops(g.id, src));
+          if (r.ok && r.ops.length) flashAction(g.file + " changed (" + r.summary + ")", "Update", function () { syncSchema(g.id, src); });
+        }, function () {});
+      });
+    }
+
     /* To-do lists: items with checkboxes, owners and due dates. */
     function todoOf(id) { var n = node(id), g = n && n.group && group(n.group); return g && g.todo ? g : null; }
     function doneOf(n) { return !!(n && n.done && n.done >= 100); }
@@ -4138,7 +4228,7 @@
       var g = group(t), n = node(t);
       if (n && n.canvas) return "canvas";
       if (n && n.mindmap) return "mindmap";
-      if (g) return g.todo ? "to-do list" : g.screen ? (g.screen === "web" ? "web page" : "screen") : g.timeline ? "timeline" : g.cycle ? "cycle" : g.kanban ? "kanban" : g.gantt ? "gantt" : g.risks ? "risks" : g.table ? "table" : g.chart ? "chart" : g.adr ? "decision" : g.sequence ? "sequence" : g.lanes ? "swimlanes" : g.entity ? "table" : "section";
+      if (g) return g.todo ? "to-do list" : g.screen ? (g.screen === "web" ? "web page" : "screen") : g.timeline ? "timeline" : g.cycle ? "cycle" : g.kanban ? "kanban" : g.gantt ? "gantt" : g.risks ? "risks" : g.table ? "table" : g.chart ? "chart" : g.adr ? "decision" : g.sequence ? "sequence" : g.lanes ? "swimlanes" : g.entity ? "table" : g.schema ? "schema" : "section";
       return "box";
     }
     // what can be a slide: the top-level sections and blocks, mindmaps and
@@ -4916,6 +5006,16 @@
       toastTimer = setTimeout(function () { toast.className = "dge-toast"; }, ms || (isError ? 5000 : 1800));
     }
 
+    /* A message with a button that does something; it stays a while. */
+    function flashAction(msg, label, act) {
+      clearTimeout(toastTimer);
+      toast.innerHTML = "";
+      toast.appendChild(h("span", {}, [msg]));
+      toast.appendChild(h("button", { class: "dge-toast-act", onclick: function () { toast.className = "dge-toast"; act(); } }, [label]));
+      toast.className = "dge-toast show act";
+      toastTimer = setTimeout(function () { toast.className = "dge-toast"; }, 12000);
+    }
+
     function closeMenu() { menu.hidden = true; }
 
     /* A comment's avatar: its author's initials (lines of text without one). */
@@ -5416,6 +5516,8 @@
       if (opts.requireName && !st.author && !view) askName(then); else then();
     }, 300);
     // a team's recipes reach the AI's prompts and Insert recipe…
+    // a schema block whose file changed offers to update
+    if (opts.sources) setTimeout(checkSchemas, 1200);
     if (opts.recipes) Promise.resolve(opts.recipes()).then(function (files) { if (files && st.session.set_recipes) st.session.set_recipes(JSON.stringify(files)); }).catch(function () {});
     return api;
   }

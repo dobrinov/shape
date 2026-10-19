@@ -261,6 +261,12 @@ export interface Group {
   columns?: string[];
   /** A database table (its nodes are columns). */
   entity?: boolean;
+  /** A database schema: a section of tables (`entity` groups) from a schema file. */
+  schema?: boolean;
+  /** Schema: the file its tables come from, relative to the board. */
+  file?: string;
+  /** Schema: only the tables matching these globs (`users orders*`). */
+  only?: string;
   /** A decision record with this status; its nodes are its fields (label = name, detail = text). */
   adr?: AdrStatus;
   /** Chart: its size. */
@@ -593,6 +599,12 @@ export interface AddGroupOp {
   columns?: string[];
   /** A database table (its nodes are columns). */
   entity?: boolean;
+  /** A database schema: a section of tables (`entity` groups) from a schema file. */
+  schema?: boolean;
+  /** Schema: the file its tables come from, relative to the board. */
+  file?: string;
+  /** Schema: only the tables matching these globs (`users orders*`). */
+  only?: string;
   /** A decision record with this status; its nodes are its fields (label = name, detail = text). */
   adr?: AdrStatus;
   /** Gantt chart: its first day (`YYYY-MM-DD`). */
@@ -643,6 +655,12 @@ export interface UpdateGroupOp {
   columns?: string[];
   /** A database table (its nodes are columns). */
   entity?: boolean;
+  /** A database schema: a section of tables (`entity` groups) from a schema file. */
+  schema?: boolean;
+  /** Schema: the file its tables come from, relative to the board. */
+  file?: string;
+  /** Schema: only the tables matching these globs (`users orders*`). */
+  only?: string;
   /** A decision record with this status; its nodes are its fields (label = name, detail = text). */
   adr?: AdrStatus;
 }
@@ -835,6 +853,8 @@ export interface GroupBox extends Rect {
   todo?: boolean;
   /** A database table. */
   entity?: boolean;
+  /** A database schema. */
+  schema?: boolean;
 }
 
 export interface EdgePath {

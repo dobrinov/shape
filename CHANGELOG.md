@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.60.0 — 2026-10-19
+
+- **Database schemas:** `schema db: Database [file: db/structure.sql] { … }` puts the tables of a real schema file on the board: a Postgres `structure.sql`, a MySQL or SQLite dump, or a Rails `schema.rb`, read by the parser of [schema](https://github.com/dobrinov/schema). Columns keep their types, primary keys, unique columns, nullability, defaults and foreign keys (drawn with crow's feet).
+  - The tables are ordinary tables on the board: point arrows and comments at them, see them in perspectives and prompts, and review a branch's schema change in the board's diff.
+  - The file stays the source. `shape schema BOARD db/structure.sql` adds a schema (or updates the one from that file; `--only 'users orders*'` keeps some tables); `shape schema BOARD` updates every schema from its file, in canvases too. Updating changes only what changed, and keeps what you added on the board, like a relationship's name.
+  - In the editor: *Blocks → Database schema* lists the schema files in the project (or takes a pasted one). When the file has changed, opening the board offers *Update*. Right-click a schema → *Update from FILE*, *Paste a new version…*, *Tables to show…*.
+  - The example board's *Data & flows* canvas reads Shape's model from `examples/model.sql`.
+- Fixed: the resize grip (0.59.0) sat on a box's link or canvas badge and stopped clicks on it; it now sits just outside the corner.
+
 ## 0.59.0 — 2026-10-19
 
 From a beta tester's notes:

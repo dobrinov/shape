@@ -136,7 +136,7 @@ fn pick(doc: &Document, sel: &str) -> Result<Vec<String>, String> {
                     "cycle" => doc.groups.iter().filter(|g| g.cycle).map(|g| g.id.clone()).collect(),
                     "todo" | "checklist" => doc.groups.iter().filter(|g| g.todo).map(|g| g.id.clone()).collect(),
                     "screen" | "wireframe" => doc.groups.iter().filter(|g| g.screen.is_some()).map(|g| g.id.clone()).collect(),
-                    "entity" | "schema" => doc.groups.iter().filter(|g| g.entity).map(|g| g.id.clone()).collect(),
+                    "entity" | "schema" => doc.groups.iter().filter(|g| g.entity || g.schema).map(|g| g.id.clone()).collect(),
                     "lanes" | "swimlanes" => doc.groups.iter().filter(|g| g.lanes).map(|g| g.id.clone()).collect(),
                     "sequence" => doc.groups.iter().filter(|g| g.sequence).map(|g| g.id.clone()).collect(),
                     "kanban" => doc.groups.iter().filter(|g| g.kanban).map(|g| g.id.clone()).collect(),

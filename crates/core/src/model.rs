@@ -524,6 +524,17 @@ pub struct Group {
     /// A database table: its nodes are columns.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub entity: bool,
+    /// A database schema: a section whose tables (`entity` groups) come
+    /// from a schema file (see [`crate::schemas`]).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub schema: bool,
+    /// Schema: the file its tables come from (`db/structure.sql`), relative
+    /// to the board.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// Schema: only the tables matching these globs (`users orders*`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub only: Option<String>,
     /// A table: its nodes are rows; these are its columns' names.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub table: bool,

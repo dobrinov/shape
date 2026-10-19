@@ -52,6 +52,7 @@ Edits keep the file as it is written. Ops, the editor and `shape apply` rewrite 
 | `lanes id: Title {` … `lane id: Title {` … `}` … `}` | swimlanes: each `lane` is a band (a row when the flow runs right or left, a column when it runs down or up) with its title at the side; the flow runs across lanes |
 | `gantt id: Title [start: YYYY-MM-DD] {` … `}` | a gantt chart: one task per line, `Label [5d, after: other-task]` (see *Gantt charts*) |
 | `entity id: Name {` … `}` | a database table: one column per line, `email: text [unique]` (see *Database tables*) |
+| `schema id: Name [file: db/structure.sql] {` … `}` | a database schema: its tables, from a schema file (see *Database schemas*) |
 | `table id: Title {` … `}` | a table: a header row, then rows of cells separated by `\|` (see *Tables*) |
 | `chart id: Title [bar] {` … `}` | a chart: a small table, `Q1 \| 120 \| 80` (see *Charts*) |
 | `risks id: Title [scale: 5] {` … `}` | a risk matrix: one risk per line, `Label [p: 4, i: 3, owner: ana, detail: "…"]` (see *Risk matrices*) |
@@ -295,6 +296,27 @@ entity users: Users {
 - A foreign key is drawn as a line from the column to the column it references, and pulls related tables together in the layout. Columns show a `PK` / `FK` / `UQ` badge, their type, and `?` when nullable; hovering one shows everything about it.
 - Reviewing a schema change: `shape diff old.shape new.shape` lists columns added, dropped and changed (type, keys, references, default), and `shape svg new.shape --base old.shape` (or `--base HEAD`) shows them in green, red and amber.
 - In the editor: the *Database table* tool; right-click a table → *Edit columns…* (the columns as text), *Add column*; right-click a column → *Edit column…*, *Colour…*, *Delete column*. Prompts show a table as a Markdown table of its columns. In JSON a table is a group with `entity`; its columns are nodes with `column: {type, pk, unique, null, fk, default}`.
+
+### Database schemas
+
+```shape
+schema db: Database [file: db/structure.sql, only: users teams] {
+  entity teams {
+    id:   bigint [pk]
+    name: text
+  }
+  entity users {
+    id:      bigint [pk]
+    team_id: bigint [null, fk: teams]
+    email:   text [unique]
+  }
+}
+```
+
+- A schema is a section of database tables that come from a schema file: a Postgres `structure.sql` (`pg_dump --schema-only`), a MySQL or SQLite dump, or a Rails `schema.rb`, read by [schema](https://github.com/dobrinov/schema)'s parser. `file:` is relative to the board; `only:` keeps the tables matching its globs (`users orders* billing.*`). Rails' `schema_migrations` and `ar_internal_metadata` are left out unless `only` names them.
+- Its tables are ordinary tables (see *Database tables*), written into the board, so arrows, comments, perspectives, prompts and `shape diff` work on them, and a branch's schema change shows in the board's diff. A table's id is its name (`billing_invoices` for one in another schema than `public`, labelled `billing.invoices`; the schema's id and the name when the name is taken). Keys of one column become `fk:`; defaults with brackets or commas are left out.
+- The file stays the source: change it, then update. `shape schema BOARD db/structure.sql` adds a schema (`--label`, `--only`) or updates the one from that file; `shape schema BOARD` updates every schema from its file; `--dry-run` shows what would change. Updating adds, changes and removes tables and columns, and keeps what the board adds to a column: its colour, detail and relationship name (`rel:`).
+- In the editor: *Blocks → Database schema* picks a schema file in the project (or takes a pasted one). When a schema's file has changed, opening the board offers *Update*. Right-click a schema → *Update from FILE*, *Paste a new version…*, *Tables to show…*. In JSON a schema is a group with `"schema": true`, `file` and `only`; ops: `add_group` / `update_group` with them.
 
 ### Tables
 

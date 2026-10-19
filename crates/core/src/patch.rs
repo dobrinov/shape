@@ -409,6 +409,7 @@ fn edit_lines(
                     || n.screen.is_some() != g.screen.is_some()
                     || n.todo != g.todo
                     || n.entity != g.entity
+                    || n.schema != g.schema
                     || n.adr.is_some() != g.adr.is_some() =>
             {
                 return None

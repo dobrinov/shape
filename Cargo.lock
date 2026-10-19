@@ -2109,6 +2109,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "schema-core"
+version = "0.7.3"
+source = "git+https://github.com/dobrinov/schema?tag=v0.7.3#3e7c45c84abcc0606d5009cd2de09fb41e0a53b2"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2219,7 +2228,7 @@ dependencies = [
 
 [[package]]
 name = "shape"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "muda",
  "objc2",
@@ -2236,15 +2245,16 @@ dependencies = [
 
 [[package]]
 name = "shape-core"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
+ "schema-core",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "shape-wasm"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "serde",
  "serde_json",

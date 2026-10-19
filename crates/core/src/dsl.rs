@@ -424,7 +424,7 @@ impl Parser {
         };
         let word = match word {
             "group" | "gantt" | "risks" | "chart" | "table" | "entity" | "adr" | "mindmap"
-            | "timeline" | "cycle"
+            | "timeline" | "cycle" | "schema"
                 if !opens =>
             {
                 ""
@@ -436,6 +436,11 @@ impl Parser {
             "group" if c.rest()[5..].starts_with(|ch: char| ch.is_whitespace()) => {
                 c.advance(5);
                 return self.group_decl(c, false);
+            }
+            // a database schema: a section of tables that come from a file
+            "schema" if c.rest()[6..].starts_with(|ch: char| ch.is_whitespace()) => {
+                c.advance(6);
+                return self.group_decl_as(c, false, true);
             }
             // swimlanes; only as block openers, so `lane -> x` stays an edge
             "lanes" | "lane"
@@ -1949,7 +1954,11 @@ impl Parser {
         Ok(())
     }
 
-    fn group_decl(&mut self, mut c: Cursor, lanes: bool) -> Result<(), String> {
+    fn group_decl(&mut self, c: Cursor, lanes: bool) -> Result<(), String> {
+        self.group_decl_as(c, lanes, false)
+    }
+
+    fn group_decl_as(&mut self, mut c: Cursor, lanes: bool, schema: bool) -> Result<(), String> {
         c.skip_ws();
         let (id, qlabel) = c.reference()?;
         let (label, attrs) = label_and_attrs_until_brace(&mut c)?;
@@ -1980,6 +1989,7 @@ impl Parser {
             g.parent = parent;
         }
         g.lanes = lanes || (again && g.lanes);
+        g.schema = schema || (again && g.schema);
         if let Some(l) = label.or(qlabel) {
             g.label = l;
         }
@@ -1990,7 +2000,12 @@ impl Parser {
                 // a section (or swimlanes) placed by hand: its top-left
                 ("x", Some(v)) => g.x = Some(num("x", v)?),
                 ("y", Some(v)) => g.y = Some(num("y", v)?),
+                ("file", Some(v)) if schema => g.file = Some(v.clone()).filter(|v| !v.is_empty()),
+                ("only", Some(v)) if schema => g.only = Some(v.clone()).filter(|v| !v.is_empty()),
                 (c, None) if valid_color(c) => g.color = Some(c.to_string()),
+                (k, _) if schema => {
+                    return Err(format!("unknown schema attribute `{k}` (file, only, color, x, y)"))
+                }
                 (k, _) => return Err(format!("unknown group attribute `{k}`")),
             }
         }
@@ -2309,6 +2324,8 @@ const KEYS: &[&str] = &[
     "type",
     "kind",
     "unit",
+    "file",
+    "only",
 ];
 
 /// Attributes whose value is free text: a `,` or `;` in it, followed by
@@ -3808,6 +3825,8 @@ pub(crate) fn group_header(doc: &Document, g: &Group) -> String {
         "column"
     } else if doc.is_lane(g) {
         "lane"
+    } else if g.schema {
+        "schema"
     } else {
         "group"
     };
@@ -3817,6 +3836,12 @@ pub(crate) fn group_header(doc: &Document, g: &Group) -> String {
         line.push_str(&label_text(&g.label));
     }
     let mut a = Vec::new();
+    if let Some(f) = &g.file {
+        a.push(format!("file: {f}"));
+    }
+    if let Some(o) = &g.only {
+        a.push(format!("only: {o}"));
+    }
     if let Some(c) = &g.color {
         a.push(if c.starts_with('#') {
             format!("color: {c}")
