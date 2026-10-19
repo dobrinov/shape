@@ -60,7 +60,7 @@
   </div>
   <div class="hero-demo">
     <div class="demo-frame" data-shape data-mode="edit" data-theme="dark"><script type="text/plain">{{HERO}}</script></div>
-    <p class="caption">This is the real editor, running in your browser. Double-click <b>Delivery plan</b> to open the board inside it, or right-click anything.</p>
+    <p class="caption">This is the real editor, running in your browser. It is Shape’s own board. Double-click <b>Roadmap</b> to open the board inside it, or right-click anything.</p>
   </div>
 </section>
 
@@ -112,7 +112,7 @@
     <h2>Wireframes and flows, in minutes</h2>
     <p class="sub">Sketch the product before anyone opens a design tool. Pick a phone, a tablet or a browser window, click components in, and draw the flow with an arrow from a button to the screen it opens. It sits on the same board as the plan, the data model and the decisions it depends on.</p>
   </div>
-  <figure class="shot wide"><img src="tour/flow.svg" alt="A sign-up flow: two phone screens leading to a web dashboard" loading="lazy"><figcaption>Sign up, welcome, dashboard: three screens and the flow between them, in about 30 lines.</figcaption></figure>
+  <figure class="shot wide"><img src="tour/flow.svg" alt="Shape on a phone, an idea: a list of boards, a perspective picker, and the board opened on a laptop" loading="lazy"><figcaption>An idea for Shape on a phone: pick a board, choose who is looking, open it on a laptop. Three screens and the flow between them, in about 30 lines.</figcaption></figure>
   <div class="grid">
     <article>
       <div class="ico">▭</div>
@@ -139,32 +139,31 @@
 
 <section id="prompts" class="split reverse">
 <pre class="code"><span class="c"># ⌘⇧C: the board, as a spec to build from</span>
-# Build: Checkout relaunch
+# Build: Shape on a phone
 
 The board below describes what to build…
 
-## The new checkout, screen by screen
+## Screens
 
-### Pay (wireframe screen, mobile: its components top to bottom)
-- header: Payment
-- stepper: Cart | Pay | Done
-- card: Visa •••• 4242 — Saved card
-- toggle: Save this card
-- button: Pay £42.00 (blue)
+### Open as (wireframe screen, mobile: its components top to bottom)
+- header: Roadmap
+- title: Who is looking?
+- radio: Full board | Product | Delivery | Business
+- button: Open (blue)
 
 ### Connections
-- Checkout → Pay: checkout
-- Pay £42.00 → Order placed: pays
+- Roadmap → Open as: opens
+- Open → Roadmap: on a laptop
 
 ## Data &amp; flows
-### Saved cards (database table `cards`)
+### Boards (database table `boards`)
 | column | type | key | references |
 |---|---|---|---|
-| id | uuid | PK | |
-| customer_id | uuid | | customers |
+| path | text | PK | |
+| theme | text | | |
 
 ## Comments
-- On Payments: Should payments own its own database?</pre>
+- On Open as: Remember the last perspective?</pre>
   <div>
     <h2>Draw the spec. Let the AI build it.</h2>
     <p>For a complex build, the best prompt is a picture of it. Lay out the system, the screens, the data model and the decisions on a board, then press <kbd>⌘⇧C</kbd>. Shape writes the whole thing up as a clean Markdown spec, with every part, every arrow and every open question, ready to paste into Claude, ChatGPT, Cursor or your coding agent.</p>
@@ -183,13 +182,13 @@ The board below describes what to build…
     <h2>One board, every audience</h2>
     <p>The same board tells the story differently to different people. Nobody keeps a separate copy for the board meeting.</p>
     <ul class="checks">
-      <li><b>Perspectives</b>: Senior management sees decisions, risks and the timeline. Legal sees the records. Design sees the screens and the user journey. Each view is one click away, and the AI tags the board for them.</li>
+      <li><b>Perspectives</b>: Business sees decisions, risks and the timeline. Delivery sees who does what by when. Design sees the screens and the user journey. Each view is one click away, and the AI tags the board for them.</li>
       <li><b>Presentation mode</b>: pick the sections, add speaker notes, and present. The view glides across the board from slide to slide, with no deck to keep in sync.</li>
       <li><b>Wireframes</b>: sketch phone and web screens as text and draw the flow with arrows from the buttons.</li>
       <li><b>Comments with names</b> on any box or arrow, and a full history to go back to.</li>
     </ul>
   </div>
-  <figure class="shot"><img src="tour/timeline.svg" alt="A timeline with the important moments starred" loading="lazy"><figcaption>What leadership opens: where we are, and the moments that mattered.</figcaption></figure>
+  <figure class="shot"><img src="tour/timeline.svg" alt="A timeline with the important moments starred" loading="lazy"><figcaption>What Business opens: Shape so far, and the moments that mattered.</figcaption></figure>
 </section>
 
 <section id="features" class="features">
@@ -229,9 +228,9 @@ The board below describes what to build…
     </ul>
   </div>
   <figure class="shot ai-demo">
-    <div class="ai-ask"><span class="ai-you">You</span>Add a read-through cache and retry failed webhooks</div>
-    <img src="tour/ask.svg" alt="The board after the request: a Redis cache and webhook retries added in green, the direct write to Postgres it replaced in red" loading="lazy">
-    <div class="ai-bar"><span class="ai-spark">✦</span><span class="ai-note">Put Redis in front of Postgres and retry webhooks on failure. 5 added, 1 removed.</span><span class="ai-keep">Keep</span><span class="ai-discard">Discard</span></div>
+    <div class="ai-ask"><span class="ai-you">You</span>Bring ../schema onto the board as a block</div>
+    <img src="tour/ask.svg" alt="Shape’s board after the request: a Schema block on schema-core added in green, the entity tables’ own code it replaces in red" loading="lazy">
+    <div class="ai-bar"><span class="ai-spark">✦</span><span class="ai-note">Added a Schema block on schema-core; it replaces the entity tables’ own code. 2 added, 1 removed.</span><span class="ai-keep">Keep</span><span class="ai-discard">Discard</span></div>
     <figcaption>What you asked, and what the AI changed on the board: added in green, removed in red. Nothing changes until you keep it.</figcaption>
   </figure>
 </section>
@@ -261,39 +260,39 @@ The board below describes what to build…
       <li>Models read short outlines and small edits, never coordinates, so AI calls stay cheap</li>
     </ul>
   </div>
-<pre class="code"><span class="c"># docs/launch.shape</span>
-kanban sprint: Sprint 12 {
+<pre class="code"><span class="c"># docs/roadmap.shape</span>
+kanban week: This week {
   column todo: To do {
-    saved: Saved cards [owner: ana]
+    schema: Schema block [owner: deyan]
   }
   column doing: Doing {
-    onepage: One-page checkout [blue]
+    site: Landing page [blue]
   }
 }
 
-screen pay: Pay [mobile] {
-  header: Payment
-  card saved: Visa •••• 4242
-  button pay-now: Pay £42.00 [blue]
+screen view: Open as [mobile] {
+  title: Who is looking?
+  radio: Full board | Product | Delivery
+  button open: Open [blue]
 }
 
-timeline launch: Launch {
-  2026-10-28: Open beta [important]
-  2026-11-26: Launch
+timeline shape: Shape, so far {
+  2026-10-07: First release
+  2026-10-18: Renamed to Shape [important]
 }
 
-comment on onepage by mia: Behind a flag?</pre>
+comment on schema by mia: Its own perspective?</pre>
 </section>
 
 <section id="agents" class="split reverse">
 <pre class="code"><span class="c"># in your terminal</span>
-<span class="p">$</span> shape ask docs/launch.shape "split Build into API and UI"
+<span class="p">$</span> shape ask docs/roadmap.shape "split Build into API and UI"
 
 <span class="c"># comments → a task for your coding agent</span>
-<span class="p">$</span> shape prompt docs/launch.shape --target code
+<span class="p">$</span> shape prompt docs/roadmap.shape --target code
 
 <span class="c"># let an agent read a few lines, not the whole board</span>
-<span class="p">$</span> shape query docs/launch.shape kind:kanban near:onepage</pre>
+<span class="p">$</span> shape query docs/roadmap.shape kind:kanban near:schema</pre>
   <div>
     <h2>Made for coding agents too</h2>
     <p>Install the bundled skills and Claude Code (or any agent) can read, draw and grow boards with few tokens.</p>
@@ -311,8 +310,8 @@ shape skills install --global <span class="c"># ~/.claude/skills</span></pre>
 
 &lt;div data-shape data-mode="view" style="height:420px"&gt;
   &lt;script type="text/plain"&gt;
-    user: Customer [person]
-    user -> api: POST /orders
+    you: You [person]
+    you -> board: draws the plan
   &lt;/script&gt;
 &lt;/div&gt;
 

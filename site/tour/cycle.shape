@@ -1,6 +1,6 @@
-cycle loop: Build, measure, learn [blue] {
-  Ship a slice
-  Watch the numbers
-  Talk to five users
-  Decide what is next
+cycle loop: How Shape ships [blue] {
+  Build a slice
+  Release and tag it
+  Beta testers try it
+  Read their notes
 }

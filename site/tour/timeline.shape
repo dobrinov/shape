@@ -1,7 +1,8 @@
-timeline launch: Saved cards, so far {
-  2026-09-03: Google Pay allowlist rejected [red]
-  2026-09-24: Design signed off
-  2026-10-14: First real card payment [important, green]
-  2026-10-28: Open beta [important]
-  2026-11-26: Launch
+timeline shape: Shape, so far {
+  2026-10-07: First release, v0.1
+  2026-10-11: Restart: mindmaps first [important]
+  2026-10-15: Binaries for every OS
+  2026-10-18: Seven tags pushed, no builds [red]
+  2026-10-18: Renamed to Shape [important, green]
+  2026-10-19: Beta testers' notes shipped
 }

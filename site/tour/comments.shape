@@ -1,13 +1,15 @@
 # render: --comments open
-user: Customer [person]
-group backend: Backend [blue] {
-  api: Orders API [detail: Rust · Axum]
-  db: Postgres [cylinder]
+user: You [person]
+group app: Shape [blue] {
+  editor: Editor [detail: browser or its own window]
+  server: Local server [detail: Rust]
 }
-stripe: Stripe [cloud, purple]
-user -> api: POST /orders
-api -> db
-api -> stripe: charge
-comment on api by deyan: Should payments be a service of its own?
-reply c1 by ana: Not before launch.
-comment on stripe by sam: Retry the webhook?
+repo: Git repo [cylinder]
+ai: Your AI CLI [cloud, purple]
+user -> editor
+editor -> server: /api/file
+server -> repo: commit
+server -> ai: prompt
+comment on server by deyan: Should the server sync with GitHub too?
+reply c1 by mia: Not yet: git is the sync.
+comment on ai by sam: Explain what to do when no AI is signed in?

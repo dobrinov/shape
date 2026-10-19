@@ -1,6 +1,7 @@
-table raci: Who does what {
-  task      | lead | PM | VP Eng
-  Discovery | R    | A  | I
-  Spec      | A    | R  | C
-  Release   | R    | C  | A [green]
+table raci: Who does what on Shape {
+  task     | Owner | Claude | Beta testers
+  Ideas    | A     | C      | R
+  Build    | A     | R      | I
+  Release  | A     | R      | I [green]
+  Feedback | I     | C      | R
 }

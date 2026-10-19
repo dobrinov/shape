@@ -1,7 +1,9 @@
 theme: blueprint
-web: Storefront [rounded, detail: Next.js]
-api: Orders API [detail: Rust]
-db: Postgres [cylinder]
-mail: E-mail [cloud]
-web -> api -> db
-api ..> mail: receipt
+editor: Editor [rounded, detail: no build step]
+wasm: shape-wasm
+core: shape-core [detail: Rust]
+cli: shape CLI [detail: Rust]
+ai: Your AI [cloud]
+editor -> wasm -> core
+cli -> core
+cli ..> ai: prompt

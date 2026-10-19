@@ -1,8 +1,9 @@
-# render: --as-of 2026-10-30
-gantt launch: Launch plan [start: 2026-10-12] {
-  Design [5d, owner: mia, done]
-  Build [2w, after: design, done: 40%]
-  Docs [3d, after: design, purple]
-  Beta [1w, after: build, orange]
-  Launch day [after: beta docs, milestone, green]
+# render: --as-of 2026-10-27
+gantt next: What's next for Shape [start: 2026-10-17] {
+  To-do lists [2d, owner: deyan, done]
+  Beta notes [1d, after: to-do-lists, done]
+  Schema block [2w, after: beta-notes, done: 40%]
+  Linux window [1w, after: beta-notes, purple]
+  npm package [3d, after: schema-block, orange]
+  Shape 1.0 [after: npm-package linux-window, milestone, green]
 }

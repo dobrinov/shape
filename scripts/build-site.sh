@@ -55,7 +55,7 @@ done
 cp "$ROOT/web/app.js" "$ROOT/web/editor.js" "$ROOT/web/editor.css" "$ROOT/web/favicon.svg" "$OUT/app/"
 cp "$ROOT/web/pkg/shape_wasm.js" "$ROOT/web/pkg/shape_wasm_bg.wasm" "$OUT/app/pkg/"
 STATIC='<script>window.SHAPE_STATIC = { shareUrl: "'"$SITE_URL"'app/", examples: [
-  { name: "Checkout relaunch (every feature)", url: "../examples/example.shape" }
+  { name: "Shape, built in public (every feature)", url: "../examples/example.shape" }
 ] };</script>'
 python3 - "$ROOT/web/index.html" "$OUT/app/index.html" "$STATIC" <<'PY'
 import sys

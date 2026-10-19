@@ -1,31 +1,26 @@
-screen signup: Sign up [mobile] {
-  header: Acme
-  title: Create your account
-  input name: Name
-  input email: Work e-mail
-  password: Password
-  checkbox: I agree to the terms
-  button go: Create account [blue]
-  divider: or
-  button google: Continue with Google
+screen boards: Your boards [mobile] {
+  header: shape
+  search: Find a board
+  card roadmap: Roadmap [detail: 3 open comments · updated today]
+  card beta: Beta notes [detail: 6 shipped in v0.59]
+  button new: New board [blue]
+  tabbar: Boards | Comments | Me
 }
-screen welcome: Welcome [mobile] {
-  header: Welcome
-  stepper: Account | Team | Done
-  avatar: Ana Bell | Product lead
-  card invite: Invite your team [detail: They see the same boards and leave comments.]
-  buttons: Skip | Invite [blue]
-  tabbar: Home | Boards | Inbox | Me
+screen view: Open as [mobile] {
+  header: Roadmap
+  title: Who is looking?
+  radio: Full board | Product | Delivery | Business
+  button open: Open [blue]
 }
-screen dashboard: Dashboard [web] {
-  navbar: Acme | Boards | People | Sign out
-  sidebar: Overview | Boards | Templates | Settings
-  breadcrumb: Home | Overview
-  title: Good morning, Ana
-  badges: 3 new comments | 1 review
-  table: Board | Owner | Updated
-  chart: Activity this week
+screen editor: Roadmap [web] {
+  navbar: shape | Boards | History | Present
+  sidebar: Full board | Product | Delivery | Business
+  breadcrumb: Roadmap | Delivery
+  title: Delivery
+  badges: 2 open comments | 1 to-do overdue
+  table: Block | Kind | Updated
+  chart: Releases this week
 }
 
-signup.go -> welcome: signs up
-welcome.buttons -> dashboard: invites
+boards.roadmap -> view: opens
+view.open -> editor: on a laptop

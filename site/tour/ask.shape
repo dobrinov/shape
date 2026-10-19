@@ -1,8 +1,8 @@
 # render: --base _ask-before.shape
-api: Orders API [detail: Rust · Axum]
-cache: Redis [cylinder]
-db: Postgres [cylinder]
-queue: Webhook retries [pill]
-api -> cache: read-through
-cache -> db
-api ..> queue: on failure
+editor: Editor [detail: web/editor.js]
+core: shape-core [detail: Rust]
+schema: schema-core [cylinder, detail: ../schema]
+block: Schema block [pill]
+editor -> block: draws
+block -> core
+core -> schema: tables and keys

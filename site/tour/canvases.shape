@@ -1,23 +1,23 @@
 group inside: Inside this board {
-  discovery: Discovery [pill, blue, canvas: discovery]
-  plan: Delivery plan [canvas: plan, detail: gantt · kanban · risks]
-  data: Data & flows [text, canvas: data]
-  metrics: Metrics [sticky, yellow, canvas: metrics]
+  discovery: Beta notes [pill, blue, canvas: discovery]
+  plan: Roadmap [canvas: plan, detail: gantt · kanban · risks]
+  data: How it works [text, canvas: data]
+  metrics: Releases [sticky, yellow, canvas: metrics]
 }
 discovery -> plan -> data
 
-canvas discovery: Discovery {
-  a: Interviews
+canvas discovery: Beta notes {
+  a: Resize from the corner
 }
 
-canvas plan: Delivery plan {
-  b: Launch
+canvas plan: Roadmap {
+  b: Schema block
 }
 
-canvas data: Data & flows {
-  c: Orders
+canvas data: How it works {
+  c: Ops
 }
 
-canvas metrics: Metrics {
-  d: Conversion
+canvas metrics: Releases {
+  d: Releases per day
 }

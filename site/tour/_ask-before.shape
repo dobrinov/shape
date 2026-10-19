@@ -1,3 +1,4 @@
-api: Orders API [detail: Rust · Axum]
-db: Postgres [cylinder]
-api -> db
+editor: Editor [detail: web/editor.js]
+core: shape-core [detail: Rust]
+tables: Entity tables [cylinder, detail: own code]
+editor -> core -> tables

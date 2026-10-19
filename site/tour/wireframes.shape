@@ -1,17 +1,17 @@
-screen cart: Cart [mobile] {
-  header: Your cart
-  list: Coffee beans | Grinder | Filters
-  alert: Free delivery over £30
-  buttons: Keep shopping | Checkout [blue]
-  tabbar: Shop | Cart | Orders | Me
+screen inbox: Comments [mobile] {
+  header: shape
+  alert: 2 comments wait for you
+  list threads: Local server | Schema block | Landing page
+  buttons: Resolved | Open [blue]
+  tabbar: Boards | Comments | Me
 }
-screen pay: Pay [mobile] {
-  header: Payment
-  stepper: Cart | Pay | Done
-  card saved: Visa •••• 4242 [detail: Saved card · expires 08/28]
-  toggle: Save this card
-  button pay-now: Pay £42.00 [blue]
-  link other: Use another card
+screen thread: Thread [mobile] {
+  header: On “Local server”
+  avatar: Deyan | Owner
+  card q: Should the server sync with GitHub? [detail: 2 replies · today]
+  textarea reply: Reply
+  toggle: Resolve when sent
+  button send: Send [blue]
 }
 
-cart.buttons -> pay: checkout
+inbox.threads -> thread: opens

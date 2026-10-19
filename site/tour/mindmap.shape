@@ -1,13 +1,13 @@
-mindmap task: Add saved cards to checkout {
+mindmap task: Bring ../schema onto the board {
   Context
-    Stripe already integrated
-    Customers re-enter cards
+    schema-core is a Rust crate
+    Boards already have entity tables
   Constraints [red]
-    No new services
-    PCI scope must not grow
+    Keep shape-core embeddable
+    The file round-trips exactly
   Steps
-    Stripe SetupIntent
-    Picker on checkout
+    Wrap schema-core as a block
+    Draw it like ../schema does
   Acceptance [green]
-    Second order needs no card
+    A schema diffs column by column
 }

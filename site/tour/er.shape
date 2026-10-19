@@ -1,13 +1,14 @@
-entity customers: Customers {
-  id:    uuid [pk]
-  email: citext [unique]
+entity boards: Boards {
+  path:  text [pk]
+  theme: text [null]
 }
-entity cards: Saved cards {
-  id:          uuid [pk]
-  customer_id: uuid [fk: customers, rel: owned by]
-  stripe_pm:   text [unique]
+entity nodes: Nodes {
+  id:     text [pk]
+  board:  text [fk: boards, rel: drawn on]
+  label:  text
 }
-entity profiles: Profiles {
-  customer_id: uuid [pk, fk: customers]
-  nickname:    text [null]
+entity comments: Comments {
+  id:     text [pk]
+  node:   text [fk: nodes, rel: about]
+  author: text
 }

@@ -1,6 +1,6 @@
-screen: Today's checkout [image: wire, w: 248, h: 178]
-n1: Card fields every time [sticky, red]
-n2: Pay button below the fold [sticky, yellow]
+screen: The editor, before the beta [image: wire, w: 248, h: 178]
+n1: No way to resize a box [sticky, red]
+n2: The Dock says “exec” [sticky, yellow]
 n1 ..> screen
 n2 ..> screen
 

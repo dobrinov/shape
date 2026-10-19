@@ -1,13 +1,13 @@
-kanban sprint: Sprint 12 {
+kanban week: This week {
   column todo: To do {
-    picker: Card picker [owner: ana]
-    a11y: Accessibility pass
+    schema: Schema block [owner: deyan]
+    linux: Linux window
   }
   column doing: Doing {
-    intent: SetupIntent flow [blue, owner: sam]
+    site: Landing page about Shape [blue, owner: claude]
   }
   column done: Done {
-    model: Data model [green]
-    flag: Feature flag
+    todos: To-do lists [green]
+    beta: Beta notes
   }
 }

@@ -1,17 +1,19 @@
-lanes order: Order to cash {
-  lane buyer: Customer {
-    place: Place order [pill, green]
-    paid: Pay invoice
+lanes release: From idea to brew upgrade {
+  lane owner: Owner {
+    ask: Ask for a feature [pill, green]
+    push: Say “push it”
   }
-  lane sales: Sales {
-    check: Credit OK? [diamond]
-    confirm: Confirm order
+  lane agent: Claude Code {
+    build: Build and test
+    check: Tests pass? [diamond]
+    tag: Changelog and tag
   }
-  lane finance: Finance [blue] {
-    invoice: Send invoice
+  lane ci: GitHub Actions [blue] {
+    binaries: Build binaries
+    tap: Update Homebrew
   }
 }
-place -> check
-check -> confirm: yes
-check -> place: no
-confirm -> invoice -> paid
+ask -> build -> check
+check -> tag: yes
+check -> build: no
+tag -> push -> binaries -> tap

@@ -1,5 +1,6 @@
-title: Checkout relaunch
-description: One board for the whole project: the system as it is, and canvases inside it for discovery, the plan, the data and the numbers. Every feature of diagram is used somewhere here.
+title: Shape, built in public
+description: Shape's own board: how the tool is built, and canvases inside it for what beta testers told us, the plan, the data and the numbers. Every feature of Shape is used somewhere here.
+type: product
 direction: right
 routing: orthogonal
 theme: brand
@@ -7,76 +8,80 @@ theme: brand
 # ---------------------------------------------------------------- the system
 # shapes, colours, details, tags, links, sections, every kind of arrow
 
-customer: Customer [person]
-support: Support team [person, teal]
-stripe: Stripe [cloud, purple, detail: payments, link: https://docs.stripe.com/payments]
-mail: E-mail provider [cloud]
-note: Every write carries an\nidempotency key [sticky, link: #orders]
-legacy: Legacy cart [document, gray, detail: retired in Q1, tags: legacy deprecated]
-ledger: Ledger export [parallelogram]
-status: All systems normal [text, green]
+owner: Owner [person, detail: deyan]
+tester: Beta testers [person, teal]
+ai: Your AI CLI [cloud, purple, detail: Claude Code · Codex · Gemini, link: https://docs.anthropic.com/en/docs/claude-code, tags: tech]
+pages: GitHub Pages [cloud, detail: dobrinov.github.io/shape]
+note: Every change is an op:\nthe editor, the CLI,\nthe AI and undo use them [sticky, link: #core]
+mermaid: Mermaid import [document, gray, detail: one way in, tags: legacy]
+file: board.shape [parallelogram, detail: plain text in git]
+status: 130 Rust tests · 27 browser tests [text, green]
 
-group edge: Edge [gray] {
-  web: Storefront [rounded, detail: Next.js, tags: frontend]
-  gateway: API gateway [hexagon]
+group local: On your machine [gray] {
+  window: Native window [rounded, detail: wry · tao, tags: tech]
+  editor: Web editor [hexagon, detail: editor.js · no build]
 }
-group backend: Backend [blue] {
-  orders: Orders API [detail: Rust · Axum, tags: core]
-  group pay: Payments [purple] {
-    payments: Payments [detail: Rust, link: #payments-flow-link]
-    fraud: Fraud score > 80? [diamond, orange]
+group crates: Rust crates [blue] {
+  cli: shape CLI [detail: server · exports · skills, tags: tech]
+  group engine: shape-core [purple] {
+    core: Model, DSL & ops [detail: the only way to change a board, link: #data-link]
+    valid: Op valid? [diamond, orange]
+    rejected: Rejected: nothing changes [text, red]
   }
-  group async: Async [teal] {
-    queue: Job queue [pill]
-    worker: Fulfilment worker
+  group outputs: Outputs [teal] {
+    render: Layout & render [pill]
+    prompt: Prompts [detail: outlines, not coordinates]
   }
-  db: Postgres [cylinder]
-  cache: Redis [cylinder, #d1495b]
+  wasm: shape-wasm [cylinder]
+  npm: @dobrinov/shape [cylinder, #d1495b]
 }
 
-customer -> web: browses
-web -> gateway: HTTPS [thick]
-gateway -> orders: POST /orders
-orders -> payments: charge
-payments -> fraud
-fraud -> stripe: no
-fraud -> support: yes [red]
-orders -> db, cache
-orders ..> queue: order.created
-queue ..> worker
-worker -> mail: receipt
-worker => ledger: nightly
-legacy -- orders: replaced by [dotted]
-cache <-> db: warm-up [dashed]
+owner -> window: opens a board
+window -> editor: hosts [thick]
+editor -> cli: /api/file · /api/git · /api/ai
+cli -> core: apply ops
+core -> valid
+valid -> file: yes
+valid -> rejected: no [red]
+cli -> render, prompt
+cli ..> ai: prompt on stdin
+ai ..> prompt
+render -> pages: the site's pictures
+prompt => tester: ⌘⇧C spec
+mermaid -- core: read by [dotted]
+wasm <-> npm: same API [dashed]
 
 # ---------------------------------------------------------------- the way into the canvases
 # a box with `canvas:` opens a board inside this one; its shape is how the link looks
 
 group inside: Inside this board [gray] {
   discovery-link: Discovery [pill, blue, canvas: discovery]
-  plan-link: Delivery plan [canvas: plan, detail: gantt · kanban · risks · decisions]
+  plan-link: Roadmap [canvas: plan, detail: gantt · kanban · risks · decisions]
   data-link: Data & flows [text, canvas: data]
   metrics-link: Metrics [sticky, yellow, canvas: metrics]
-  payments-flow-link: Payments, step by step [rounded, purple, canvas: data]
-  screens-link: The new checkout, screen by screen [rounded, teal, canvas: screens]
+  ai-flow-link: An AI edit, step by step [rounded, purple, canvas: data]
+  screens-link: Shape's screens [rounded, teal, canvas: screens]
 }
 
 discovery-link -> plan-link -> data-link
 
 # ---------------------------------------------------------------- review
-comment on payments by deyan: Should payments own its own database?
-reply c1 by ana: Not before launch; a separate schema is enough.
-comment on queue->worker by ana: What happens when the worker crashes mid-order?
-comment c3 at 40,-60 by deyan: Add the admin dashboard to this picture
-comment on legacy by sam: Can we delete it now? [resolved, resolution: "Removed from the menu; code goes in Q1"]
+comment on core by deyan: Should the schema block live in shape-core or its own crate?
+reply c1 by claude: Its own crate (schema-core), plugged in as a block type; shape-core stays app-free.
+comment on cli->ai by deyan: What if the AI CLI isn't signed in?
+comment c3 at 40,-60 by deyan: Add the Homebrew tap to this picture
+comment on mermaid by tester: Can I paste Mermaid into the editor? [resolved, resolution: "Yes: paste it and it becomes boxes and arrows"]
 
 # ---------------------------------------------------------------- the board as slides
-presentation: Checkout relaunch in five minutes [instructions: "For the Monday review: where we are and what we need"] {
-  * [title: The system today, notes: "Start here: what a shopper touches, and what runs behind it"]
-  backend [title: Where orders go, notes: Payments and orders are the two services we change]
-  discovery-link [title: What we learned, transition: zoom]
-  plan-link [title: The plan and its risks, notes: Ask for sign-off on the beta date]
+presentation: Shape in five minutes [instructions: "For a beta tester's first call: what it is, what's next"] {
+  * [title: How Shape is built, notes: "Start here: one Rust core, a web editor, your own AI"]
+  crates [title: The core, notes: "Every change is an op, and the DSL round-trips exactly"]
+  discovery-link [title: What testers told us, transition: zoom]
+  plan-link [title: What's next, notes: The schema block is next]
 }
+
+# ---------------------------------------------------------------- perspectives
+perspective contributors: Contributors [tags: tech, show: adr sequence entity]
 
 # ---------------------------------------------------------------- a theme of our own
 theme brand {
@@ -96,320 +101,351 @@ theme brand {
 # ================================================================ canvases
 
 canvas discovery: Discovery {
-  # what we learned, and the task for the coding agent, as a prompt mindmap
+  # what beta testers told us, and the next task for the coding agent, as a prompt mindmap
   direction: right
 
-  quote: "I type my card in every single time" — interview #4 [sticky, yellow]
-  screen: Today's checkout [image: wire, w: 248, h: 178]
-  tickets: 38% of support tickets are about cards [text, red]
+  quote: "Z should be a magnifier for zooming in and out" — beta tester [sticky, yellow]
+  sketch: The first board [image: wire, w: 248, h: 178]
+  shipped: All six notes shipped in v0.59.0 [text, green]
 
-  mindmap task: Add saved payment methods to checkout [layout: both] {
+  mindmap task: Bring ../schema onto the board as a block [layout: both] {
     Context
-      Rails monolith, Stripe already integrated
-      Checkout is one page: app/views/checkout
-      Customers re-enter cards on every order [link: #quote]
+      ../schema draws Postgres schemas (crate schema-core)
+      Shape already has entity blocks
+      Database tables are drawn by hand today [link: #data-link]
     Goal
-      Returning customers pay in one click
-      Cards stored by Stripe, never by us
+      A schema file opens as a block on the board
+      Its tables update when the schema changes
     Constraints [red]
-      No new services
-      PCI scope must not grow
-      Feature flag: saved_cards
+      shape-core stays free of app concerns
+      The DSL round-trips exactly
+      Few tokens: the AI reads tables, not coordinates
     Steps
-      Model: customer has many payment methods
-      Stripe SetupIntent on first payment
-      Picker on the checkout page
+      schema-core as an optional dependency
+      A schema block that points at a file
+      Render it like ../schema does
     Acceptance [green]
-      Second order needs no card details
-      Flag off: checkout unchanged
+      structure.sql opens as a block
+      A migration shows as a diff in review
     Open questions [collapsed]
-      Default card per customer?
-      What about expired cards?
+      Rails schema.rb too?
+      Edit the schema from the board?
   }
 
-  mindmap retro: Sprint 42 retro [layout: down] {
-    Went well [green]
-      Shipped the importer a week early
-      Pairing on the parser
-    Didn't [red]
-      Flaky CI on macOS runners
-    Try next [blue]
-      Async stand-ups
+  mindmap beta: Beta notes [layout: down] {
+    Asked for [blue]
+      Resize a box from its corner
+      Click a dot to add a box
+      Z for a magnifier
+    Felt wrong [red]
+      Dragging stuttered
+      The connector started at the centre
+      The Dock said "exec"
+    Shipped [green]
+      All of it, in v0.59.0
   }
 
-  quote ..> customers-re-enter-cards-on-every-order
+  quote ..> z-for-a-magnifier
 
-  comment on quote by ana: Same in interviews #2 and #7
+  comment on quote by deyan: Same as Figma's Z: easy to remember
 
-  canvas interviews: Interview notes {
+  canvas notes: All beta notes {
     layout: grid
 
-    i1: Shops weekly, always re-enters the card [sticky, green]
-    i2: Gave up when 3-D Secure timed out [sticky, red]
-    i3: Wants Apple Pay more than saved cards [sticky, blue]
-    i4: Didn't notice the guest checkout [sticky]
+    n1: Resize a card from its corner [sticky, green]
+    n2: Dragging an image stutters [sticky, red]
+    n3: Click a dot: a new box on that side [sticky, blue]
+    n4: The window's icon says "exec" [sticky]
   }
 
-  interviews-link: All interview notes [box, canvas: interviews]
+  notes-link: Every note, as written [box, canvas: notes]
 
   asset wire: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAACWCAIAAABvmpKCAAACRklEQVR42u3drRHCMBiA4WpmqKjqYMyDRHcAFBqBQiDKHYJZyqGKQNYgSki+PNy7AMkDR/NzNG3XS2FqDIGAloCWgJaAFtCL5h+/DL2AloAW0EALaKAFtGTZTgJaQEtAS0BLQEtL0NPzJYUJaAEtAS0BLQEtoCWgJaAloCWgBbRUA+jr7aFsq2fu1gTto59n34Cu5J0CDTTQAhpoAQ20gAYaaKCBBhpoAQ20gM4c9G4/FBfQnw7HU7YBDTTQQAMNNNBAAw000IWAllUOy3YCGmgBnQD0+TIqWUCnAO07Mk1AAw000EADDbRKBG0dGmiggRbQQAtooIEG2saKjRWrHLL1DbSABlpAAw000G6sAA000EADDbQ7hS7JAg000EADbZUDaKAFNNCyyuHWt4B2fNTxUaCBBhpoAQ20gAYaaKCBBhpooIEGWkDbWJGNFVewBDTQQAMNdFTQbddnG9BAA+3GCtBAAw000EADDTTQQAMNNNBWOYAGWjZWbKwIaIeT5HCS46OOjwINNNBAAw000AIaaAENNNBAAx0RdJiABrq6bKwE31gB2qgF/GUJtFEDGmgBDbSABlqmBmiggTZqQAMtoIEW0EDL1KwJerO9K1lAAw000EADDbSABlpAAw000PFAz399AQ000EADDTTQQAMNtIdCD4VAAw000AIaaAENNNBAAw20A/5ywB9oAQ20TA3QQANt1IAGWkADLaCBlqkBGmigjRrQQAvoUkCr6H/vA1oCWgJaAloCWkBLQEtAS0BLQCtybx5lt8ChRZBrAAAAAElFTkSuQmCC
 }
 
-canvas plan: Delivery plan {
-  # when, who does what, what could go wrong, and why we chose what we chose
+canvas plan: Roadmap {
+  # when, what's in progress, what could go wrong, and why we chose what we chose
 
-  gantt launch: Launch plan [start: 2026-10-12, scale: week] {
-    Design [5d, owner: mia, done]
-    Build [2w, after: design, owner: sam, done: 40%]
-    Docs [3d, after: design, purple]
-    Beta [1w, after: build, orange]
-    Launch day [after: beta docs, milestone, green]
+  gantt next: Next releases [start: 2026-10-20, scale: week] {
+    Schema block design [3d, owner: deyan]
+    Schema block [2w, after: schema-block-design, done: 10%]
+    Linux window [1w, after: schema-block-design, purple]
+    Beta round 2 [1w, after: schema-block, orange]
+    v1.0 [after: beta-round-2 linux-window, milestone, green]
   }
 
-  gantt marketing: Marketing [start: 2026-10-19, scale: week] {
-    Landing page [1w]
-    Announcement [after: launch/launch-day, milestone]
+  gantt outreach: Outreach [start: 2026-10-26, scale: week] {
+    npm package [1w]
+    Announcement [after: next/v1-0, milestone]
   }
 
-  todo go-live: Before we go live {
-    [x] Release notes written [owner: ana]
-    [ ] Migrations run on staging [owner: sam, due: 2026-10-24]
-    [ ] Rollback tested [owner: sam]
-      [ ] On staging
-      [ ] On a production copy
-    [ ] Support told what changes [owner: mia, due: 2026-10-27]
+  todo release: Release checklist {
+    [x] Bump Cargo.toml and js/package.json [owner: claude]
+    [x] Add a CHANGELOG entry [owner: claude]
+    [ ] Commit and tag vX.Y.Z [owner: claude]
+    [ ] Push, at most three tags at a time [owner: deyan]
+      [ ] Check a Release run started for each
+      [ ] Check the site deployed
+    [ ] Update the Homebrew tap [owner: claude, due: 2026-10-20]
   }
 
-  kanban sprint: Sprint 12 {
+  kanban work: Now {
     column todo: To do {
-      saved: Saved cards [owner: ana]
-      a11y: Accessibility pass [detail: forms and focus order]
+      schema: Schema block [owner: deyan]
+      winconsole: Windows without a console window [detail: the binary opens a terminal today]
     }
     column doing: Doing {
-      onepage: One-page checkout [blue, owner: sam, link: #build]
+      landing: Landing page tells Shape's own story [blue, owner: claude, link: #v1-0]
     }
     column review: In review {
-      emails: Order emails
+      beta: Beta notes (v0.59.0)
     }
     column done: Done {
-      intent: Payment intents [green]
+      todos: To-do lists (v0.58.0) [green]
     }
   }
 
-  risks delivery: Delivery risks {
-    Stripe review slips [p: 4, i: 4, owner: ana, detail: "Their review takes up to 4 weeks"]
-    3-D Secure timeouts [p: 3, i: 4]
-    Scope creep [p: 2, i: 3]
-    Key engineer leaves [p: 1, i: 5, owner: deyan]
+  risks project: Risks {
+    Too many tags in one push [p: 3, i: 3, owner: deyan, detail: "GitHub skipped the builds when 7 tags went at once (2026-10-18)"]
+    AI CLIs change their flags [p: 3, i: 4]
+    Scope creep [p: 3, i: 5, detail: "The earlier attempt was dropped for being too complex"]
+    Big boards get slow [p: 2, i: 3, owner: claude]
     Unknown unknowns
   }
 
-  adr psp: Use one payment provider [accepted] {
-    context: Two providers double the integration and reconciliation work.
-    options: Stripe only; Stripe + Adyen
-    decision: Stripe only, with payment intents.
-    consequences: A Stripe outage stops checkout; we keep a status page.
+  adr git: Git is the database [accepted] {
+    context: Boards should diff, review and merge like code, with nothing new to host.
+    options: A sync server; Files in git
+    decision: A board is one text file; collaboration is commits and pull requests.
+    consequences: No live cursors; merges go element by element instead.
   }
 
-  adr wallets: Add Apple Pay first [proposed] {
-    context: Interviews ask for wallets more than saved cards.
-    decision: Ship Apple Pay before saved cards.
+  adr own-ai: Use the user's own AI subscription [accepted] {
+    context: People already pay for Claude, ChatGPT or Gemini.
+    decision: Pipe the prompt to the CLI they're signed into; no API keys.
   }
 
-  adr cart: Keep the legacy cart [superseded] {
-    decision: Run both carts side by side.
+  adr local: Run a local model [superseded] {
+    decision: No local models for now (owner's call).
+  }
+
+  adr rename: Rename diagram to Shape [accepted] {
+    context: One name for the product, the command and the files.
+    decision: shape, .shape and dobrinov/shape; the old names keep working.
   }
 
   table raci: Who does what {
-    task      | lead | PM | VP Eng
-    Discovery | R    | A  | I
-    Spec      | A    | R  | C
-    Release   | R    | C  | A [green]
+    task      | owner | Claude Code | testers
+    Discovery | A     | C           | R
+    Build     | A     | R           | I
+    Release   | R     | R           | I [green]
   }
 
-  table options: Hosting options {
-    option | cost          | latency | notes
-    Local  | $0            | 40 ms   | Needs an 8B model on every laptop
-    Hosted | $1.2k / month | 300 ms  | Data leaves the laptop [red]
+  table options: Where the AI runs {
+    option          | cost              | setup        | notes
+    Your AI CLI     | your plan         | signed in    | What Shape does
+    API keys        | pay per token     | a key each   | A second bill [red]
   }
 
   timeline history: How we got here {
-    Q1 2026: Checkout is 38% of support tickets
-    12 Mar 2026: Interviews: shoppers re-enter their card every time [detail: 6 of 8 shoppers; see the Discovery canvas]
-    2026-04-20: Saved cards chosen as the fix [important]
-    4–15 May 2026: Prototype tested with 12 shoppers [blue]
-    Jun 2026: One payment provider for everything [link: #psp]
-    ~Sep 2026: Apple Pay asked for again
-    2026-10-12: Build starts
-    2026-11-30: Launch day [important, green]
+    2026-10-07: v0.1: boards as text, comments as prompts [important]
+    2026-10-11: The restart: mindmaps first (v0.2) [detail: an earlier, bigger attempt was dropped]
+    2026-10-12: Gantt, charts, tables and themes [blue]
+    2026-10-13: Kanban, decisions and sequence diagrams
+    2026-10-15: Boards inside boards, merging, binaries for every OS
+    2026-10-17: Rethink and the AI button
+    2026-10-18: Perspectives, slides, a native window, wireframes; diagram becomes Shape [important, link: #rename]
+    2026-10-19: To-do lists and the beta notes [green]
   }
 
-  wallets -> cart: supersedes
+  local -> own-ai: superseded by
 
-  comment on beta by mia: Do we need a second week?
+  comment on beta-round-2 by deyan: Do we need more testers first?
 }
 
 canvas data: Data & flows {
-  # the data model as an ER diagram, the payment as a sequence, order-to-cash in swimlanes
+  # Shape's own model as an ER diagram, an AI edit as a sequence, a release in swimlanes
 
-  entity teams: Teams {
-    id:         uuid [pk]
-    name:       text [unique]
-    created_at: timestamptz [default: now()]
+  entity boards: Boards {
+    path:  text [pk]
+    title: text
+    theme: text [null]
   }
-  entity customers: Customers {
-    id:         uuid [pk]
-    team_id:    uuid [fk: teams, rel: belongs to]
-    email:      citext [unique]
-    bio:        text [null]
+  entity nodes: Nodes {
+    id:     text [pk]
+    board:  text [fk: boards, rel: drawn on]
+    parent: text [null]
+    label:  text [default: '']
   }
-  entity cards: Saved cards {
-    id:          uuid [pk]
-    customer_id: uuid [fk: customers, rel: owned by]
-    stripe_pm:   text [unique]
+  entity edges: Edges {
+    id:   text [pk]
+    from: text [fk: nodes, rel: starts at]
+    to:   text [fk: nodes, rel: ends at]
   }
-  entity profiles: Profiles {
-    customer_id [pk, fk: customers]
-    nickname
-  }
-
-  sequence pay: Pay for an order {
-    shopper: Shopper [person]
-    page: Checkout page
-    api: Orders API
-    psp: Stripe [cloud]
-    shopper -> page: Pay €42
-    page -> api: POST /orders/42/pay
-    api -> psp: create payment intent
-    psp ..> api: client secret
-    api ..> page: client secret
-    page -> psp: confirm card (3-D Secure)
-    psp -> api: webhook payment.succeeded
-    api -> api: mark order paid
-    page ..> shopper: Thank you page
+  entity comments: Comments {
+    id [pk]
+    on [fk: nodes]
+    by
   }
 
-  lanes order: Order to cash {
-    lane buyer: Customer {
-      place: Place order [pill, green]
-      paid: Pay invoice
+  sequence edit: An AI edit {
+    you: You [person]
+    page: Editor
+    server: Local server
+    cli: Your AI CLI [cloud]
+    you -> page: "Split Build into API and UI"
+    page -> server: POST /api/ai
+    server -> cli: prompt on stdin
+    cli ..> server: a few ops
+    server ..> page: ops
+    page -> page: check the ops
+    page ..> you: Keep or Discard
+  }
+
+  lanes release: A release {
+    lane own: Owner {
+      ask: Ask for a change [pill, green]
+      push: Push it
     }
-    lane sales: Sales {
-      check: Credit OK? [diamond]
-      confirm: Confirm order
+    lane claude: Claude Code {
+      tested: Tests pass? [diamond]
+      tag: Commit and tag
     }
-    lane finance: Finance [blue] {
-      invoice: Send invoice
-      book: Book payment [pill]
+    lane actions: GitHub Actions [blue] {
+      build: Build every OS
+      publish: Publish the release [pill]
     }
   }
 
-  crm: CRM [cylinder]
+  tap: Homebrew tap [cylinder]
 
-  place -> check
-  check -> confirm: yes
-  check -> place: no
-  confirm -> invoice -> paid -> book
-  confirm ..> crm
+  ask -> tested
+  tested -> tag: yes
+  tested -> ask: no
+  tag -> push -> build -> publish
+  publish ..> tap
 
-  comment on check: Who sets the credit limit?
+  comment on tested: Which browser tests run on CI?
+
+  cycle loop: The loop {
+    Ask
+    Build
+    Release
+    Hear back
+  }
 }
 
 canvas metrics: Metrics {
   layout: grid
   theme: paper
 
-  chart revenue: Revenue by quarter [bar, unit: k€] {
-    quarter | EU  | US
-    Q1      | 120 | 80
-    Q2      | 150 | 95
-    Q3      | 170 | 130
-    Q4      | 160 | 150
+  chart releases: Releases per day [bar] {
+    day    | releases
+    Oct 7  | 1
+    Oct 11 | 2
+    Oct 12 | 19
+    Oct 13 | 11
+    Oct 15 | 7
+    Oct 17 | 7
+    Oct 18 | 29
+    Oct 19 | 2
   }
 
-  chart stacked: Revenue, stacked [bar, stacked, unit: k€] {
-    quarter | EU  | US
-    Q1      | 120 | 80
-    Q2      | 150 | 95
-    Q3      | 170 | 130
+  chart code: Lines of code [bar, stacked, unit: k] {
+    part  | Rust | JS & CSS
+    core  | 26.9 | 0
+    cli   | 3.9  | 0
+    wasm  | 0.7  | 0
+    web   | 0    | 6.2
   }
 
-  chart ttv: Time to pay [bar, horizontal, unit: s] {
-    Guest checkout 74
-    Saved card 12 [green]
-    Apple Pay 8
+  chart tests: Tests [bar, horizontal] {
+    Rust 130 [green]
+    Browser 27
   }
 
-  chart conversion: Checkout conversion [line, unit: %] {
-    week | Web | Mobile
-    W1   | 61  | 48
-    W2   | 63  | 51
-    W3   | 66  | 55
-    W4   | 70  | 60
+  chart total: Releases so far [line] {
+    day    | releases
+    Oct 7  | 1
+    Oct 11 | 3
+    Oct 12 | 22
+    Oct 13 | 33
+    Oct 15 | 40
+    Oct 17 | 47
+    Oct 18 | 76
+    Oct 19 | 78
   }
 
-  chart tokens: Tokens per AI edit [area, stacked] {
-    week | Prompt | Reply
-    W1   | 1800   | 300
-    W2   | 1500   | 260
-    W3   | 1100   | 240
+  chart kinds: Features and fixes [area, stacked] {
+    day    | Features | Fixes
+    Oct 7  | 1        | 0
+    Oct 11 | 1        | 1
+    Oct 12 | 13       | 6
+    Oct 13 | 10       | 1
+    Oct 15 | 5        | 2
+    Oct 17 | 6        | 1
+    Oct 18 | 21       | 8
+    Oct 19 | 2        | 0
   }
 
-  chart methods: Payment methods [pie, unit: %] {
-    Card 62
-    Apple Pay 21
-    PayPal 12
-    Other 5
+  chart size: Code by part [pie, unit: k lines] {
+    core 26.9
+    web 6.2
+    cli 3.9
+    wasm 0.7
   }
 
-  chart budget: Budget [donut, unit: k€] {
-    Engineering 420
-    Design 90
-    Infra 60
+  chart days: Releases by day of week [donut] {
+    Sun 31
+    Mon 21
+    Tue 11
+    Thu 7
+    Sat 7
+    Wed 1
   }
 
-  chart ideas: Effort vs impact [scatter] {
+  chart ideas: Effort vs impact (a guess) [scatter] {
     idea          | effort | impact
-    Saved cards   | 5      | 8
-    Apple Pay     | 3      | 9
-    One-page      | 8      | 7
-    Guest by default | 2   | 4
+    Schema block  | 8      | 9
+    Linux window  | 3      | 4
+    npm package   | 2      | 5
+    Windows console | 2    | 3
   }
 }
 
-canvas screens: The new checkout, screen by screen {
-  screen cart: Cart [mobile] {
-    header: Your cart
-    list: Coffee beans | Grinder | Filters
-    alert: Free delivery over £30
-    buttons: Keep shopping | Checkout [blue]
-    tabbar: Shop | Cart | Orders | Me
+canvas screens: Shape's screens {
+  screen board: Editor [web] {
+    navbar: shape | Full board | History | Present | Share
+    sidebar: Select | Box | Sticky | Connect | Comment
+    title: roadmap.shape
+    image: The board
+    badges: Saved | 100%
+    fab: ✦
   }
-  screen pay: Pay [mobile] {
-    header: Payment
-    stepper: Cart | Pay | Done
-    card saved: Visa •••• 4242 [detail: Saved card · expires 08/28]
-    toggle: Save this card
-    button pay-now: Pay £42.00 [blue]
-    link other: Use another card
+  screen pick: Pick a perspective [web] {
+    header: Open as…
+    radio: Full board | Product | Technical | Users
+    text: You can switch any time from the top bar.
+    button open: Open [blue]
   }
-  screen done: Order placed [mobile] {
-    header: Thank you
-    image: Order on its way
-    title: Order #1042 placed
-    text: We sent the receipt to your e-mail.
-    button track: Track the order [green]
+  screen ask: ✦ Ask [web] {
+    header: Ask the AI
+    tabs: Ask | Add | Rethink
+    textarea: What blocks the launch?
+    button send: Ask [blue]
+    alert: Uses Claude Code, signed in as you
   }
-  screen orders: Orders admin [web] {
-    navbar: Acme | Orders | Customers | Sign out
-    sidebar: Overview | Orders | Refunds
-    title: Today's orders
-    badges: Paid | Pending | Refunded
-    table: Order | Customer | Total | Status
-    pagination
+  screen viewer: Board viewer (idea) [mobile] {
+    header: Shape
+    search: Find on the board
+    list: Discovery | Roadmap | Data & flows | Metrics
+    button view: Present [green]
+    tabbar: Boards | Recent | Me
   }
 
-  cart.buttons -> pay: checkout
-  pay.pay-now -> done: pays
-  done -> orders: shows up in
+  board -> pick: opens with
+  pick.open -> board: shows
+  board -> ask: ✦
+  ask.send -> board: answers on
+  viewer -> board: same file
 }

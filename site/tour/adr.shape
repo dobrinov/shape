@@ -1,10 +1,10 @@
 direction: down
-adr psp: Use one payment provider [accepted] {
-  context: Two providers double the integration work.
-  decision: Stripe only, with payment intents.
-  consequences: An outage stops checkout; we keep a status page.
+adr git: Git is the database [accepted] {
+  context: Boards should diff, review and merge like code.
+  decision: A board is one text file; collaboration is commits and pull requests.
+  consequences: No server to host; the format must round-trip exactly.
 }
-adr wallets: Add Apple Pay first [proposed] {
-  decision: Ship wallets before saved cards.
+adr ai: Use the user's own AI subscription [accepted] {
+  decision: Run the Claude, Codex or Gemini CLI they are signed into. No API keys.
 }
-wallets -> psp: builds on
+ai -> git: builds on
