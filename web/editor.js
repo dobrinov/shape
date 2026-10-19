@@ -2973,6 +2973,13 @@
     });
 
     canvas.addEventListener("wheel", function (e) {
+      // over a popup or a bar (Blocks, Ask, the minimap…) the wheel scrolls
+      // it, and the board stays put; a pinch there zooms neither
+      var t = e.target;
+      if (t !== canvas && !stage.contains(t) && !(titles && titles.contains(t)) && !(empty && empty.contains(t))) {
+        if (e.ctrlKey || e.metaKey) e.preventDefault();
+        return;
+      }
       e.preventDefault();
       var rect = canvas.getBoundingClientRect();
       if (e.ctrlKey || e.metaKey) {

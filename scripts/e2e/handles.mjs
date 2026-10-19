@@ -95,7 +95,15 @@ try {
   await p.locator(".dge-blocks-btn").click(); await sleep(200);
   const [menu, cv] = await p.evaluate(() => [".dge-blocks", ".dge-canvas"].map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }));
   assert.ok(menu.top >= cv.top && menu.bottom <= cv.bottom, `the Blocks menu fits: ${JSON.stringify(menu)} in ${JSON.stringify(cv)}`);
+  // a wheel (or a two-finger swipe) over it scrolls it, not the board behind
+  const view = () => p.evaluate(() => document.querySelector(".dge-stage").style.transform);
+  const v0 = await view();
+  await p.mouse.move(450, (menu.top + menu.bottom) / 2); await p.mouse.wheel(0, 200); await sleep(200);
+  assert.equal(await view(), v0, "the board stays put");
+  assert.ok(await p.evaluate(() => document.querySelector(".dge-blocks").scrollTop) > 0, "the menu scrolled");
   await p.locator(".dge-blocks-btn").click();
+  await p.mouse.move(450, cv.bottom - 120); await p.mouse.wheel(0, 120); await sleep(200);
+  assert.notEqual(await view(), v0, "over the board, the wheel pans it");
 
   assert.deepEqual(errors, []);
   await browser.close();

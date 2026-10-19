@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.2 — 2026-10-19
+
+- Fixed: scrolling (a mouse wheel or a two-finger swipe) over an open popup, such as the Blocks menu, the Ask panel or the AI menu, moved the board behind it. It now scrolls the popup, and the board stays put; over the bars and the minimap the board stays put too.
+
 ## 0.60.1 — 2026-10-19
 
 - Fixed: in a small editor (like the one on the landing page), the Blocks menu ran up under the top bar. Popups now stay inside the editor and scroll instead: the Blocks and AI menus and the Ask panel stop below the top bar, the Board, History and right-click menus stop at the bottom edge, and they fit again when the window is resized.
