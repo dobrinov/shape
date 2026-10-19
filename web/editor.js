@@ -277,7 +277,7 @@
       opts.ai && opts.aiSetup ? h("button", { class: "dge-ai-foot", title: "Which AI is used, and whether it works", onclick: function () { closeAiMenu(); setupAI(); } }, ["Your AI: check it, or change it…"]) : null
     ].filter(Boolean));
     var aiFab = h("button", { class: "dge-ai-fab", "aria-haspopup": "menu", "aria-label": "AI", title: "AI features: Rethink this canvas, or Add what you know. They run on your own AI subscription, and you see every change before keeping it.", html: icon("magic"), onclick: function () {
-      if (aiMenu.hidden) { aiMenu.hidden = false; aiFab.classList.add("on"); } else closeAiMenu();
+      if (aiMenu.hidden) { aiMenu.hidden = false; aiFab.classList.add("on"); fitPopup(aiMenu, true); } else closeAiMenu();
     } });
     function closeAiMenu() { aiMenu.hidden = true; aiFab.classList.remove("on"); }
     /* Ask: questions about the board; answers point at places on it. */
@@ -390,6 +390,7 @@
       closeAiMenu();
       blocksMenu.hidden = false;
       blocksBtn.classList.add("on");
+      fitPopup(blocksMenu, true);
     }
     function buildBlocks() {
       blocksMenu = h("div", { class: "dge-blocks", role: "menu", "aria-label": "Add a block", hidden: true });
@@ -624,6 +625,7 @@
       var r = anchor.getBoundingClientRect(), host = el.getBoundingClientRect();
       boardMenu.hidden = false;
       boardMenu.style.top = (r.bottom - host.top + 6) + "px";
+      fitPopup(boardMenu);
       boardMenu.style.left = Math.max(8, Math.min(r.right - host.left - boardMenu.offsetWidth, host.width - boardMenu.offsetWidth - 8)) + "px";
     }
     function buildToolbar() {
@@ -1466,6 +1468,7 @@
     function openAsk() {
       closeAiMenu();
       askPanel.hidden = false;
+      fitPopup(askPanel, true);
       setTimeout(function () { askInput.focus(); }, 0);
     }
     function closeAsk(keep) {
@@ -3380,6 +3383,7 @@
       var r = anchor.getBoundingClientRect(), host = el.getBoundingClientRect();
       historyMenu.hidden = false;
       historyMenu.style.top = (r.bottom - host.top + 6) + "px";
+      fitPopup(historyMenu);
       historyMenu.style.left = Math.max(8, Math.min(r.right - host.left - 340, host.width - 348)) + "px";
       opts.history.list().then(function (res) {
         historyMenu.innerHTML = "";
@@ -5092,6 +5096,20 @@
       placeBubble(cx, cy);
     }
     document.addEventListener("pointerdown", function (e) { if (!bubble.hidden && !bubble.contains(e.target) && !canvas.contains(e.target)) closeBubble(); });
+    /* A popup stays inside the editor, however small it is, and scrolls
+       instead: one that opens upwards (`up`, from the bottom bar or the AI
+       button) stops below the top bar, one that drops down stops at the
+       bottom edge. */
+    function fitPopup(pop, up) {
+      if (!pop || pop.hidden) return;
+      pop.style.maxHeight = "none";
+      var r = pop.getBoundingClientRect(), c = canvas.getBoundingClientRect(), e = el.getBoundingClientRect();
+      var room = up ? r.bottom - c.top - 8 : e.bottom - r.top - 8;
+      pop.style.maxHeight = Math.max(80, Math.floor(room)) + "px";
+    }
+    window.addEventListener("resize", function () {
+      [[blocksMenu, true], [aiMenu, true], [askPanel, true], [boardMenu], [historyMenu]].forEach(function (p) { fitPopup(p[0], p[1]); });
+    });
     /* `anchor`: an element (the menu drops below it) or a {x, y} client point. */
     function openMenu(anchor, items) {
       menu.innerHTML = "";
@@ -5101,6 +5119,7 @@
       });
       var r = anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : { left: anchor.x, bottom: anchor.y - 4 }, host = el.getBoundingClientRect();
       menu.hidden = false;
+      menu.style.maxHeight = Math.max(80, host.height - 16) + "px";
       menu.style.top = Math.max(8, Math.min(r.bottom - host.top + 4, host.height - menu.offsetHeight - 8)) + "px";
       menu.style.left = Math.max(8, Math.min(r.left - host.left, host.width - menu.offsetWidth - 8)) + "px";
     }

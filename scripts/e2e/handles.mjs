@@ -90,6 +90,13 @@ try {
   await p.keyboard.press("z"); await sleep(100);
   assert.equal(await p.locator(".dge-canvas.zooming").count(), 0, "Z again leaves it");
 
+  // in a short window, the Blocks menu stays below the top bar and scrolls
+  await p.setViewportSize({ width: 900, height: 460 }); await sleep(200);
+  await p.locator(".dge-blocks-btn").click(); await sleep(200);
+  const [menu, cv] = await p.evaluate(() => [".dge-blocks", ".dge-canvas"].map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }));
+  assert.ok(menu.top >= cv.top && menu.bottom <= cv.bottom, `the Blocks menu fits: ${JSON.stringify(menu)} in ${JSON.stringify(cv)}`);
+  await p.locator(".dge-blocks-btn").click();
+
   assert.deepEqual(errors, []);
   await browser.close();
   console.log("handles: ok");

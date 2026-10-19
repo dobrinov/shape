@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.1 — 2026-10-19
+
+- Fixed: in a small editor (like the one on the landing page), the Blocks menu ran up under the top bar. Popups now stay inside the editor and scroll instead: the Blocks and AI menus and the Ask panel stop below the top bar, the Board, History and right-click menus stop at the bottom edge, and they fit again when the window is resized.
+
 ## 0.60.0 — 2026-10-19
 
 - **Database schemas:** `schema db: Database [file: db/structure.sql] { … }` puts the tables of a real schema file on the board: a Postgres `structure.sql`, a MySQL or SQLite dump, or a Rails `schema.rb`, read by the parser of [schema](https://github.com/dobrinov/schema). Columns keep their types, primary keys, unique columns, nullability, defaults and foreign keys (drawn with crow's feet).
