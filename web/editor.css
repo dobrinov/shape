@@ -537,3 +537,22 @@
 .dge-att-keep { display: flex; align-items: center; gap: 3px; color: var(--muted); font-size: 11px; }
 .dge .dge-att-btn { flex: none; width: 32px; height: 32px; min-height: 0; padding: 0; display: grid; place-items: center; }
 .dge .dge-att-btn svg { width: 16px; height: 16px; }
+
+/* the AI at work on the board: dimmed, locked, a light sweeping over it */
+.dge-busy { position: absolute; inset: 0; z-index: 45; display: grid; place-items: center; overflow: hidden; background: color-mix(in srgb, var(--bg) 35%, transparent); backdrop-filter: blur(0.6px) saturate(0.8); cursor: progress; }
+.dge-busy-beam { position: absolute; inset: -20% -60%; background: linear-gradient(105deg, transparent 38%, color-mix(in srgb, var(--accent) 16%, transparent) 48%, color-mix(in srgb, var(--accent) 26%, transparent) 50%, color-mix(in srgb, var(--accent) 16%, transparent) 52%, transparent 62%); animation: dge-sweep 2.8s ease-in-out infinite; pointer-events: none; }
+@keyframes dge-sweep { from { transform: translateX(-35%); } to { transform: translateX(35%); } }
+.dge-busy-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(360px, calc(100% - 48px)); padding: 20px 22px 16px; border: 1px solid var(--line-strong); border-radius: var(--r-4); background: var(--bg); box-shadow: var(--shadow); text-align: center; cursor: default; }
+.dge-busy-card b { font-size: 15px; }
+.dge-busy-spark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--accent-solid, var(--accent)); color: #fff; animation: dge-pulse 1.6s ease-in-out infinite; }
+.dge-busy-spark svg { width: 22px; height: 22px; animation: dge-turn 6s linear infinite; }
+@keyframes dge-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 50% { box-shadow: 0 0 0 12px transparent; } }
+@keyframes dge-turn { to { transform: rotate(360deg); } }
+.dge-busy-step { min-height: 18px; color: var(--fg); font-size: 13px; }
+.dge-busy-dots { display: flex; gap: 6px; }
+.dge-busy-dots span { width: 22px; height: 4px; border-radius: 2px; background: var(--line-strong); transition: background .4s; }
+.dge-busy-dots span.on { background: var(--accent); }
+.dge-busy-foot { display: flex; gap: 10px; align-items: baseline; font-size: 11.5px; }
+.dge-busy-time { font-variant-numeric: tabular-nums; color: var(--muted); }
+.dge.dge-busy-on .dge-toolbar, .dge.dge-busy-on .dge-tools, .dge.dge-busy-on .dge-ai-fab { pointer-events: none; opacity: 0.55; }
+@media (prefers-reduced-motion: reduce) { .dge-busy-beam, .dge-busy-spark, .dge-busy-spark svg { animation: none; } }

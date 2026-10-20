@@ -984,6 +984,7 @@
     /* `top`: ops for the whole board (its type, its perspectives), applied to
        the top board also while a canvas is open. */
     function applyOps(ops, live, top) {
+      if (st.busy) { flash("The AI is working on the board: wait, or stop waiting", true); return { ok: false, error: "busy" }; }
       // without a name (none from git), say who you are first
       if (opts.requireName && !st.author && !view) { askName(); return { ok: false, error: "your name first" }; }
       // editing while looking at the AI's changes keeps them
@@ -1815,9 +1816,15 @@
     }
     /* `where`: the canvas the reply's ops are about ([]: the top board,
        where `in` ops reach into canvases). */
-    function askRound(prompt, round, req, busy, where, images) {
-      if (opts.ai) flash(round ? "✦ The reply did not fit; asking again…" : busy || "✦ Thinking…", false, 180000);
+    function askRound(prompt, round, req, busy, where, images, job) {
+      if (opts.ai) {
+        // the board waits, locked, while the AI works; it says what is going on
+        job = job || busyStart(busy ? "rethink" : "add", (busy || "✦ " + req).replace(/^✦ /, "").replace(/…$/, ""));
+        if (round) busyStep(job, "The reply did not fit; asking again (" + (round + 1) + " of 3)");
+      }
       ask(prompt, "✦ " + req, images).then(function (text) {
+        if (job && job.stopped) return;
+        if (job) busyStep(job, "Checking the changes");
         text = String(text || "");
         var test = new wasm.Diagram();
         test.set_source(st.text);
@@ -1825,19 +1832,74 @@
         var res = JSON.parse(test.apply(text));
         if (!res.ok) {
           test.free();
-          if (opts.ai && round < 2) return askRound(wasm.ask_again(prompt, text, res.error || "invalid reply"), round + 1, req, busy, where, images);
+          if (opts.ai && round < 2) return askRound(wasm.ask_again(prompt, text, res.error || "invalid reply"), round + 1, req, busy, where, images, job);
+          busyEnd(job);
           return flash("The AI's reply did not apply: " + (res.error || "no ops in it"), true);
         }
         var next = test.source("dsl");
         test.free();
         var note = wasm.reply_note(text);
+        busyEnd(job);
         if (!res.count) return showNote(note || "The AI changed nothing.");
         startPreview(next, res.count, note);
       }, function (e) {
+        if (job && job.stopped) return;
+        busyEnd(job);
         if (e && e.shown) flash(""); // the dialog says it
         else if (String(e && e.message) !== "cancelled") flash("AI: " + (e && e.message || e), true);
       });
     }
+    /* While the AI works on the board: the board dims and is locked (no
+       clicks, keys or edits), a light sweeps over it, and a card says what
+       is going on, how long it has taken, and lets you stop waiting (the
+       answer is then thrown away). */
+    var BUSY_STEPS = {
+      rethink: ["Reading the board, every canvas and comment", "Working out what changed and where it belongs", "Choosing the right block for each thing", "Writing the changes"],
+      add: ["Reading what you added", "Finding where each thing belongs", "Writing the changes"]
+    };
+    function busyStart(kind, title) {
+      busyEnd(st.busy);
+      var steps = BUSY_STEPS[kind] || BUSY_STEPS.add;
+      var job = { stopped: false, t0: Date.now(), step: 0 };
+      var stepEl = h("span", { class: "dge-busy-step" }, [steps[0] + "…"]);
+      var timeEl = h("span", { class: "dge-busy-time" }, ["0:00"]);
+      var dots = h("div", { class: "dge-busy-dots" }, steps.map(function (_, i) { return h("span", { class: i ? "" : "on" }); }));
+      var card = h("div", { class: "dge-busy-card", role: "status", "aria-live": "polite" }, [
+        h("span", { class: "dge-busy-spark", html: icon("magic") }),
+        h("b", {}, [title]),
+        stepEl, dots,
+        h("div", { class: "dge-busy-foot" }, [timeEl, h("span", { class: "dge-muted" }, ["You see the changes before keeping them"])]),
+        h("button", { onclick: function () { job.stopped = true; busyEnd(job); flash("Stopped waiting: the AI's answer will be ignored"); } }, ["Stop waiting"])
+      ]);
+      job.el = h("div", { class: "dge-busy" }, [h("div", { class: "dge-busy-beam" }), card]);
+      ["pointerdown", "dblclick", "contextmenu", "wheel"].forEach(function (ev) { job.el.addEventListener(ev, function (e) { if (!card.contains(e.target)) e.preventDefault(); e.stopPropagation(); }, { passive: false }); });
+      job.stepEl = stepEl; job.dots = dots;
+      job.timer = setInterval(function () {
+        var s = Math.floor((Date.now() - job.t0) / 1000);
+        timeEl.textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+        // no word from the AI until it is done: the steps move on with time, and wait at the last
+        var k = Math.min(steps.length - 1, Math.floor(s / 7));
+        if (k !== job.step && !job.fixed) { job.step = k; showStep(job, steps[k]); }
+      }, 500);
+      canvas.appendChild(job.el);
+      el.classList.add("dge-busy-on");
+      st.busy = job;
+      flash("");
+      return job;
+    }
+    function showStep(job, text) {
+      job.stepEl.textContent = text + "…";
+      Array.prototype.forEach.call(job.dots.children, function (d, i) { d.className = i <= job.step ? "on" : ""; });
+    }
+    function busyStep(job, text) { if (!job || !job.el) return; job.fixed = true; showStep(job, text); }
+    function busyEnd(job) {
+      if (!job || !job.el) return;
+      clearInterval(job.timer);
+      job.el.remove();
+      job.el = null;
+      if (st.busy === job) { st.busy = null; el.classList.remove("dge-busy-on"); }
+    }
+
     /* What the AI said when it changed nothing: stays until read. */
     function showNote(text) {
       flash("");
@@ -4914,6 +4976,7 @@
       }
       if (mod && e.key === "/" && hasCode) { e.preventDefault(); showCode = !showCode; applyChrome(); syncCode(true); return; }
       if (typing || !el.contains(document.activeElement) && document.activeElement !== document.body) return;
+      if (st.busy) { if (!mod) e.preventDefault(); return; }
       // the summary is read-only: moving around, finding and the AI, nothing that edits
       if (dashOn() && (mod ? "fkcs".indexOf(e.key.toLowerCase()) < 0 : ["f", "F", "m", "M", "0", "+", "=", "-", "z", "Z", "c", "C", "v", "V", "Escape", " ", "?"].indexOf(e.key) < 0)) return;
       if (e.key === "Alt") canvas.classList.add("out");

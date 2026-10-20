@@ -35,7 +35,7 @@ test:
 
 # Browser tests of the editor (Playwright + the installed Chrome; serves web/ from disk)
 e2e: build
-	cd scripts/e2e && (test -d node_modules || npm install --silent) && node mindmap.mjs && node risks.mjs && node charts.mjs && node tables.mjs && node themes.mjs && node ask.mjs && node board.mjs && node entity.mjs && node links.mjs && node kanban.mjs && node adr.mjs && node sequence.mjs && node images.mjs && node canvases.mjs && node merge.mjs && node timeline.mjs && node perspectives.mjs && node cycle.mjs && node history.mjs && node prompts.mjs && node ai-setup.mjs && node minimap.mjs && node presentation.mjs && node wireframes.mjs && node todo.mjs && node handles.mjs && node schema.mjs && node forecast.mjs && node images-ai.mjs
+	cd scripts/e2e && (test -d node_modules || npm install --silent) && node mindmap.mjs && node risks.mjs && node charts.mjs && node tables.mjs && node themes.mjs && node ask.mjs && node board.mjs && node entity.mjs && node links.mjs && node kanban.mjs && node adr.mjs && node sequence.mjs && node images.mjs && node canvases.mjs && node merge.mjs && node timeline.mjs && node perspectives.mjs && node cycle.mjs && node history.mjs && node prompts.mjs && node ai-setup.mjs && node minimap.mjs && node presentation.mjs && node wireframes.mjs && node todo.mjs && node handles.mjs && node schema.mjs && node forecast.mjs && node images-ai.mjs && node busy.mjs
 
 # Browser library: one JS file with the WASM inlined
 embed: build
