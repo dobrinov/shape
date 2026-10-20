@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.70.0 — 2026-10-20
+
+- **Marketing, Design, Legal and Users open on their own summaries**, like Delivery, Business, Product and Technical:
+  - **Marketing:** the next launch and its light, the readiness checklists with their progress, the dates people outside see (starred first), and *Don't promise yet*: launches at risk, decisions not taken and high risks, each with why.
+  - **Design:** the screens as they are on the board, with the flow between them, how many flows and open design comments, the comments on screens and the design decisions.
+  - **Legal:** what is waiting (decisions, high risks, overdue obligations), the obligations with their due dates (overdue in red), the risk matrix and the decision records.
+  - **Users:** the journey as the swimlanes draw it (or the screens in order), what users told us, and the open questions.
+- In every summary, a block too wide for a column (the screens, a gantt chart) takes the whole width, and a table of comments no longer shows a pin on each of its rows.
+
 ## 0.69.1 — 2026-10-20
 
 - While the AI works on the board, its card stays still: no light sweeping over the board, no turning icon.

@@ -561,12 +561,12 @@ fn tiles(id: &str) -> &'static [&'static str] {
         "delivery" => &["burndown", "kanban", "gantt", "matrix"],
         "business" | "investors" => &["money", "milestones", "decisions", "risks"],
         "client" => &["milestones", "decisions", "todos", "screens"],
-        "marketing" => &["milestones", "todos", "decisions", "risks"],
+        "marketing" => &["todos", "dates", "dontpromise"],
         "product" => &["scope", "plan", "decisions", "screens"],
-        "design" => &["screens", "decisions", "comments"],
+        "design" => &["flow", "screencomments", "records"],
         "tech" => &["records", "unrecorded", "blockers", "risks"],
-        "legal" => &["records", "decisions", "risks"],
-        "users" => &["screens", "comments", "decisions"],
+        "legal" => &["obligations", "matrix", "records"],
+        "user" | "users" => &["journey", "voices", "comments"],
         _ => &["milestones", "decisions", "risks", "blockers"],
     }
 }
@@ -646,6 +646,107 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                 .unwrap_or_default(),
             )
         }
+        ("design", _) => {
+            let screens: Vec<(Vec<String>, String)> = docs(doc)
+                .iter()
+                .flat_map(|(p, d)| {
+                    d.groups
+                        .iter()
+                        .filter(|g| g.screen.is_some())
+                        .map(move |g| (p.clone(), g.id.clone()))
+                })
+                .collect();
+            let flows = flow_count(doc);
+            let open = screen_comments(doc).len();
+            (
+                format!(
+                    "Screens: {}{}{}",
+                    screens.len(),
+                    if flows > 0 {
+                        format!(", in {flows} {}", if flows == 1 { "flow" } else { "flows" })
+                    } else {
+                        String::new()
+                    },
+                    if open > 0 {
+                        format!(
+                            " · {open} open design {}",
+                            if open == 1 { "comment" } else { "comments" }
+                        )
+                    } else {
+                        String::new()
+                    }
+                ),
+                if open > 0 { "orange" } else { "blue" },
+                if screens.is_empty() {
+                    "No wireframe screens on this board yet: Blocks → Phone, Web page or Screen flow".to_string()
+                } else {
+                    String::new()
+                },
+            )
+        }
+        ("legal", _) => {
+            let waiting = decisions(doc).len();
+            let high = risks(doc).iter().filter(|r| r.score >= 15.0).count();
+            let late = obligations(doc)
+                .iter()
+                .filter(|o| gantt::parse_date(&o.due).is_some_and(|z| z < today))
+                .count();
+            let mut parts = vec![format!(
+                "{waiting} {} waiting",
+                if waiting == 1 {
+                    "decision"
+                } else {
+                    "decisions"
+                }
+            )];
+            if high > 0 {
+                parts.push(format!(
+                    "{high} high {}",
+                    if high == 1 { "risk" } else { "risks" }
+                ));
+            }
+            if late > 0 {
+                parts.push(format!(
+                    "{late} overdue {}",
+                    if late == 1 {
+                        "obligation"
+                    } else {
+                        "obligations"
+                    }
+                ));
+            }
+            (
+                parts.join(" · "),
+                if late > 0 || high > 0 {
+                    "orange"
+                } else {
+                    "green"
+                },
+                crate::perspectives::purpose("legal")
+                    .unwrap_or_default()
+                    .to_string(),
+            )
+        }
+        ("user" | "users", _) => {
+            let (steps, roles) = journey_size(doc);
+            (
+                if steps > 0 {
+                    format!(
+                        "The journey: {steps} steps across {roles} {}",
+                        if roles == 1 { "role" } else { "roles" }
+                    )
+                } else {
+                    "What people see and do".to_string()
+                },
+                "blue",
+                if steps == 0 {
+                    "No journey on this board yet: Blocks → Swimlanes, or screens with a flow"
+                        .to_string()
+                } else {
+                    String::new()
+                },
+            )
+        }
         ("tech", _) => {
             let records = docs(doc)
                 .iter()
@@ -685,7 +786,12 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
             doc.description.clone().unwrap_or_default(),
         ),
         ("client", Some(m)) => (
-            format!("Next delivery: {} {}, {}", m.label, countdown(m.due - today), m.light.word().to_lowercase()),
+            format!(
+                "Next delivery: {} {}, {}",
+                m.label,
+                countdown(m.due - today),
+                m.light.word().to_lowercase()
+            ),
             m.light.color(),
             m.reason.clone(),
         ),
@@ -1110,6 +1216,244 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                     g.columns = vec!["Plan, board or milestone".into(), "".into()];
                 }
             }
+            "dates" => {
+                // what people outside will see: the timeline's dates ahead, the starred first
+                let mut rows: Vec<(At, String, String, bool)> = Vec::new();
+                for (path, d) in docs(doc) {
+                    for g in d.groups.iter().filter(|g| g.timeline) {
+                        for n in d
+                            .nodes
+                            .iter()
+                            .filter(|n| n.group.as_deref() == Some(g.id.as_str()))
+                        {
+                            let Some(z) = n.date.as_deref().and_then(gantt::parse_date) else {
+                                continue;
+                            };
+                            if z >= today {
+                                rows.push((
+                                    At {
+                                        path: path.clone(),
+                                        id: n.id.clone(),
+                                    },
+                                    n.display().to_string(),
+                                    n.date.clone().unwrap_or_default(),
+                                    n.important,
+                                ));
+                            }
+                        }
+                    }
+                }
+                for m in ms.iter() {
+                    rows.push((
+                        m.at.clone(),
+                        m.label.clone(),
+                        gantt::format_date(m.due),
+                        true,
+                    ));
+                }
+                if rows.is_empty() {
+                    continue;
+                }
+                rows.sort_by_key(|r| gantt::parse_date(&r.2).unwrap_or(i64::MAX));
+                rows.dedup_by(|a, b| a.1 == b.1);
+                out.groups
+                    .push(table("dates", "Dates people outside see", &["", "When"]));
+                for (i, (at, label, when, star)) in rows.into_iter().take(8).enumerate() {
+                    let z = gantt::parse_date(&when).unwrap_or(today);
+                    out.nodes.push(row(
+                        row_id(&format!("dt{i}"), &at),
+                        "dates",
+                        &format!("{}{label}", if star { "★ " } else { "" }),
+                        &[format!(
+                            "{} ({})",
+                            gantt::short_date(z),
+                            countdown(z - today)
+                        )],
+                        None,
+                    ));
+                }
+                if let Some(g) = out.group_mut("dates") {
+                    g.columns = vec!["Event".into(), "When".into()];
+                }
+            }
+            "dontpromise" => {
+                // what is not certain yet: launches at risk, open decisions, high risks
+                let mut rows: Vec<(String, At, String, String, &str)> = Vec::new();
+                for m in ms.iter().filter(|m| m.light != Light::Green) {
+                    rows.push((
+                        "ms".into(),
+                        m.at.clone(),
+                        format!("{} on {}", m.label, gantt::short_date(m.due)),
+                        format!("{}: {}", m.light.word(), m.reason),
+                        m.light.color(),
+                    ));
+                }
+                for x in decisions(doc) {
+                    rows.push((
+                        "de".into(),
+                        x.at.clone(),
+                        x.label.clone(),
+                        "not decided yet".into(),
+                        "orange",
+                    ));
+                }
+                for r in risks(doc).into_iter().filter(|r| r.score >= 15.0) {
+                    rows.push((
+                        "ri".into(),
+                        r.at.clone(),
+                        r.label.clone(),
+                        format!("risk {:.0} of 25", r.score),
+                        "red",
+                    ));
+                }
+                if rows.is_empty() {
+                    continue;
+                }
+                out.groups
+                    .push(table("dontpromise", "Don't promise yet", &["What", "Why"]));
+                for (i, (tile, at, label, why, color)) in rows.into_iter().take(8).enumerate() {
+                    out.nodes.push(row(
+                        row_id(&format!("{tile}{i}"), &at),
+                        "dontpromise",
+                        &label,
+                        &[why],
+                        Some(color),
+                    ));
+                }
+            }
+            "flow" => {
+                // the screens, as on the board, with the arrows between them
+                let before = out.groups.len();
+                for (path, d) in docs(doc) {
+                    let ids: Vec<String> = d
+                        .groups
+                        .iter()
+                        .filter(|g| g.screen.is_some())
+                        .map(|g| g.id.clone())
+                        .collect();
+                    copy_trees(&mut out, d, &path, &ids, "sc");
+                }
+                wrap(
+                    &mut out,
+                    before,
+                    "flow",
+                    "Screens and the flow between them",
+                );
+            }
+            "screencomments" => {
+                let list = screen_comments(doc);
+                if list.is_empty() {
+                    continue;
+                }
+                out.groups.push(table(
+                    "screencomments",
+                    &format!("Open comments on screens ({})", list.len()),
+                    &["Comment", "On", "By"],
+                ));
+                for (i, (at, text, on, by)) in list.into_iter().take(8).enumerate() {
+                    out.nodes.push(row(
+                        row_id(&format!("sm{i}"), &at),
+                        "screencomments",
+                        &text,
+                        &[on, by],
+                        None,
+                    ));
+                }
+            }
+            "obligations" => {
+                let list = obligations(doc);
+                if list.is_empty() {
+                    continue;
+                }
+                out.groups.push(table(
+                    "obligations",
+                    &format!("Obligations ({})", list.len()),
+                    &["Obligation", "Due", "Owner"],
+                ));
+                for x in list.iter().take(8) {
+                    let late = gantt::parse_date(&x.due).is_some_and(|z| z < today);
+                    out.nodes.push(row(
+                        row_id("ob", &x.at),
+                        "obligations",
+                        &x.label,
+                        &[x.due.clone(), x.owner.clone()],
+                        late.then_some("red"),
+                    ));
+                }
+            }
+            "journey" => {
+                // the swimlanes as on the board; without any, the screens and their flow
+                let mut any = false;
+                for (path, d) in docs(doc) {
+                    let ids: Vec<String> = d
+                        .groups
+                        .iter()
+                        .filter(|g| g.lanes && !g.kanban && g.parent.is_none())
+                        .map(|g| g.id.clone())
+                        .collect();
+                    any |= !ids.is_empty();
+                    copy_trees(&mut out, d, &path, &ids, "jo");
+                }
+                let before = out.groups.len();
+                if !any {
+                    for (path, d) in docs(doc) {
+                        let ids: Vec<String> = d
+                            .groups
+                            .iter()
+                            .filter(|g| g.screen.is_some())
+                            .map(|g| g.id.clone())
+                            .collect();
+                        copy_trees(&mut out, d, &path, &ids, "jo");
+                    }
+                    wrap(&mut out, before, "journey", "The screens, in order");
+                }
+            }
+            "voices" => {
+                // what users said: stickies and quotes, tagged for users or in a section about them
+                let mut rows = Vec::new();
+                for (path, d) in docs(doc) {
+                    for n in &d.nodes {
+                        let up = ancestors(d, n);
+                        let about = n.tags.iter().any(|t| t == "user" || t == "users")
+                            || up.iter().any(|g| {
+                                word_in(
+                                    g.display(),
+                                    &[
+                                        "in their words",
+                                        "quote",
+                                        "feedback",
+                                        "interview",
+                                        "users said",
+                                        "what users",
+                                    ],
+                                )
+                            });
+                        if about
+                            && (n.shape == crate::model::Shape::Sticky || !up.is_empty())
+                            && !up.iter().any(|g| g.plotted())
+                        {
+                            rows.push(item(doc, &path, d, n));
+                        }
+                    }
+                }
+                if rows.is_empty() {
+                    continue;
+                }
+                out.groups
+                    .push(table("voices", "What users told us", &["", "Where"]));
+                for x in rows.iter().take(8) {
+                    out.nodes.push(row(
+                        row_id("vo", &x.at),
+                        "voices",
+                        &x.label,
+                        &[x.place.clone()],
+                        None,
+                    ));
+                }
+                if let Some(g) = out.group_mut("voices") {
+                    g.columns = vec!["Said".into(), "Where".into()];
+                }
+            }
             "unrecorded" => {
                 // decisions talked about but not written down as a record
                 let list: Vec<Item> = decisions(doc)
@@ -1227,10 +1571,13 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
     for (path, d) in docs(doc) {
         for (i, c) in d.comments.iter().enumerate() {
             let Some(on) = c.on.as_deref() else { continue };
-            let shown = out
-                .nodes
-                .iter()
-                .find(|n| target(&n.id).is_some_and(|(p, id)| p == path && id == on));
+            // (not on the rows of a table of comments: they are the comments)
+            let shown = out.nodes.iter().find(|n| {
+                !n.group
+                    .as_deref()
+                    .is_some_and(|g| g == "comments" || g == "screencomments")
+                    && target(&n.id).is_some_and(|(p, id)| p == path && id == on)
+            });
             if let Some(n) = shown {
                 let mut copy = c.clone();
                 copy.id = row_id(
@@ -1249,6 +1596,231 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
     drop_empty_columns(&mut out);
     arrange(&mut out);
     out
+}
+
+/// Blocks `ids` of `d` and everything inside them (lanes, components),
+/// with the arrows between what was copied, under dashboard ids.
+fn copy_trees(out: &mut Document, d: &Document, path: &[String], ids: &[String], tile: &str) {
+    let new_id = |old: &str| {
+        row_id(
+            tile,
+            &At {
+                path: path.to_vec(),
+                id: old.to_string(),
+            },
+        )
+    };
+    let mut groups: Vec<String> = ids.to_vec();
+    let mut i = 0;
+    while i < groups.len() {
+        let kids: Vec<String> = d
+            .groups
+            .iter()
+            .filter(|g| g.parent.as_deref() == Some(groups[i].as_str()))
+            .map(|g| g.id.clone())
+            .collect();
+        groups.extend(kids);
+        i += 1;
+    }
+    for g in d.groups.iter().filter(|g| groups.contains(&g.id)) {
+        let mut c = g.clone();
+        c.id = new_id(&g.id);
+        c.parent = g
+            .parent
+            .as_deref()
+            .filter(|p| groups.iter().any(|x| x == p))
+            .map(new_id);
+        c.x = None;
+        c.y = None;
+        out.groups.push(c);
+    }
+    let mut copied: Vec<String> = groups.clone();
+    for n in d.nodes.iter().filter(|n| {
+        n.group
+            .as_deref()
+            .is_some_and(|g| groups.iter().any(|x| x == g))
+    }) {
+        let mut c = n.clone();
+        c.id = new_id(&n.id);
+        c.group = n.group.as_deref().map(new_id);
+        c.x = None;
+        c.y = None;
+        copied.push(n.id.clone());
+        out.nodes.push(c);
+    }
+    for e in d
+        .edges
+        .iter()
+        .filter(|e| copied.contains(&e.from) && copied.contains(&e.to))
+    {
+        let mut c = e.clone();
+        c.id = new_id(&e.id);
+        c.from = new_id(&e.from);
+        c.to = new_id(&e.to);
+        out.edges.push(c);
+    }
+}
+
+/// The blocks added since `from` (the top-level ones) put in one section.
+fn wrap(out: &mut Document, from: usize, id: &str, label: &str) {
+    if out.groups.len() <= from {
+        return;
+    }
+    for g in out.groups[from..].iter_mut().filter(|g| g.parent.is_none()) {
+        g.parent = Some(id.to_string());
+    }
+    out.groups.insert(
+        from,
+        Group {
+            id: id.to_string(),
+            label: label.to_string(),
+            ..Default::default()
+        },
+    );
+}
+
+/// How many screen flows: arrows from a screen (or its components) to another screen.
+fn flow_count(doc: &Document) -> usize {
+    docs(doc)
+        .iter()
+        .map(|(_, d)| {
+            let screen_of = |id: &str| {
+                d.group(id)
+                    .filter(|g| g.screen.is_some())
+                    .map(|g| g.id.clone())
+                    .or_else(|| {
+                        d.node(id)
+                            .and_then(|n| n.group.clone())
+                            .filter(|g| d.group(g).is_some_and(|g| g.screen.is_some()))
+                    })
+            };
+            let links: Vec<(String, String)> = d
+                .edges
+                .iter()
+                .filter_map(|e| Some((screen_of(&e.from)?, screen_of(&e.to)?)))
+                .filter(|(a, b)| a != b)
+                .collect();
+            // screens joined by links, counted as connected groups
+            let mut seen: Vec<String> = Vec::new();
+            let mut flows = 0;
+            for (a, _) in &links {
+                if seen.contains(a) {
+                    continue;
+                }
+                flows += 1;
+                let mut todo = vec![a.clone()];
+                while let Some(x) = todo.pop() {
+                    if seen.contains(&x) {
+                        continue;
+                    }
+                    seen.push(x.clone());
+                    for (p, q) in &links {
+                        if *p == x {
+                            todo.push(q.clone());
+                        }
+                        if *q == x {
+                            todo.push(p.clone());
+                        }
+                    }
+                }
+            }
+            flows
+        })
+        .sum()
+}
+
+/// Open comments on screens or their components: (where, text, on what, by).
+fn screen_comments(doc: &Document) -> Vec<(At, String, String, String)> {
+    let mut out = Vec::new();
+    for (path, d) in docs(doc) {
+        for c in d
+            .comments
+            .iter()
+            .filter(|c| c.status != crate::model::Status::Resolved)
+        {
+            let Some(on) = c.on.as_deref() else { continue };
+            let screen = d.group(on).filter(|g| g.screen.is_some()).or_else(|| {
+                d.node(on)
+                    .and_then(|n| n.group.as_deref())
+                    .and_then(|g| d.group(g))
+                    .filter(|g| g.screen.is_some())
+            });
+            if let Some(g) = screen {
+                out.push((
+                    At {
+                        path: path.clone(),
+                        id: on.to_string(),
+                    },
+                    c.text.clone(),
+                    g.display().to_string(),
+                    c.author.clone().unwrap_or_default(),
+                ));
+            }
+        }
+    }
+    out
+}
+
+/// What the board commits to legally: items tagged legal, or in a section
+/// about obligations, compliance or legal (not decision records or risks).
+pub fn obligations(doc: &Document) -> Vec<Item> {
+    let mut out = Vec::new();
+    for (path, d) in docs(doc) {
+        for n in &d.nodes {
+            if done(n) {
+                continue;
+            }
+            let up = ancestors(d, n);
+            if up
+                .iter()
+                .any(|g| g.adr.is_some() || g.risks || g.chart.is_some())
+            {
+                continue;
+            }
+            let about = n.tags.iter().any(|t| t == "legal" || t == "compliance")
+                || up.iter().any(|g| {
+                    word_in(
+                        g.display(),
+                        &["obligation", "compliance", "legal", "contract", "regulat"],
+                    )
+                });
+            if about {
+                out.push(item(doc, &path, d, n));
+            }
+        }
+    }
+    out.sort_by(|a, b| (a.due.is_empty(), a.due.clone()).cmp(&(b.due.is_empty(), b.due.clone())));
+    out
+}
+
+/// The journey's size: steps in the swimlanes and their lanes (roles).
+fn journey_size(doc: &Document) -> (usize, usize) {
+    let mut steps = 0;
+    let mut roles = 0;
+    for (_, d) in docs(doc) {
+        for top in d
+            .groups
+            .iter()
+            .filter(|g| g.lanes && !g.kanban && g.parent.is_none())
+        {
+            let lanes: Vec<&Group> = d
+                .groups
+                .iter()
+                .filter(|g| g.parent.as_deref() == Some(top.id.as_str()))
+                .collect();
+            roles += lanes.len();
+            steps += d
+                .nodes
+                .iter()
+                .filter(|n| {
+                    n.group
+                        .as_deref()
+                        .is_some_and(|g| lanes.iter().any(|l| l.id == g))
+                })
+                .count();
+        }
+    }
+    (steps, roles)
 }
 
 /// The first forecast on the board (in the top board or a canvas).
@@ -1466,12 +2038,66 @@ fn arrange(d: &mut Document) {
     const GAP: f64 = 28.0;
     // a block's frame around what it draws: its title and padding
     let size = |d: &Document, g: &Group| {
-        let p = crate::charts::plot_any(d, g);
-        (p.w + 40.0, p.h + 76.0)
+        if g.plotted() {
+            let p = crate::charts::plot_any(d, g);
+            return (p.w + 40.0, p.h + 76.0);
+        }
+        // a section of blocks (the screens, the journey): as the layout draws it
+        let mut part = Document {
+            settings: d.settings.clone(),
+            ..Default::default()
+        };
+        let mut ids = vec![g.id.clone()];
+        let mut i = 0;
+        while i < ids.len() {
+            let kids: Vec<String> = d
+                .groups
+                .iter()
+                .filter(|c| c.parent.as_deref() == Some(ids[i].as_str()))
+                .map(|c| c.id.clone())
+                .collect();
+            ids.extend(kids);
+            i += 1;
+        }
+        part.groups = d
+            .groups
+            .iter()
+            .filter(|c| ids.contains(&c.id))
+            .cloned()
+            .map(|mut c| {
+                if c.id == g.id {
+                    c.x = None;
+                    c.y = None;
+                }
+                c
+            })
+            .collect();
+        part.nodes = d
+            .nodes
+            .iter()
+            .filter(|n| n.group.as_ref().is_some_and(|x| ids.contains(x)))
+            .cloned()
+            .collect();
+        let inside: Vec<&str> = part
+            .nodes
+            .iter()
+            .map(|n| n.id.as_str())
+            .chain(ids.iter().map(|x| x.as_str()))
+            .collect();
+        part.edges = d
+            .edges
+            .iter()
+            .filter(|e| inside.contains(&e.from.as_str()) && inside.contains(&e.to.as_str()))
+            .cloned()
+            .collect();
+        part.settings.layout = LayoutKind::default();
+        let r = crate::render::render(&part, &Default::default());
+        (r.view.w - 40.0, r.view.h - 40.0)
     };
     let sizes: Vec<(String, f64, f64)> = d
         .groups
         .iter()
+        .filter(|g| g.parent.is_none())
         .map(|g| {
             let (w, h) = size(d, g);
             (g.id.clone(), w, h)
@@ -1485,12 +2111,20 @@ fn arrange(d: &mut Document) {
         .iter()
         .filter(|(id, _, _)| first.as_ref().is_none_or(|f| f.0 != *id))
         .collect();
-    let col_w = rest.iter().map(|(_, w, _)| *w).fold(0.0_f64, f64::max);
+    // columns as wide as the narrow blocks; a wide one (the screens) spans both
+    const WIDE: f64 = 700.0;
+    let col_w = rest
+        .iter()
+        .map(|(_, w, _)| *w)
+        .filter(|w| *w <= WIDE)
+        .fold(0.0_f64, f64::max);
+    let widest = rest.iter().map(|(_, w, _)| *w).fold(0.0_f64, f64::max);
     let width = first
         .as_ref()
         .map(|f| f.1)
         .unwrap_or(0.0)
         .max(2.0 * col_w + GAP)
+        .max(if widest > WIDE { widest } else { 0.0 })
         .max(720.0);
     let head_h = 72.0;
     if let Some(h) = d.nodes.first_mut() {
@@ -1512,8 +2146,8 @@ fn arrange(d: &mut Document) {
     let mut cols = [y, y];
     let xs = [0.0, (width - GAP) / 2.0 + GAP];
     for (id, w, h) in rest {
-        // a block wider than a column (a gantt chart) takes the whole width
-        if *w > (width - GAP) / 2.0 {
+        // a block wider than a column (a gantt chart, the screens) takes the whole width
+        if *w > col_w.max((width - GAP) / 2.0) {
             let y = cols[0].max(cols[1]);
             place(d, id, 0.0, y);
             cols = [y + h + GAP, y + h + GAP];
@@ -1707,6 +2341,60 @@ mod tests {
             .nodes
             .iter()
             .any(|n| n.group.as_deref() == Some("unrecorded") && n.label == "Set the price"));
+    }
+
+    #[test]
+    fn marketing_design_legal_and_users_lead_with_their_question() {
+        let src = format!(
+            "{BOARD}\ntimeline t: Dates {{\n  2026-11-01: Press day [important]\n}}\n\
+             screen a: Sign in [mobile] {{\n  button go: Go [blue]\n}}\nscreen b: Home [mobile] {{\n  title: Hi\n}}\na.go -> b\n\
+             comment on b: Too empty?\n\
+             group law: Obligations {{\n  gdpr: Data deletion within 30 days [date: 2026-10-01]\n}}\n\
+             lanes j: Signing up {{\n  lane u: User {{\n    s1: Fill in the form\n  }}\n  lane s: System {{\n    s2: Send the email\n  }}\n}}\ns1 -> s2\n"
+        );
+        let doc = crate::dsl::parse(&src).unwrap();
+        let today = gantt::parse_date("2026-10-15").unwrap();
+        let get = |id: &str| {
+            let mut ps = crate::perspectives::all(&doc);
+            ps.extend(builtins_of("product"));
+            ps.into_iter().find(|p| p.id == id).unwrap()
+        };
+        // Marketing: the next launch, the dates outside, what not to promise
+        let d = build(&doc, &get("marketing"), today, None);
+        assert!(d.nodes[0].label.starts_with("Next launch: Beta"));
+        assert!(d
+            .nodes
+            .iter()
+            .any(|n| n.group.as_deref() == Some("dates") && n.label == "★ Press day"));
+        assert!(d
+            .nodes
+            .iter()
+            .any(|n| n.group.as_deref() == Some("dontpromise") && n.label == "Set the price"));
+        // Design: the screens with their flow, the comments on them
+        let d = build(&doc, &get("design"), today, None);
+        assert_eq!(
+            d.nodes[0].label,
+            "Screens: 2, in 1 flow · 1 open design comment"
+        );
+        assert!(d.groups.iter().any(|g| g.id == "flow") && d.edges.len() == 1);
+        // Legal: what is waiting, the obligations (overdue in red)
+        let d = build(&doc, &get("legal"), today, None);
+        assert!(
+            d.nodes[0].label.contains("1 overdue obligation"),
+            "{}",
+            d.nodes[0].label
+        );
+        assert!(d.nodes.iter().any(
+            |n| n.group.as_deref() == Some("obligations") && n.color.as_deref() == Some("red")
+        ));
+        // Users: the journey, as the swimlanes draw it
+        let d = build(&doc, &get("user"), today, None);
+        assert_eq!(d.nodes[0].label, "The journey: 2 steps across 2 roles");
+        assert!(d.groups.iter().any(|g| g.lanes));
+    }
+
+    fn builtins_of(kind: &str) -> Vec<Perspective> {
+        crate::perspectives::builtins(crate::model::BoardKind::parse(kind).unwrap())
     }
 
     #[test]
