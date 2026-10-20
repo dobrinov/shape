@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.69.1 — 2026-10-20
+
+- While the AI works on the board, its card stays still: no light sweeping over the board, no turning icon.
+- What the AI changed comes in the same kind of card: what it did, how many changes are highlighted on the board, then *Copy summary*, *Discard* and *Keep*.
+- Fixed: a long request (a link, say) ran out of the card while *Add what you know* worked. The card says *Adding what you know* and shows the request below, wrapped, at most two lines.
+
 ## 0.69.0 — 2026-10-20
 
 - **Copy as text**, next to *Copy as prompt* when you right-click a block, a topic or a selection: what the board shows, to paste for people, in Markdown, without the details behind the items, their ids or the notes meant for a model. A to-do list comes out as a checklist (sub-items indented, owners and due dates in brackets), a mindmap as indented bullets, a table as a table. *Copy as prompt* still gives the AI everything.

@@ -1819,7 +1819,7 @@
     function askRound(prompt, round, req, busy, where, images, job) {
       if (opts.ai) {
         // the board waits, locked, while the AI works; it says what is going on
-        job = job || busyStart(busy ? "rethink" : "add", (busy || "✦ " + req).replace(/^✦ /, "").replace(/…$/, ""));
+        job = job || (busy ? busyStart("rethink", busy.replace(/^✦ /, "").replace(/…$/, "")) : busyStart("add", "Adding what you know", req));
         if (round) busyStep(job, "The reply did not fit; asking again (" + (round + 1) + " of 3)");
       }
       ask(prompt, "✦ " + req, images).then(function (text) {
@@ -1850,14 +1850,14 @@
       });
     }
     /* While the AI works on the board: the board dims and is locked (no
-       clicks, keys or edits), a light sweeps over it, and a card says what
+       clicks, keys or edits), and a card says what
        is going on, how long it has taken, and lets you stop waiting (the
        answer is then thrown away). */
     var BUSY_STEPS = {
       rethink: ["Reading the board, every canvas and comment", "Working out what changed and where it belongs", "Choosing the right block for each thing", "Writing the changes"],
       add: ["Reading what you added", "Finding where each thing belongs", "Writing the changes"]
     };
-    function busyStart(kind, title) {
+    function busyStart(kind, title, what) {
       busyEnd(st.busy);
       var steps = BUSY_STEPS[kind] || BUSY_STEPS.add;
       var job = { stopped: false, t0: Date.now(), step: 0 };
@@ -1867,11 +1867,12 @@
       var card = h("div", { class: "dge-busy-card", role: "status", "aria-live": "polite" }, [
         h("span", { class: "dge-busy-spark", html: icon("magic") }),
         h("b", {}, [title]),
+        what ? h("span", { class: "dge-busy-what", title: what }, [what]) : null,
         stepEl, dots,
         h("div", { class: "dge-busy-foot" }, [timeEl, h("span", { class: "dge-muted" }, ["You see the changes before keeping them"])]),
         h("button", { onclick: function () { job.stopped = true; busyEnd(job); flash("Stopped waiting: the AI's answer will be ignored"); } }, ["Stop waiting"])
       ]);
-      job.el = h("div", { class: "dge-busy" }, [h("div", { class: "dge-busy-beam" }), card]);
+      job.el = h("div", { class: "dge-busy" }, [card]);
       ["pointerdown", "dblclick", "contextmenu", "wheel"].forEach(function (ev) { job.el.addEventListener(ev, function (e) { if (!card.contains(e.target)) e.preventDefault(); e.stopPropagation(); }, { passive: false }); });
       job.stepEl = stepEl; job.dots = dots;
       job.timer = setInterval(function () {
@@ -1915,11 +1916,19 @@
       st.session.set_source(next);
       refreshDoc();
       setBase(st.preview.before, "before the AI");
-      var bar = h("div", { class: "dge-preview-bar", role: "status" }, [
-        h("span", { title: note || "" }, ["✦ " + (note ? note + " " : "The AI's changes are highlighted ") + "(" + count + " op" + (count === 1 ? "" : "s") + ")"]),
-        h("button", { title: "What changed, as Markdown", onclick: function () { copyText(st.session.diff_markdown()).then(function () { flash("Change summary copied"); }); } }, ["Copy summary"]),
-        h("button", { onclick: discardPreview }, ["Discard"]),
-        h("button", { class: "primary", onclick: acceptPreview }, ["Keep"])
+      // a card like the one shown while the AI worked: what it did, then keep or discard
+      var bar = h("div", { class: "dge-preview-bar dge-ai-card", role: "status" }, [
+        h("div", { class: "dge-ai-card-head" }, [
+          h("span", { class: "dge-busy-spark", html: icon("magic") }),
+          h("div", {}, [h("b", {}, ["The AI's changes"]), h("span", { class: "dge-muted" }, [count + (count === 1 ? " change" : " changes") + ", highlighted on the board"])])
+        ]),
+        h("p", { class: "dge-ai-card-note" }, [note || "Look them over on the board, then keep or discard them."]),
+        h("div", { class: "dge-ai-card-actions" }, [
+          h("button", { title: "What changed, as Markdown", onclick: function () { copyText(st.session.diff_markdown()).then(function () { flash("Change summary copied"); }); } }, ["Copy summary"]),
+          h("span", { class: "dge-spacer" }),
+          h("button", { onclick: discardPreview }, ["Discard"]),
+          h("button", { class: "primary", onclick: acceptPreview }, ["Keep"])
+        ])
       ]);
       st.preview.bar = bar;
       el.appendChild(bar);

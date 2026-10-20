@@ -43,7 +43,7 @@ try {
   await p.locator(".dge-dialog textarea").fill("Add a cache the API reads from");
   await p.locator(".dge-dialog button.primary").click();
   await p.waitForSelector(".dge-preview-bar");
-  assert.match(await p.locator(".dge-preview-bar").textContent(), /1 op/);
+  assert.match(await p.locator(".dge-preview-bar").textContent(), /1 change, highlighted on the board/);
   assert.equal(await p.locator('.dg-node[data-id="cache"]').count(), 1);
   await sleep(600);
   assert.equal(saved(), start, "nothing is saved before Keep");
@@ -71,7 +71,7 @@ try {
   await p.locator(".dge-canvas").click({ position: { x: 20, y: 300 }, button: "right" });
   await p.locator(".dge-menu button, .dge-menu [role=menuitem]", { hasText: "Rethink the board" }).first().click();
   await p.waitForSelector(".dge-preview-bar");
-  assert.match(await p.locator(".dge-preview-bar").textContent(), /Put the storage in its own section\. \(1 op\)/);
+  assert.match(await p.locator(".dge-preview-bar").textContent(), /1 change[\s\S]*Put the storage in its own section\./);
   await p.locator(".dge-preview-bar button.primary").click();
   await sleep(700);
   assert.match(saved(), /group storage: Storage \{\n\s+db: Postgres/);
@@ -85,7 +85,7 @@ try {
   await p.locator(".dge-ai-fab").click();
   await p.locator(".dge-ai-item", { hasText: "Rethink" }).click();
   await p.waitForSelector(".dge-preview-bar");
-  assert.match(await p.locator(".dge-preview-bar").textContent(), /Scope now has both plans\. \(1 op\)/);
+  assert.match(await p.locator(".dge-preview-bar").textContent(), /1 change[\s\S]*Scope now has both plans\./);
   await p.locator(".dge-preview-bar button.primary").click(); await sleep(700);
   assert.match(saved(), /n1: Two plans: free and team/);
   assert.match(saved(), /comment c1 on n1: Two plans now \[resolved, resolution: Scope updated\]/);
