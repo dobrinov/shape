@@ -23,6 +23,14 @@ Diagrams are plain-text `.shape` files. People edit them in a FigJam-like browse
    ```
    Shapes: box, rounded, pill, circle, diamond, hexagon, cylinder, parallelogram, document, person, cloud, sticky, text.
    Colours: gray, blue, green, yellow, orange, red, purple, pink, teal.
+
+   Blocks, for what boxes and arrows draw badly (each is `KIND id: Title { … }`; `shape spec` has each one's lines):
+   - `mindmap` (an indented outline), `timeline` (`2026-10-28: Open beta [important]`), `cycle`, `adr` (decision record: `context:`, `options:`, `decision:`, `consequences:`; status `[accepted]`, `[proposed]`…)
+   - `todo` (`[ ] Item [owner: ana, due: 28 Oct]`), `kanban` (with `column` blocks), `gantt` (`Task [2w, after: design, done: 40%]`, `[milestone]`), `risks` (`Risk [p: 4, i: 3, owner: sam]`)
+   - `table`, `chart` (`[line]`, `[bar]`, `[donut]`… over a small table), `forecast` (revenue `now: 12k`, then `Launch milestone [adds: 3k, ramp: 3]`: it follows the gantt's dates)
+   - `entity` (a database table: `email: text [unique]`, `team_id: uuid [fk: teams]`), `schema` (tables read from a file: create it with `shape schema FILE db/structure.sql`)
+   - `sequence` (participants, then `a -> b: message`), `lanes` (swimlanes), `screen` (a wireframe, `screen login: Sign in [mobile] {`, then one component per line: `title: Welcome back`, `input email: Email`, `button go: Sign in [blue]`)
+   - `canvas id: Name { … }` holds a whole board inside this one; `type: product` or `type: project` gives the board perspectives (Delivery, Product, Business…), each opening on a summary Shape works out from the blocks.
 2. Gather the facts first. When drawing a codebase, read the code (entry points, services, queues, databases, external APIs) and draw what is actually there. Use short labels, put tech details in `detail:`, and group by deployable unit or bounded context.
 3. Write the file, e.g. `docs/diagrams/<name>.shape`. Leave out `x`/`y`, because the layout places nodes automatically.
 4. Validate it, then render it:

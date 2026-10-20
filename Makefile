@@ -4,6 +4,9 @@ CARGO_BIN := $(HOME)/.cargo/bin
 RUSTUP_BIN := $(shell rustup which rustc 2>/dev/null | xargs dirname 2>/dev/null)
 WASM_ENV := PATH="$(RUSTUP_BIN):$(CARGO_BIN):$$PATH" DYLD_FALLBACK_LIBRARY_PATH="$(RUSTUP_BIN)/../lib" CARGO_TARGET_DIR="$(CURDIR)/target/wasm"
 
+# builds and tests here do not rewrite the Claude skills installed on this machine
+export SHAPE_NO_SKILL_REFRESH := 1
+
 .PHONY: all wasm js build release install test e2e site dev embed clean
 
 all: build

@@ -102,6 +102,7 @@ MORE
   shape spec [--json-schema]         the language reference (for people and LLMs)
   shape embed [-o shape.embed.js]    browser library bundle (JS + inlined WASM)
   shape skills list | show NAME | install [--global] [--dir PATH]     agent skills
+                                     (installed ones follow upgrades, unless you edit them)
   shape install-app [--remove]       give .shape files their own icon and open them in the
                                      editor on a double-click (macOS, Linux, Windows)
   shape version
@@ -248,6 +249,10 @@ fn main() -> ExitCode {
     }
     if let Some(c) = args.val("--canvas").filter(|c| !c.is_empty()) {
         let _ = CANVAS.set(c.split('/').map(str::to_string).collect());
+    }
+    // after an upgrade, the installed Claude skills follow (unless edited)
+    if args.cmd != "skills" {
+        skills::refresh();
     }
     match run(args) {
         Ok(code) => code,

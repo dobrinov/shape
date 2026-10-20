@@ -296,6 +296,8 @@ shape skills install              # into .claude/skills of the current repo
 shape skills install --global     # into ~/.claude/skills
 ```
 
+Installed skills follow upgrades: the first time a newer Shape runs, it updates the ones it installed, unless you edited them (`SHAPE_NO_SKILL_REFRESH=1` turns this off).
+
 | Skill | What it does |
 |---|---|
 | `shape-draw` | Draw an architecture, flow or board diagram (from a description or by reading the codebase), validate it and render it |

@@ -9,7 +9,7 @@ description: Make precise changes to an existing .shape (or diagram JSON / Merma
 
 1. Read only what you need: `shape query FILE group:backend` (or `near:api`, `chart:plan`, `map:goals`, `label~ledger`, `kind:task`, `owner:ana`, `comments:open`; `--ids` for ids only) prints that part of the board as Shape language. For the whole board, `cat FILE` or `shape brief FILE`.
 2. Adding a lot: write statements and merge them, e.g. `shape add FILE - <<'EOF'` … `EOF` with lines like `group backend {` / `  cache: Redis [cylinder]` / `}` / `api -> cache: reads` / `api [red]`. New elements are created; one written again by its id gets the attributes given; a group written again keeps its place. (The op form is `{"op":"merge","dsl":"…"}`.)
-3. Small changes: edit the text directly. The format is one statement per line, so this is easy and diffs cleanly. Then run `shape check FILE`.
+3. Small changes: edit the text directly. Blocks (`todo`, `kanban`, `gantt`, `timeline`, `table`, `chart`, `forecast`, `adr`, `screen`, `entity`…) list their items one per line, so ticking `[ ]` → `[x]`, moving a card to another `column` or changing a task's `done:` is a one-line edit. Tables in a `schema` block come from a file: change the file and run `shape schema FILE` instead. The format is one statement per line, so this is easy and diffs cleanly. Then run `shape check FILE`.
 4. Structural changes (renames, moving things between groups, deleting nodes together with their edges): use ops. A rename updates every edge and comment that refers to the old id.
    ```bash
    shape apply FILE - <<'JSON'

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.64.0 — 2026-10-20
+
+- **Claude skills follow upgrades.** Skills installed with `shape skills install` (in `~/.claude/skills` or a repository's `.claude/skills`) are brought up to date the first time a newer Shape runs, which says which it updated. A skill you edited is left as it is. `SHAPE_NO_SKILL_REFRESH=1` turns it off.
+- The skills know the blocks added since they were written: to-do lists, wireframe screens, database schemas, forecasts, perspectives and the rest, each with its one-line form.
+
 ## 0.63.1 — 2026-10-19
 
 - **Comment from a perspective's summary.** The comment tool (C) works there again: click a milestone, a risk, a topic or any row to comment on what it stands for. The comment is kept on that element on the board, in whichever canvas it is. The comments on what a summary shows appear on it, and clicking one opens its thread on the full board, to reply or resolve.
