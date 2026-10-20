@@ -1,6 +1,6 @@
 title: Shape, built in public
 description: Shape's own board: how the tool is built, and canvases inside it for what beta testers told us, the plan, the data and the numbers. Every feature of Shape is used somewhere here.
-type: project
+perspectives: project
 direction: right
 routing: orthogonal
 theme: brand

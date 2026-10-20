@@ -688,7 +688,7 @@ mod tests {
         let own = s
             .rethink_prompt(None, "", Some("Adapt this canvas for senior management."))
             .unwrap();
-        assert!(own.contains("## What to do\n\nAdapt this canvas for senior management.\n\nHow to change the board:") && !own.contains("Bring this canvas up to date"), "{own}");
+        assert!(own.contains("## What to do\n\nAdapt this canvas for senior management.\n\n## The right block for each kind of information") && own.contains("How to change the board:") && !own.contains("Bring this canvas up to date"), "{own}");
         assert!(s
             .rethink_prompt(None, "", Some("  "))
             .unwrap()

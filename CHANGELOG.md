@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.66.0 — 2026-10-20
+
+- **Named sets of perspectives.** A board's audiences are a set, picked under *Board → Perspectives* (it was *Type*), which lists what each brings: **Project team** (Delivery, Product, Technical, Legal, Business, Marketing, Design), **Product team** (Product, Technical, Users and the same four), and two new ones: **Startup** (Investors, Product, Delivery, Technical, Business, Marketing, Design) and **Agency**, for client work (Client, Delivery, Business, Design, Technical). Investors opens on the money, the launches and the risks; Client on what they get and when, and what we need from them.
+  - In the file it is one line, `perspectives: project` (`startup`, `agency`, `product`, `none`). `type: project`, as it was written before, still works.
+  - A board with plans on it (a dozen elements, two kinds of planning block) and no set asks once, when it opens, which set fits.
+- **Rethink picks the right block for each kind of information:** dates on a timeline, work with owners on a to-do list or kanban, a plan on a gantt chart, risks on the matrix, a choice in a decision record, numbers on a chart, revenue in a forecast, screens as wireframes. Loose boxes and stickies that are really one of these move into it. *Add what you know* puts new information in the right block the same way.
+
 ## 0.65.0 — 2026-10-20
 
 - **Images for the AI.** In *Add what you know* (⌘K) and in *Ask*, paste a screenshot (⌘V), drop images or pick them with the 📎 button: they show as thumbnails (× takes one off) and go to the AI with what you write, so it can read a slide, a chart or a whiteboard photo and put what it says on the board. Images stay out of the board, so the file stays small, unless you tick *keep* on one in *Add what you know*: that one is added as an image box too.

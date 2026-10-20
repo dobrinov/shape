@@ -246,11 +246,12 @@ pub fn ask(
         )),
     }
     s.push_str(&format!("## The request\n\n{}\n\n", request.trim()));
+    s.push_str(BEST_BLOCKS);
     s.push_str(&crate::recipes::prompt_section(recipes));
     s.push('\n');
     s.push_str("## How to respond\n\nReply with a single ```json code block holding the operations, for example:\n\n```json\n{\"ops\": [\n  {\"op\": \"update_node\", \"id\": \"api\", \"color\": \"red\"},\n  {\"op\": \"merge\", \"dsl\": \"cache: Redis [cylinder]\\napi -> cache: reads\"}\n]}\n```\n\n");
     s.push_str(OPS_REFERENCE);
-    s.push_str("\n\nRules:\n- Change only what the request asks for; keep existing ids.\n- Information that fits an existing item goes into it (its label or `detail`); new topics become new boxes or stickies near what they relate to, in the right section.\n- To add several things, prefer one `merge` with statements in the Shape language.\n- The batch is applied all at once or not at all, so it must be valid as a whole.\n- No explanation is needed outside the code block.\n");
+    s.push_str("\n\nRules:\n- Change only what the request asks for; keep existing ids.\n- Information that fits an existing item goes into it (its label or `detail`); new information goes into the block that shows it best (dates on a timeline, tasks on a to-do list, a risk on the matrix…), or that block is added; a box or sticky only for what fits none.\n- To add several things, prefer one `merge` with statements in the Shape language.\n- The batch is applied all at once or not at all, so it must be valid as a whole.\n- No explanation is needed outside the code block.\n");
     s
 }
 
@@ -296,13 +297,31 @@ fn canvases_of(root: &Document) -> Vec<(Vec<String>, &Document)> {
 
 /// What Rethink does unless the person asks for something else: the
 /// editable part of [`rethink`]'s prompt (the editor shows it to change).
+/// Which block shows which kind of information best: what Rethink goes by
+/// when it organises a board.
+pub const BEST_BLOCKS: &str = "## The right block for each kind of information
+
+Pick the block that lets someone get it at a glance; plain boxes are for parts of a system and their connections.
+- What happened when, and the dates ahead: `timeline` (`2026-10-28: Open beta [important]`).
+- Work to do, with owners and due dates: `todo` (`[ ] Item [owner: ana, due: 28 Oct]`); work moving through stages: `kanban` (`column` blocks of cards).
+- A plan with durations and dependencies: `gantt` (`Task [2w, after: design, done: 40%]`, `[milestone]` for the dates that matter); its forecast and the Delivery summary follow from it.
+- What could go wrong: `risks` (`Risk [p: 4, i: 3, owner: sam]`); something that already blocks work: a card in a blockers `kanban` (column `Blocked`/`Open`).
+- A choice made or to make, with its options: `adr` (`context:`, `options:`, `decision:`, `consequences:`, `[proposed]` until decided).
+- Numbers over time or by category: `chart`; side-by-side facts (options, who does what): `table`; expected revenue as launches ship: `forecast` (`now:`, a milestone per line with `adds:` and `ramp:`).
+- Ideas, a problem broken down, scope: `mindmap`; a loop that repeats: `cycle`.
+- Who does which step, or how a request travels: `lanes` (swimlanes) or `sequence`; screens and the flow between them: `screen` (wireframes); database tables: `entity` (or a `schema` read from a file).
+- Each line's exact form is in the language reference; when unsure, keep the information as it is rather than force it into a block.
+
+";
+
 pub const RETHINK_DEFAULT: &str = "Bring this canvas up to date and make it easy to read.
 
 1. Act on every open comment: change the board as it says, wherever it matters (one new fact can change items on other canvases too), then resolve it with a short resolution saying what changed. If you cannot act on one, reply saying what is missing and leave it open.
 2. Take in what is new (recent changes, loose stickies, notes) and revise the older items around it: update what it changes, and mark what it supersedes instead of deleting it.
 3. Organise: put related items in clearly named sections, merge duplicates into one item that keeps everything they said, and fold settled discussion and stray notes into the items they are about.
-4. Give every item a short, specific title, and put the context the title leaves out in its details.
-5. Fix arrows that no longer make sense, and add the ones that are missing.
+4. Show each kind of information in the block that communicates it best (see below): loose boxes, stickies and text that are really dates, tasks, a plan, risks, a decision, numbers or screens read better as a timeline, a to-do list, a gantt chart, a risk matrix, a decision record, a chart or a wireframe. Move them in, then remove the loose ones.
+5. Give every item a short, specific title, and put the context the title leaves out in its details.
+6. Fix arrows that no longer make sense, and add the ones that are missing.
 
 Keep every piece of information: reorganise, merge and move it, but never drop it.";
 
@@ -396,6 +415,7 @@ pub fn rethink(
         .filter(|i| !i.is_empty())
         .unwrap_or(RETHINK_DEFAULT);
     s.push_str(&format!("## What to do\n\n{what}\n\n"));
+    s.push_str(BEST_BLOCKS);
     s.push_str(&perspectives_section(root));
     s.push_str("How to change the board:\n- Keep ids; to merge, keep one item and remove the others only after moving what they said into it.\n- Ops apply to the top board. For anything inside a canvas, wrap them in an `in` op with the canvas path: `{\"op\": \"in\", \"canvas\": \"plan\", \"ops\": [...]}` (`plan/details` for a canvas inside `plan`). A comment's own ops (`resolve_comment`, `reply`) go in the `in` of the canvas it is in.\n- A box's `detail` holds the context its title leaves out; on a kanban card it shows on hover.\n- Do not set `x`/`y` or move things: the layout follows the structure.\n- Leave the data inside blocks (gantt dates, table cells, chart values, columns) as it is unless the instructions or the information say otherwise.\n- If nothing needs to change, change nothing and say so in the note.\n\n");
     s.push_str(&crate::recipes::prompt_section(recipes));

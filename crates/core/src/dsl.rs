@@ -24,6 +24,7 @@ use crate::model::*;
 pub const SETTINGS: &[&str] = &[
     "title",
     "description",
+    "perspectives",
     "type",
     "direction",
     "layout",
@@ -588,7 +589,7 @@ impl Parser {
             // stays a box called type)
             w if SETTINGS.contains(&w)
                 && c.rest()[w.len()..].trim_start().starts_with(':')
-                && (w != "type"
+                && (!matches!(w, "type" | "perspectives")
                     || BoardKind::parse(
                         unquote(c.rest()[w.len()..].trim_start()[1..].trim()).as_str(),
                     )
@@ -632,9 +633,9 @@ impl Parser {
                     format!("unknown routing `{value}` (use {})", Routing::names())
                 })?
             }
-            "type" => {
+            "type" | "perspectives" => {
                 s.kind = BoardKind::parse(&value).ok_or_else(|| {
-                    format!("unknown board type `{value}` (use {})", BoardKind::names())
+                    format!("unknown set of perspectives `{value}` (use {})", BoardKind::names())
                 })?
             }
             "theme" => {
@@ -3926,7 +3927,7 @@ pub(crate) fn setting_line(doc: &Document, key: &str) -> Option<String> {
         }
         "layout" => (s.layout != def.layout).then(|| format!("layout: {}", s.layout.as_str())),
         "routing" => (s.routing != def.routing).then(|| format!("routing: {}", s.routing.as_str())),
-        "type" => (s.kind != def.kind).then(|| format!("type: {}", s.kind.as_str())),
+        "perspectives" => (s.kind != def.kind).then(|| format!("perspectives: {}", s.kind.as_str())),
         "theme" => match &s.palette {
             Some(p) => Some(format!("theme: {p}")),
             None => (s.theme != def.theme).then(|| format!("theme: {}", s.theme.as_str())),

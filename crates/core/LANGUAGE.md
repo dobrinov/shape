@@ -60,7 +60,7 @@ Edits keep the file as it is written. Ops, the editor and `shape apply` rewrite 
 | `comment [id] [on target] [at x,y] [by author]: text [attrs]` | a review comment. Ids default to `c1`, `c2`, … |
 | `reply id [by author]: text` | a reply to a comment |
 | `theme id [base: light] {` … `}` | a theme: `key: value` lines (see *Themes*) |
-| `title:` `description:` `type:` `direction:` `layout:` `routing:` `theme:` | settings (top level only). The title is metadata (briefs, export names); it is not drawn on the board (`--title` draws it in exports). `type:` is what the board is for, `sketch` (the default), `product` or `project`; it decides the built-in perspectives |
+| `title:` `description:` `perspectives:` `direction:` `layout:` `routing:` `theme:` | settings (top level only). The title is metadata (briefs, export names); it is not drawn on the board (`--title` draws it in exports). `perspectives:` is who looks at the board, a named set: `project`, `product`, `startup`, `agency` or `none` (the default); it decides the built-in perspectives (`type:` is the same setting, as it was called before) |
 
 Ids are made of letters, digits, `_`, and `-` or `.` between them (`orders-api`, `svc.v2`). Writing `\n` in a label starts a new line. Quote a label (`"…"`) when it should keep leading or trailing spaces.
 
@@ -350,14 +350,19 @@ cycle loop: Build loop {
 ### Perspectives
 
 ```shape
-type: project
+perspectives: project
 perspective legal: Legal [tags: legal, show: adr]
 
 fraud: Fraud reporting API [tags: tech exec]
 ```
 
 - A perspective is a way of looking at the board: it shows the elements tagged for it (`tags`), the blocks of the kinds it names whole (`show`: mindmap, timeline, adr, risks, kanban, gantt, table, chart, entity, sequence, lanes, sticky), the sections around them and the arrows and comments between them. `details: off` shows titles only. It changes what you see, never the board.
-- The board's `type:` brings built-in ones. A product board: Product (`product`), Technical (`tech`), Users (`user`). A project board: Delivery (`delivery`, also `team`), Product, Technical. Both also: Legal (`legal`), Business (`business`, also `finance` and `commercial`), Marketing (`marketing`), Design (`design`). A sketch has none. `perspective id: Name [...]` adds one, or overrides a built-in with the same id.
+- The board's set (`perspectives: project`; *Board → Perspectives* in the editor, which also asks once when a board with plans on it has none) brings built-in ones:
+  - `project`, a project team: Delivery (`delivery`, also `team`), Product (`product`), Technical (`tech`), Legal (`legal`), Business (`business`, also `finance` and `commercial`), Marketing (`marketing`), Design (`design`);
+  - `product`, a product team: Product, Technical, Users (`user`), Legal, Business, Marketing, Design;
+  - `startup`: Investors (`investors`, also `board`: the money, the launches, the risks), Product, Delivery, Technical, Business, Marketing, Design;
+  - `agency`, work for a client: Client (`client`: what they get and when, what we need from them), Delivery, Business, Design, Technical;
+  - `none` (also `sketch`): no perspectives. `perspective id: Name [...]` adds one, or overrides a built-in with the same id.
 - **A perspective opens on its summary**, computed from the whole board (its canvases too), so nothing needs keeping up to date. A headline answers the role's first question (Delivery: *Off track: Beta in 7 days* and why; Business: the next launch), then tables, laid out in two columns:
   - **Milestones**: every gantt milestone ahead (or a chart's end), with a light. *Off track* (red): work planned to end by it is forecast to end after it or is late, it is forecast late itself, or an arrow ties a blocker or a risk scoring 20 or more (of 25) to it. *At risk* (amber): work before it is behind, or it is the next milestone and the board has open blockers, risks scoring 12 or more or overdue to-dos that no arrow ties to another one. *On track* (green) otherwise. Each says why.
   - **Open blockers**: cards in a blockers kanban (not in a done/solved column), what sits in a section about blockers or what is at risk, anything tagged `blocker`. **Decisions needed**: proposed decision records, what sits in a section of asks or decisions (*What we need from you*), anything tagged `decision`. **Top risks**: the risk matrices' worst. **Changed since**: what moved, was re-rated, progressed, was added or removed since a week ago (the editor takes the version from the history; exports take `--base`).

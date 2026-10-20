@@ -559,7 +559,8 @@ pub fn since(old: &Document, new: &Document) -> Vec<(At, String)> {
 fn tiles(id: &str) -> &'static [&'static str] {
     match id {
         "delivery" => &["burndown", "kanban", "gantt", "matrix"],
-        "business" => &["money", "milestones", "decisions", "risks"],
+        "business" | "investors" => &["money", "milestones", "decisions", "risks"],
+        "client" => &["milestones", "decisions", "todos", "screens"],
         "marketing" => &["milestones", "todos", "decisions", "risks"],
         "product" => &["scope", "plan", "decisions", "screens"],
         "design" => &["screens", "decisions", "comments"],
@@ -618,7 +619,7 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                 }
             ),
         ),
-        ("business", _) if first_forecast(doc).is_some() => {
+        ("business" | "investors", _) if first_forecast(doc).is_some() => {
             let (d, g) = first_forecast(doc).unwrap();
             let s = crate::forecast::series(doc, d, g, today);
             let slipping = s.forecast.iter().zip(&s.planned).any(|(f, p)| f + 0.5 < *p);
@@ -683,7 +684,12 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
             "blue",
             doc.description.clone().unwrap_or_default(),
         ),
-        ("business" | "marketing", Some(m)) => (
+        ("client", Some(m)) => (
+            format!("Next delivery: {} {}, {}", m.label, countdown(m.due - today), m.light.word().to_lowercase()),
+            m.light.color(),
+            m.reason.clone(),
+        ),
+        ("business" | "marketing" | "investors", Some(m)) => (
             format!(
                 "Next launch: {} {}, {}",
                 m.label,

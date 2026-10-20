@@ -87,8 +87,33 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
             ),
         ]
     };
+    let investors = p(
+        "investors",
+        "Investors",
+        &["investors", "board"],
+        &["chart", "timeline", "risks", "adr"],
+        true,
+    );
+    let client = p(
+        "client",
+        "Client",
+        &["client"],
+        &["timeline", "gantt", "adr", "screen", "todo"],
+        true,
+    );
     match kind {
         BoardKind::Sketch => Vec::new(),
+        BoardKind::Startup => {
+            let mut v = vec![investors, product, delivery, tech];
+            v.extend(around().into_iter().filter(|x| x.id != "legal"));
+            v
+        }
+        BoardKind::Agency => {
+            let mut v = vec![client, delivery];
+            v.extend(around().into_iter().filter(|x| x.id == "design" || x.id == "business"));
+            v.push(tech);
+            v
+        }
         BoardKind::Product => {
             let mut v = vec![product, tech, user];
             v.extend(around());
@@ -113,6 +138,8 @@ pub fn purpose(id: &str) -> Option<&'static str> {
         "business" => "Money, pricing, deals and the numbers",
         "marketing" => "The launch, the message and the dates",
         "design" => "Screens, flows and the user journey",
+        "investors" => "Where the money goes, what it brings and what could go wrong",
+        "client" => "What they get and when, and what we need from them",
         _ => return None,
     })
 }
@@ -482,10 +509,19 @@ mod tests {
 
     #[test]
     fn types_and_perspectives_round_trip_and_change_by_ops() {
-        let src = "title: Launch\ntype: project\n\nperspective exec: Leadership [tags: exec boss, show: adr risks, details: off]\nperspective ux: Design [tags: ux]\n\napi: Orders API [tags: tech]\n";
+        let src = "title: Launch\nperspectives: project\n\nperspective exec: Leadership [tags: exec boss, show: adr risks, details: off]\nperspective ux: Design [tags: ux]\n\napi: Orders API [tags: tech]\n";
         let doc = dsl::parse(src).unwrap();
         assert_eq!(doc.settings.kind, BoardKind::Project);
         assert_eq!(dsl::print(&doc), src);
+        // written as before: `type:` is the same setting
+        assert_eq!(dsl::parse(&src.replace("perspectives: project", "type: project")).unwrap(), doc);
+        // the named sets
+        let names = |k: &str| builtins(BoardKind::parse(k).unwrap()).into_iter().map(|p| p.label).collect::<Vec<_>>().join(", ");
+        assert_eq!(names("startup"), "Investors, Product, Delivery, Technical, Business, Marketing, Design");
+        assert_eq!(names("agency"), "Client, Delivery, Business, Design, Technical");
+        assert_eq!(names("none"), "");
+        // a box called perspectives stays a box too
+        assert!(dsl::parse("perspectives: Who looks at it\n").unwrap().node("perspectives").is_some());
         assert_eq!(crate::from_json(&crate::to_json(&doc)).unwrap(), doc);
         // a box called type stays a box
         let d = dsl::parse("type: Database\n").unwrap();
@@ -501,7 +537,7 @@ mod tests {
         assert_eq!(r["ok"], true, "{r}");
         let out = s.source("dsl").unwrap();
         assert!(
-            out.contains("type: product\n")
+            out.contains("perspectives: product\n")
                 && out.contains(
                     "perspective delivery: Squad [tags: delivery team, show: timeline todo gantt kanban risks table]"
                 )
@@ -531,7 +567,7 @@ mod tests {
         assert_eq!(c.apply_top(r#"{"ops":[{"op":"perspective","id":"audit","label":"Audit"},{"op":"set","key":"type","value":"product"}]}"#)["ok"], true);
         let out = c.source("dsl").unwrap();
         assert!(
-            out.starts_with("type: product\n\nperspective audit: Audit\n"),
+            out.starts_with("perspectives: product\n\nperspective audit: Audit\n"),
             "{out}"
         );
         assert!(c.doc.node("x").is_some(), "still in the canvas");

@@ -274,8 +274,15 @@ pub struct Slide {
     pub transition: Option<Transition>,
 }
 keyword_enum!(
-    /// What a board is for; it decides the built-in perspectives.
-    BoardKind { Sketch = "sketch" | "diagram", Product = "product", Project = "project" } default Sketch
+    /// What a board is for; it decides the built-in perspectives (its set:
+    /// `perspectives: project`, also written `type: project`).
+    BoardKind {
+        Sketch = "sketch" | "diagram" | "none",
+        Product = "product" | "product-team",
+        Project = "project" | "project-team",
+        Startup = "startup",
+        Agency = "agency" | "client"
+    } default Sketch
 );
 keyword_enum!(
     Shape {

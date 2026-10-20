@@ -2203,9 +2203,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                         format!("unknown routing `{v}` (use {})", Routing::names())
                     })?
                 }
-                "type" => {
+                "type" | "perspectives" => {
                     s.kind = BoardKind::parse(v).ok_or_else(|| {
-                        format!("unknown board type `{v}` (use {})", BoardKind::names())
+                        format!("unknown set of perspectives `{v}` (use {})", BoardKind::names())
                     })?
                 }
                 "theme" => match Theme::parse(v) {
