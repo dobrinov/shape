@@ -65,6 +65,14 @@ try {
     await p.locator('button[title="Light / dark"]').click(); await sleep(300);
     await p.screenshot({ path: join(process.env.SHOTS, "todo-dark.png") });
   }
+  // Copy as text: the checklist as the board shows it, for people (no details)
+  await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await p.evaluate(() => window.diagramEditor.apply([{ op: "update_node", id: "launch-checklist.tell-support", detail: "A long note that is for the AI only" }]));
+  await sleep(300);
+  await p.locator('.dg-group[data-id="launch-checklist"]').first().click({ button: "right", position: { x: 30, y: 12 } });
+  await p.getByText("Copy as text").click(); await sleep(300);
+  const text = await p.evaluate(() => navigator.clipboard.readText());
+  assert.equal(text, "- [x] First thing\n- [ ] Second thing (ana, due 2020-01-01)\n  - [ ] On staging\n- [ ] Tell support\n");
   assert.deepEqual(errors, []);
   await browser.close();
   console.log("todo: ok");

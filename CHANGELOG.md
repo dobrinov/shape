@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.69.0 — 2026-10-20
+
+- **Copy as text**, next to *Copy as prompt* when you right-click a block, a topic or a selection: what the board shows, to paste for people, in Markdown, without the details behind the items, their ids or the notes meant for a model. A to-do list comes out as a checklist (sub-items indented, owners and due dates in brackets), a mindmap as indented bullets, a table as a table. *Copy as prompt* still gives the AI everything.
+
 ## 0.68.0 — 2026-10-20
 
 - **Check for Updates…** (macOS, under *Shape → About Shape*): asks GitHub now, whatever Shape remembered, and says what it found: *Shape 0.69.0 is out*, with how to upgrade (`brew upgrade shape`) and *See what's new* for the release notes; or that you have the latest version; or why it could not check. The *New: …* badge in the editor follows. In a terminal: `shape version --check`.

@@ -1113,7 +1113,9 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
             format!(" (forecast in {}: now {}; each launch adds this much a month, reached after `ramp` months, from its gantt milestone's date)", g.unit.as_deref().unwrap_or("units"), crate::forecast::format_amount(g.now.unwrap_or(0.0)))
         } else if g.schema {
             match &g.file {
-                Some(f) => format!(" (database schema, from `{f}`: change the file, not these tables)"),
+                Some(f) => {
+                    format!(" (database schema, from `{f}`: change the file, not these tables)")
+                }
                 None => " (database schema)".to_string(),
             }
         } else if g.table {
@@ -1165,6 +1167,7 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
         } else {
             String::new()
         };
+        let kind = if plain() { String::new() } else { kind };
         out.push_str(&format!(
             "{} {}{kind}\n",
             "#".repeat(level.min(6)),
@@ -1271,7 +1274,7 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
                 if !more.is_empty() {
                     line.push_str(&format!(" ({})", more.join(", ")));
                 }
-                if let Some(d) = &x.detail {
+                if let Some(d) = shown(&x.detail) {
                     line.push_str(&format!(" — {}", d.replace('\n', " ")));
                 }
                 out.push_str(&line);
@@ -1293,10 +1296,12 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
                 if let Some(c) = &x.color {
                     line.push_str(&format!(" ({c})"));
                 }
-                if let Some(d) = &x.detail {
+                if let Some(d) = shown(&x.detail) {
                     line.push_str(&format!(" — {}", d.replace('\n', " ")));
                 }
-                line.push_str(&format!(" `{}`", x.id));
+                if !plain() {
+                    line.push_str(&format!(" `{}`", x.id));
+                }
                 out.push_str(&line);
                 out.push('\n');
             }
@@ -1315,7 +1320,7 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
                 let when = x.date.as_deref().unwrap_or("?");
                 let star = if x.important { " (important)" } else { "" };
                 let mut line = format!("- {when}: {label}{star}");
-                if let Some(d) = &x.detail {
+                if let Some(d) = shown(&x.detail) {
                     line.push_str(&format!(" — {}", d.replace('\n', " ")));
                 }
                 out.push_str(&line);
@@ -1338,7 +1343,7 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
                 if let Some(o) = &x.owner {
                     line.push_str(&format!(", owner {o}"));
                 }
-                if let Some(d) = &x.detail {
+                if let Some(d) = shown(&x.detail) {
                     line.push_str(&format!(" — {}", d.replace('\n', " ")));
                 }
                 out.push_str(&line);
@@ -1689,13 +1694,95 @@ fn steps(
     }
 }
 
+thread_local! {
+    /// Writing for people (Copy as text): what the board shows, without the
+    /// details, the ids and the notes for a model.
+    static PLAIN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+fn plain() -> bool {
+    PLAIN.with(|p| p.get())
+}
+
+/// A detail, unless writing for people.
+fn shown(d: &Option<String>) -> Option<&String> {
+    d.as_ref().filter(|_| !plain())
+}
+
+/// The selection as text for people (Copy as text): the items as the board
+/// shows them, in Markdown (a to-do list as a checklist, a map as indented
+/// bullets, a table as a table), without the details behind them, the ids
+/// or the notes for a model. One block comes without its title.
+pub fn plain_text(doc: &Document, ids: &[String], today: Option<i64>) -> String {
+    // a mindmap (or a branch of one): its topics as indented bullets
+    if let [one] = ids {
+        if doc
+            .node(one)
+            .is_some_and(|n| n.parent.is_some() || n.mindmap.is_some())
+        {
+            fn walk(doc: &Document, id: &str, depth: usize, out: &mut String) {
+                for c in doc.children(id) {
+                    out.push_str(&format!(
+                        "{}- {}\n",
+                        "  ".repeat(depth),
+                        c.display().replace('\n', " ")
+                    ));
+                    walk(doc, &c.id, depth + 1, out);
+                }
+            }
+            let mut out = format!(
+                "{}\n\n",
+                doc.node(one)
+                    .map(|n| n.display().replace('\n', " "))
+                    .unwrap_or_default()
+            );
+            walk(doc, one, 0, &mut out);
+            return out.trim_end().to_string() + "\n";
+        }
+    }
+    let before = PLAIN.with(|p| p.replace(true));
+    let mut out = with_today(today, || selection_core(doc, ids, false));
+    PLAIN.with(|p| p.set(before));
+    // one block: its items, without its heading
+    let single = ids.len() == 1
+        && doc.group(&ids[0]).is_some_and(|g| {
+            doc.groups
+                .iter()
+                .all(|c| c.parent.as_deref() != Some(g.id.as_str()))
+        });
+    if single {
+        if let Some(rest) = out
+            .strip_prefix('#')
+            .and_then(|r| r.split_once('\n'))
+            .map(|(_, r)| r)
+        {
+            out = rest.trim_start_matches('\n').to_string();
+        }
+    }
+    out.trim_end().to_string() + "\n"
+}
+
 /// A block as one Markdown line: label, then its detail and link.
 fn item(doc: &Document, n: &Node) -> String {
     let mut s = link_md(doc, &n.display().replace('\n', " "), n.link.as_deref());
-    if let Some(d) = &n.detail {
+    if let Some(d) = shown(&n.detail) {
         s.push_str(&format!(" — {}", d.replace('\n', " ")));
     }
     s
+}
+
+#[cfg(test)]
+mod plain_tests {
+    #[test]
+    fn copy_as_text_is_what_the_board_shows() {
+        let d = crate::dsl::parse("todo plan: Rollout {\n  [ ] Staging [detail: Before production, every step]\n    [ ] Create the accounts (Ops) [detail: The old ones are gone]\n    [x] Rotate the keys [owner: ana]\n  [ ] Production\n    [ ] Same again [detail: After staging]\n}\nmindmap m: Ideas {\n  One [detail: why one]\n    One a\n  Two\n}\n").unwrap();
+        let t = super::plain_text(&d, &["plan".into()], None);
+        assert_eq!(t, "- [ ] Staging\n  - [ ] Create the accounts (Ops)\n  - [x] Rotate the keys (ana)\n- [ ] Production\n  - [ ] Same again\n");
+        // the prompt keeps the details
+        assert!(super::selection(&d, &["plan".into()]).contains("Before production, every step"));
+        let m = super::plain_text(&d, &["m".into()], None);
+        assert_eq!(m, "Ideas\n\n- One\n  - One a\n- Two\n");
+    }
 }
 
 #[cfg(test)]

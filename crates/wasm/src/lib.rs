@@ -219,6 +219,14 @@ impl Diagram {
 
     /// The selected items as Markdown, with gantt forecasts as of `today`
     /// (`YYYY-MM-DD`; empty: none).
+    /// The selection as text for people (Copy as text): what the board
+    /// shows, without details or ids. `today` as `YYYY-MM-DD`, or "".
+    pub fn selection_text_at(&self, ids: &str, today: &str) -> String {
+        let ids: Vec<String> = serde_json::from_str(ids).unwrap_or_default();
+        let t = shape_core::gantt::parse_date(today);
+        shape_core::prompt::plain_text(&self.inner.doc, &ids, t)
+    }
+
     pub fn selection_markdown_at(&self, ids: &str, today: &str) -> String {
         let ids: Vec<String> = serde_json::from_str(ids).unwrap_or_default();
         let t = shape_core::gantt::parse_date(today);

@@ -2274,6 +2274,7 @@
       var items = itemsFor(t);
       var many = st.sel.length > 1 && st.sel.indexOf(t.id) >= 0;
       if (many) return [
+        ["Copy as text", function () { copyAsText(); }, "What they show, to paste for people: no details"],
         ["Copy as prompt", function () { copyPrompt(); }, "The selected blocks, the arrows between them and their open comments, as Markdown (" + MOD + "⇧C)"]
       ].concat(view ? [] : [
         ["Put in a section", function () { groupSelection(); }, MOD + "G"],
@@ -2281,8 +2282,9 @@
         ["Delete", function () { deleteSelection(); }]
       ]);
       if (t.type === "edge" || t.type === "dep" || mapInfo(t.id)) return items;
-      var copy = ["Copy as prompt", function () { copyPrompt([t.id]); }, "As Markdown to paste into a prompt (" + MOD + "⇧C)"];
-      return view ? [copy] : [copy, "-"].concat(items);
+      var asText = ["Copy as text", function () { copyAsText([t.id]); }, "What it shows, to paste for people (a list as a checklist): no details"];
+      var copy = ["Copy as prompt", function () { copyPrompt([t.id]); }, "Everything in it, details included, to paste into a prompt (" + MOD + "⇧C)"];
+      return view ? [asText, copy] : [asText, copy, "-"].concat(items);
     }
     function itemsFor(t) {
       if (t.type === "dep") return view ? [] : [
@@ -2694,8 +2696,9 @@
         ["Add parent", function () { addParent(t.id); }, mapInfo(t.id).parent ? "A new topic between this one and its parent" : "A new centre above this one (⇧Tab)"],
         [mapInfo(t.id).parent ? "Branch colour…" : "Colour…", function () { colourMenu(t.id, "update_node", node(t.id).color); }, mapInfo(t.id).parent ? "This topic and everything under it" : null],
         "-",
+        ["Copy as text", function () { copyAsText([t.id]); }, "This topic and the ones under it, as indented bullets"],
         ["Copy as prompt", function () { copyPrompt([t.id]); }, "This topic and everything under it as Markdown (" + MOD + "⇧C)"]
-      ].filter(function (it) { return !view || it[0] === "Copy as prompt"; });
+      ].filter(function (it) { return !view || /^Copy as/.test(it[0]); });
       return [];
     }
     /* Pick a shape for a box, at the spot of the menu that led here. */
@@ -2732,6 +2735,15 @@
       var n = ids.length === 1 && (node(ids[0]) || group(ids[0])), label = n && (n.label || n.id);
       copyText(st.session.selection_markdown_at(JSON.stringify(ids), isoDay(today()))).then(function () {
         flash(n ? "Prompt copied — “" + label + "”" + (mapInfo(ids[0]) || group(ids[0]) ? " and everything in it" : "") : "Prompt copied — " + ids.length + " items");
+      });
+    }
+    /* For people: what the selection shows, as Markdown, without the details. */
+    function copyAsText(ids) {
+      ids = (ids || st.sel).filter(kindOf);
+      if (!ids.length) return;
+      var n = ids.length === 1 && (node(ids[0]) || group(ids[0])), label = n && (n.label || n.id);
+      copyText(st.session.selection_text_at(JSON.stringify(ids), isoDay(today()))).then(function () {
+        flash(n ? "Copied “" + label + "” as text" : "Copied " + ids.length + " items as text");
       });
     }
     canvas.addEventListener("contextmenu", function (e) {
