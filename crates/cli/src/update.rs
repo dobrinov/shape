@@ -53,6 +53,32 @@ pub fn start() {
     });
 }
 
+/// Check now, whatever the cache says (Shape → Check for Updates…): the
+/// newer release, `None` when this is the latest, or why it could not tell.
+pub fn check_now() -> Result<Option<Update>, String> {
+    let latest = fetch().ok_or("Could not reach GitHub to check (offline, or its limit on checks for now). Try again in a while.")?;
+    if let Some(f) = cache_file() {
+        if let Some(dir) = f.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let _ = std::fs::write(f, format!("{now} {latest}\n"));
+    }
+    let found = newer(&latest, env!("CARGO_PKG_VERSION")).then(|| Update {
+        url: format!("https://github.com/{REPO}/releases/tag/v{latest}"),
+        how: how(),
+        latest,
+    });
+    // the editor's badge follows
+    if let Ok(mut f) = FOUND.lock() {
+        *f = Some(found.clone());
+    }
+    Ok(found)
+}
+
 /// What the checks found, once the first is done.
 pub fn found() -> Option<Option<Update>> {
     FOUND.lock().ok().and_then(|f| f.clone())

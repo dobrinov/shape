@@ -149,6 +149,9 @@ mod native {
         /// saved (or given up waiting): go
         Close,
         Title(String),
+        /// what Check for Updates… found: the newer version, or why it could not tell
+        #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+        Updates(Result<Option<crate::update::Update>, String>),
     }
 
     /// Saves what the editor has pending, then tells us to close.
@@ -300,6 +303,7 @@ mod native {
                     }
                     Event::UserEvent(Ev::Close) => *flow = ControlFlow::Exit,
                     Event::UserEvent(Ev::Title(t)) => window.set_title(&super::title(&t)),
+                    Event::UserEvent(Ev::Updates(found)) => tell_updates(found),
                     _ => {}
                 }
             })
@@ -319,6 +323,48 @@ mod native {
     /// macOS: text editing shortcuts reach a webview only through an Edit
     /// menu; Quit and Close go through the same save-first close as the
     /// window's button.
+    /// What Check for Updates… found, in a dialog.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    fn tell_updates(found: Result<Option<crate::update::Update>, String>) {
+        use rfd::{MessageButtons, MessageDialog, MessageDialogResult, MessageLevel};
+        let current = env!("CARGO_PKG_VERSION");
+        match found {
+            Ok(Some(u)) => {
+                let how = if u.how.starts_with("http") {
+                    format!("Download it from {}", u.how)
+                } else {
+                    format!("To upgrade, run `{}` in a terminal, then open your board again.", u.how)
+                };
+                let pick = MessageDialog::new()
+                    .set_level(MessageLevel::Info)
+                    .set_title(format!("Shape {} is out", u.latest))
+                    .set_description(format!("You have {current}. {how}"))
+                    .set_buttons(MessageButtons::OkCancelCustom("See what's new".into(), "Later".into()))
+                    .show();
+                if matches!(pick, MessageDialogResult::Custom(ref b) if b == "See what's new") {
+                    let opener = if cfg!(target_os = "macos") { "open" } else if cfg!(windows) { "explorer" } else { "xdg-open" };
+                    let _ = std::process::Command::new(opener).arg(&u.url).spawn();
+                }
+            }
+            Ok(None) => {
+                MessageDialog::new()
+                    .set_level(MessageLevel::Info)
+                    .set_title("Shape is up to date")
+                    .set_description(format!("You have the latest version, {current}."))
+                    .set_buttons(MessageButtons::Ok)
+                    .show();
+            }
+            Err(e) => {
+                MessageDialog::new()
+                    .set_level(MessageLevel::Warning)
+                    .set_title("Could not check for updates")
+                    .set_description(e)
+                    .set_buttons(MessageButtons::Ok)
+                    .show();
+            }
+        }
+    }
+
     #[cfg(target_os = "macos")]
     mod mac {
         use muda::accelerator::{Accelerator, Code, Modifiers};
@@ -413,6 +459,7 @@ mod native {
             let cmd = |key| Some(Accelerator::new(Modifiers::META, key));
             let quit = MenuItem::with_id("quit", "Quit Shape", true, cmd(Code::KeyQ));
             let about = MenuItem::with_id("about", "About Shape", true, None);
+            let updates = MenuItem::with_id("updates", "Check for Updates…", true, None);
             let close = MenuItem::with_id("close", "Close Window", true, cmd(Code::KeyW));
             let menu = Menu::new();
             let sep = P::separator;
@@ -421,6 +468,7 @@ mod native {
                 true,
                 &[
                     &about,
+                    &updates,
                     &sep(),
                     &P::hide(None),
                     &P::hide_others(None),
@@ -453,6 +501,12 @@ mod native {
             MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
                 if e.id == "about" {
                     show_about();
+                } else if e.id == "updates" {
+                    // asking GitHub takes a moment: not on the window's thread
+                    let proxy = proxy.clone();
+                    std::thread::spawn(move || {
+                        let _ = proxy.send_event(Ev::Updates(crate::update::check_now()));
+                    });
                 } else if e.id == "quit" || e.id == "close" {
                     let _ = proxy.send_event(Ev::CloseRequested);
                 }

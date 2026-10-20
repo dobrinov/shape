@@ -105,7 +105,7 @@ MORE
                                      (installed ones follow upgrades, unless you edit them)
   shape install-app [--remove]       give .shape files their own icon and open them in the
                                      editor on a double-click (macOS, Linux, Windows)
-  shape version
+  shape version [--check]            this version (--check: is there a newer one? asks GitHub now)
 
 SERVER OPTIONS
   --port N  --ai CMD
@@ -815,6 +815,13 @@ fn run(args: Args) -> Result<ExitCode, String> {
         }
         "version" => {
             println!("shape {}", env!("CARGO_PKG_VERSION"));
+            // --check: ask GitHub now, whatever was cached
+            if args.flag("--check") {
+                match update::check_now()? {
+                    Some(u) => println!("{} is out: {}\nwhat's new: {}", u.latest, u.how, u.url),
+                    None => println!("this is the latest"),
+                }
+            }
             ok
         }
         "open" => {

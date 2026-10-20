@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.68.0 — 2026-10-20
+
+- **Check for Updates…** (macOS, under *Shape → About Shape*): asks GitHub now, whatever Shape remembered, and says what it found: *Shape 0.69.0 is out*, with how to upgrade (`brew upgrade shape`) and *See what's new* for the release notes; or that you have the latest version; or why it could not check. The *New: …* badge in the editor follows. In a terminal: `shape version --check`.
+
 ## 0.67.0 — 2026-10-20
 
 - **The board says when the AI is at work on it.** While Rethink or *Add what you know* runs, the board dims and is locked: no clicks, keys or edits, and the top bar and tools wait too. A light sweeps across it, and a card says what is going on (*Reading the board, every canvas and comment… → Working out what changed… → Choosing the right block for each thing… → Writing the changes…*), how long it has taken, and when a reply did not fit and it asks again. *Stop waiting* frees the board at once and throws the late answer away. When it is done, you see the changes to keep or discard, as before. With reduced motion on, nothing moves.
