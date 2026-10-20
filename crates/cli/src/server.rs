@@ -448,6 +448,18 @@ fn listen(
             (Method::Post, "/api/ai") => {
                 let mut prompt = String::new();
                 let _ = req.as_reader().read_to_string(&mut prompt);
+                // `{prompt, images: [{name, data}]}` when images go along; else the prompt
+                let mut images = Vec::new();
+                if prompt.starts_with("{\"prompt\"") {
+                    if let Ok(v) = serde_json::from_str::<Value>(&prompt) {
+                        for im in v["images"].as_array().into_iter().flatten() {
+                            if let Some(i) = crate::ai::image_from_data_uri(im["name"].as_str().unwrap_or("image"), im["data"].as_str().unwrap_or("")) {
+                                images.push(i);
+                            }
+                        }
+                        prompt = v["prompt"].as_str().unwrap_or("").to_string();
+                    }
+                }
                 let Some(cmd) = ai.clone() else {
                     respond_json(
                         req,
@@ -457,7 +469,7 @@ fn listen(
                     continue;
                 };
                 // models take seconds; keep serving saves and polls meanwhile
-                std::thread::spawn(move || match crate::ai::run(&cmd, &prompt) {
+                std::thread::spawn(move || match crate::ai::run_with_images(&cmd, &prompt, &images) {
                     Ok(text) => respond_json(req, 200, json!({ "ok": true, "text": text })),
                     Err(e) => respond_json(
                         req,

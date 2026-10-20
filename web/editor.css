@@ -524,3 +524,15 @@
 /* the zoom tool */
 .dge-canvas.zooming { cursor: zoom-in; }
 .dge-canvas.zooming.out { cursor: zoom-out; }
+
+/* images that go with a request to the AI */
+.dge-att-bar { display: flex; align-items: flex-start; gap: 8px; margin: -2px 0 8px; }
+.dge-att { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }
+.dge-att[hidden] { display: none; }
+.dge-ask-panel > .dge-att { padding: 8px 10px 0; }
+.dge-att-item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.dge-att-item img { width: 64px; height: 48px; object-fit: cover; border: 1px solid var(--line-strong); border-radius: var(--r-2); background: var(--bg2); }
+.dge .dge-att-x { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--bg); color: var(--fg); font-size: 12px; line-height: 1; }
+.dge-att-keep { display: flex; align-items: center; gap: 3px; color: var(--muted); font-size: 11px; }
+.dge .dge-att-btn { flex: none; width: 32px; height: 32px; min-height: 0; padding: 0; display: grid; place-items: center; }
+.dge .dge-att-btn svg { width: 16px; height: 16px; }

@@ -128,8 +128,10 @@
         file: f.path,
         name: f.name.replace(/\..*$/, ""),
         // ✦ actions go to the harness the server was started with (--ai CMD)
-        ai: harness.available ? function (prompt) {
-          return fetch("api/ai", { method: "POST", body: prompt }).then(function (r) { return r.json(); }).then(function (res) {
+        ai: harness.available ? function (prompt, images) {
+          // images go along as data URIs; the server hands them to the AI tool
+          var body = images && images.length ? JSON.stringify({ prompt: prompt, images: images }) : prompt;
+          return fetch("api/ai", { method: "POST", body: body }).then(function (r) { return r.json(); }).then(function (res) {
             if (!res.ok) { var e = new Error(res.error); e.hint = res.hint; throw e; }
             return res.text;
           });

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.65.0 — 2026-10-20
+
+- **Images for the AI.** In *Add what you know* (⌘K) and in *Ask*, paste a screenshot (⌘V), drop images or pick them with the 📎 button: they show as thumbnails (× takes one off) and go to the AI with what you write, so it can read a slide, a chart or a whiteboard photo and put what it says on the board. Images stay out of the board, so the file stays small, unless you tick *keep* on one in *Add what you know*: that one is added as an image box too.
+  - Your AI tool gets them as files: Claude Code reads them, Codex attaches them (`-i`), Gemini includes them (`@FILE`); another command finds their paths in `SHAPE_AI_IMAGES`. They are deleted once it has answered.
+  - Without a connected AI, the prompt to copy says to attach the images in your chat too.
+
 ## 0.64.0 — 2026-10-20
 
 - **Claude skills follow upgrades.** Skills installed with `shape skills install` (in `~/.claude/skills` or a repository's `.claude/skills`) are brought up to date the first time a newer Shape runs, which says which it updated. A skill you edited is left as it is. `SHAPE_NO_SKILL_REFRESH=1` turns it off.

@@ -147,7 +147,161 @@ pub fn command(explicit: Option<&str>) -> Option<String> {
 }
 
 pub fn run(cmd: &str, prompt: &str) -> Result<String, String> {
-    let mut child = sh(cmd)
+    run_env(cmd, prompt, &[])
+}
+
+/// An image the person gave with a request: a file name and its bytes.
+pub struct Image {
+    pub name: String,
+    pub bytes: Vec<u8>,
+}
+
+/// An image from a `data:image/png;base64,…` URI.
+pub fn image_from_data_uri(name: &str, uri: &str) -> Option<Image> {
+    let (head, data) = uri.split_once(',')?;
+    if !head.starts_with("data:image/") || !head.ends_with(";base64") {
+        return None;
+    }
+    let ext = head["data:image/".len()..head.len() - ";base64".len()]
+        .replace("svg+xml", "svg")
+        .replace("jpeg", "jpg");
+    let stem: String = name
+        .chars()
+        .take_while(|c| *c != '.')
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(40)
+        .collect();
+    let stem = if stem.is_empty() {
+        "image".to_string()
+    } else {
+        stem
+    };
+    Some(Image {
+        name: format!("{stem}.{ext}"),
+        bytes: unbase64(data)?,
+    })
+}
+
+fn unbase64(s: &str) -> Option<Vec<u8>> {
+    let val = |c: u8| -> Option<u32> {
+        Some(match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' | b'-' => 62,
+            b'/' | b'_' => 63,
+            _ => return None,
+        } as u32)
+    };
+    let clean: Vec<u8> = s
+        .bytes()
+        .filter(|c| !c.is_ascii_whitespace() && *c != b'=')
+        .collect();
+    let mut out = Vec::with_capacity(clean.len() * 3 / 4);
+    for chunk in clean.chunks(4) {
+        let mut n = 0u32;
+        for (i, c) in chunk.iter().enumerate() {
+            n |= val(*c)? << (18 - 6 * i);
+        }
+        out.push((n >> 16) as u8);
+        if chunk.len() > 2 {
+            out.push((n >> 8) as u8);
+        }
+        if chunk.len() > 3 {
+            out.push(n as u8);
+        }
+    }
+    Some(out)
+}
+
+fn quote(p: &std::path::Path) -> String {
+    format!("'{}'", p.display().to_string().replace('\'', "'\\''"))
+}
+
+/// `cmd` and `prompt` with images handed over the way each CLI takes them:
+/// Claude Code reads the files (`--add-dir`, the Read tool), Codex attaches
+/// them (`-i FILE`), Gemini includes them (`@FILE` in the prompt); any other
+/// command gets their paths in `SHAPE_AI_IMAGES` (one per line). The prompt
+/// always lists them.
+fn with_images(
+    cmd: &str,
+    prompt: &str,
+    dir: &std::path::Path,
+    files: &[std::path::PathBuf],
+) -> (String, String, Vec<(String, String)>) {
+    let prog = cmd
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .rsplit('/')
+        .next()
+        .unwrap_or("");
+    let gemini = prog == "gemini";
+    let lines: Vec<String> = files
+        .iter()
+        .map(|f| {
+            if gemini {
+                format!("- @{}", f.display())
+            } else {
+                format!("- {}", f.display())
+            }
+        })
+        .collect();
+    let prompt = format!(
+        "{prompt}\n\n## Images\n\nThe person also gave you {} with this; look at {} before you answer, {} part of what they tell you or ask:\n{}\n",
+        if files.len() == 1 { "an image".to_string() } else { format!("{} images", files.len()) },
+        if files.len() == 1 { "it" } else { "them" },
+        if files.len() == 1 { "it is" } else { "they are" },
+        lines.join("\n")
+    );
+    let cmd = match prog {
+        "claude" => format!("{cmd} --add-dir {} --allowedTools Read", quote(dir)),
+        "codex" => {
+            let flags: String = files.iter().map(|f| format!(" -i {}", quote(f))).collect();
+            match cmd.strip_suffix(" -") {
+                Some(base) => format!("{base}{flags} -"),
+                None => format!("{cmd}{flags}"),
+            }
+        }
+        _ => cmd.to_string(),
+    };
+    let paths = files
+        .iter()
+        .map(|f| f.display().to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    (cmd, prompt, vec![("SHAPE_AI_IMAGES".into(), paths)])
+}
+
+/// [`run`], with images that go along (in a temporary folder, removed after).
+pub fn run_with_images(cmd: &str, prompt: &str, images: &[Image]) -> Result<String, String> {
+    if images.is_empty() {
+        return run(cmd, prompt);
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let dir = std::env::temp_dir().join(format!("shape-ai-{}-{stamp}", std::process::id()));
+    std::fs::create_dir_all(&dir).map_err(|e| format!("images: {e}"))?;
+    let mut files = Vec::new();
+    for (i, img) in images.iter().enumerate() {
+        let f = dir.join(format!("{}-{}", i + 1, img.name));
+        std::fs::write(&f, &img.bytes).map_err(|e| format!("images: {e}"))?;
+        files.push(f);
+    }
+    let (cmd2, prompt2, env) = with_images(cmd, prompt, &dir, &files);
+    let out = run_env(&cmd2, &prompt2, &env);
+    let _ = std::fs::remove_dir_all(&dir);
+    out
+}
+
+fn run_env(cmd: &str, prompt: &str, env: &[(String, String)]) -> Result<String, String> {
+    let mut c = sh(cmd);
+    for (k, v) in env {
+        c.env(k, v);
+    }
+    let mut child = c
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -182,6 +336,41 @@ pub fn run(cmd: &str, prompt: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn images_go_the_way_each_cli_takes_them() {
+        let png =
+            image_from_data_uri("Pricing slide.png", "data:image/png;base64,aGVsbG8hPw==").unwrap();
+        assert_eq!(
+            (png.name.as_str(), png.bytes.as_slice()),
+            ("Pricingslide.png", &b"hello!?"[..])
+        );
+        assert!(image_from_data_uri("x", "data:text/plain;base64,aGk=").is_none());
+        let dir = std::path::Path::new("/tmp/shape-ai-1");
+        let files = vec![dir.join("1-a.png")];
+        let (cmd, prompt, _) = with_images("claude -p", "Hi", dir, &files);
+        assert_eq!(
+            cmd,
+            "claude -p --add-dir '/tmp/shape-ai-1' --allowedTools Read"
+        );
+        assert!(prompt.ends_with("## Images\n\nThe person also gave you an image with this; look at it before you answer, it is part of what they tell you or ask:\n- /tmp/shape-ai-1/1-a.png\n"));
+        let (cmd, _, _) = with_images("codex exec --skip-git-repo-check -", "Hi", dir, &files);
+        assert_eq!(
+            cmd,
+            "codex exec --skip-git-repo-check -i '/tmp/shape-ai-1/1-a.png' -"
+        );
+        let (cmd, prompt, _) = with_images("gemini", "Hi", dir, &files);
+        assert_eq!(cmd, "gemini");
+        assert!(prompt.contains("- @/tmp/shape-ai-1/1-a.png"));
+        let (_, _, env) = with_images("my-model --fast", "Hi", dir, &files);
+        assert_eq!(
+            env[0],
+            (
+                "SHAPE_AI_IMAGES".to_string(),
+                "/tmp/shape-ai-1/1-a.png".to_string()
+            )
+        );
+    }
 
     #[test]
     fn failures_come_with_what_to_try() {

@@ -49,6 +49,7 @@
     tidy: '<path d="M4 6h7M4 12h11M4 18h16"/>',
     decision: '<path d="M12 3l9 9-9 9-9-9z"/>',
     present: '<rect x="3.5" y="5" width="17" height="12" rx="2"/><path d="M12 17v3M8.5 20h7M10.5 9v4l3.5-2z"/>',
+    attach: '<path d="M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/>',
     forecast: '<path d="M3 20h18M4 16l5-5 4 3 7-8"/><path d="M15 6h5v5"/>',
     schema: '<ellipse cx="9" cy="5" rx="6" ry="2.2"/><path d="M3 5v9c0 1.2 2.7 2.2 6 2.2M15 5v4"/><rect x="11" y="11" width="10" height="9" rx="1.5"/><path d="M11 14.5h10"/>',
     entity: '<ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6"/>',
@@ -283,7 +284,8 @@
     function closeAiMenu() { aiMenu.hidden = true; aiFab.classList.remove("on"); }
     /* Ask: questions about the board; answers point at places on it. */
     var askThread = h("div", { class: "dge-ask-thread" });
-    var askInput = h("textarea", { rows: "2", placeholder: "Ask about this board, e.g. what is still open?" });
+    var askInput = h("textarea", { rows: "2", placeholder: "Ask about this board, e.g. what is still open? (paste a screenshot to ask about it)" });
+    var askAtt = attachments(askInput, false);
     var askPanel = h("div", { class: "dge-ask-panel", role: "dialog", "aria-label": "Ask about this board", hidden: true }, [
       h("header", {}, [
         h("span", { class: "dge-ai-ico", html: icon("ask") }),
@@ -291,7 +293,8 @@
         h("button", { class: "dge-ask-close", title: "Close (Esc)", "aria-label": "Close", onclick: function () { closeAsk(); } }, ["×"])
       ]),
       askThread,
-      h("div", { class: "dge-ask-box" }, [askInput, h("button", { class: "primary", title: "Ask (Enter; ⇧Enter for a new line)", onclick: function () { sendQuestion(); } }, ["Ask"])])
+      askAtt.thumbs,
+      h("div", { class: "dge-ask-box" }, [askInput, askAtt.button, h("button", { class: "primary", title: "Ask (Enter; ⇧Enter for a new line)", onclick: function () { sendQuestion(); } }, ["Ask"])])
     ]);
     askInput.addEventListener("keydown", function (e) {
       e.stopPropagation();
@@ -1358,11 +1361,12 @@
     }
     /* Ask the model. With no `ai` option the prompt is shown to copy into any
        chat or harness, and the reply is pasted back. */
-    function ask(prompt, title) {
+    function ask(prompt, title, images) {
       // the date, so the model does not guess the year
       prompt = "Today is " + isoDay(today()) + ".\n\n" + prompt;
+      images = images || [];
       // when the AI fails, say why and what to try
-      if (opts.ai) return Promise.resolve().then(function () { return opts.ai(prompt); }).catch(function (e) {
+      if (opts.ai) return Promise.resolve().then(function () { return opts.ai(prompt, images); }).catch(function (e) {
         if (String(e && e.message) !== "cancelled") { setupAI(e); if (e && typeof e === "object") e.shown = true; }
         throw e;
       });
@@ -1373,6 +1377,7 @@
         var settled = false;
         showModal(title || "✦ Ask a model", h("div", { class: "dge-prompt" }, [
           h("p", { class: "dge-muted" }, ["No model is connected here. Copy the prompt into any chat or agent, then paste its reply. ", h("a", { href: "#", onclick: function (e) { e.preventDefault(); settled = true; reject(new Error("cancelled")); setupAI(); } }, ["Connect your AI…"])]),
+          images.length ? h("p", { class: "dge-muted" }, ["Attach the " + (images.length === 1 ? "image" : images.length + " images") + " you added in that chat too."]) : null,
           pre, reply
         ]), [
           h("button", { onclick: function () { copyText(prompt).then(function () { flash("Prompt copied"); }); } }, ["Copy prompt"]),
@@ -1488,24 +1493,78 @@
       if (st.preview) return flash("Keep or discard the AI's changes first", true);
       var ids = st.sel.filter(kindOf);
       closeAiMenu();
-      var input = h("textarea", { class: "dge-chart-data", rows: "5", placeholder: ids.length ? "e.g. Ana says this runs nightly and takes about 40 minutes; it must finish before 6am" : "e.g. In the interviews, 5 of 8 teams left over price; two asked for SSO; legal needs an audit log by March" });
+      var input = h("textarea", { class: "dge-chart-data", rows: "5", placeholder: ids.length ? "e.g. Ana says this runs nightly and takes about 40 minutes; it must finish before 6am" : "e.g. In the interviews, 5 of 8 teams left over price; two asked for SSO; legal needs an audit log by March. Paste or drop screenshots too." });
+      var att = attachments(input, true);
       var go = function () {
         var req = input.value.trim();
-        if (!req) return;
-        closeModal();
-        var prompt = st.session.ask_prompt(JSON.stringify(ids), req);
-        askRound(prompt, 0, req, null, st.canvasPath.slice());
+        if (!req && !att.count()) return;
+        if (!req) req = "Here is what these images show: put it on the board, each fact where it belongs.";
+        att.take().then(function (got) {
+          closeModal();
+          // the ones ticked to keep: image boxes, side by side in view
+          if (got.keep.length) {
+            var r = canvas.getBoundingClientRect(), at = toDiagram(r.left + canvas.clientWidth / 2, r.top + canvas.clientHeight / 2), x = at.x;
+            got.keep.forEach(function (img) { addImageBox(img, { x: x, y: at.y }); x += Math.min(480, img.w) + 40; });
+          }
+          var prompt = st.session.ask_prompt(JSON.stringify(ids), req);
+          askRound(prompt, 0, req, null, st.canvasPath.slice(), got.images);
+        }, function (e) { flash("Could not read the image: " + (e.message || e), true); });
       };
       input.addEventListener("keydown", function (e) { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") go(); });
       showModal("✦ Add what you know", h("div", {}, [
         h("p", { class: "dge-muted" }, ["Write down details or information you have; the AI puts each where it belongs" + (ids.length ? ", around the " + ids.length + " selected item" + (ids.length > 1 ? "s" : "") + "." : " on this canvas (select something to narrow it).") + " You can also ask for a change."]),
         input,
-        h("p", { class: "dge-muted" }, [opts.ai ? "Your AI subscription's CLI answers; you see the changes before keeping them." : "No AI is connected here: you'll get the prompt to paste into any chat, then paste its reply back."])
+        h("div", { class: "dge-att-bar" }, [att.thumbs, att.button]),
+        h("p", { class: "dge-muted" }, [opts.ai ? "Your AI subscription's CLI answers, and reads the images; you see the changes before keeping them. Images stay out of the board unless you tick keep." : "No AI is connected here: you'll get the prompt to paste into any chat, then paste its reply back."])
       ]), [
         h("button", { onclick: closeModal }, ["Cancel"]),
         h("button", { class: "primary", onclick: go }, ["Add (" + MOD + "↵)"])
       ]);
       setTimeout(function () { input.focus(); }, 0);
+    }
+    /* Images that go with a request to the AI: pasted into `input`, dropped
+       on it or picked with the 📎 button; thumbnails to take them off, and
+       with `keep`, a tick to also put one on the board. */
+    function attachments(input, keep) {
+      var items = [];
+      var thumbs = h("div", { class: "dge-att" });
+      var draw = function () {
+        thumbs.innerHTML = "";
+        thumbs.hidden = !items.length;
+        items.forEach(function (it, i) {
+          var tick = keep ? h("label", { class: "dge-att-keep", title: "Also put this image on the board" }, [h("input", { type: "checkbox", checked: it.keep, onchange: function (e) { it.keep = e.target.checked; } }), "keep"]) : null;
+          thumbs.appendChild(h("span", { class: "dge-att-item", title: it.name }, [
+            h("img", { src: it.url, alt: it.name }),
+            h("button", { class: "dge-att-x", title: "Take it off", "aria-label": "Remove " + it.name, onclick: function () { URL.revokeObjectURL(it.url); items.splice(i, 1); draw(); } }, ["×"]),
+            tick
+          ]));
+        });
+      };
+      var add = function (files) {
+        files.forEach(function (f) { items.push({ file: f, name: f.name || "pasted.png", url: URL.createObjectURL(f), keep: false }); });
+        draw();
+      };
+      input.addEventListener("paste", function (e) { var f = imageFiles(e.clipboardData); if (f.length) { e.preventDefault(); add(f); } });
+      input.addEventListener("dragover", function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") >= 0) e.preventDefault(); });
+      input.addEventListener("drop", function (e) { var f = imageFiles(e.dataTransfer); if (f.length) { e.preventDefault(); add(f); } });
+      var picker = h("input", { type: "file", accept: "image/*", multiple: "multiple", hidden: true, onchange: function () { add(Array.prototype.slice.call(picker.files)); picker.value = ""; } });
+      var button = h("button", { class: "dge-att-btn", type: "button", title: "Add images (or paste / drop them here)", onclick: function () { picker.click(); } }, [h("span", { html: icon("attach") }), picker]);
+      draw();
+      return {
+        thumbs: thumbs,
+        button: button,
+        count: function () { return items.length; },
+        /* {images: [{name, data}] for the AI, keep: [image data] for the board} */
+        take: function () {
+          return Promise.all(items.map(function (it) { return imageData(it.file).then(function (img) { return { it: it, img: img }; }); })).then(function (all) {
+            return {
+              images: all.map(function (x) { return { name: x.it.name, data: x.img.data }; }),
+              keep: all.filter(function (x) { return x.it.keep; }).map(function (x) { return x.img; })
+            };
+          });
+        },
+        clear: function () { items.forEach(function (it) { URL.revokeObjectURL(it.url); }); items = []; draw(); }
+      };
     }
     /* A box's details: the context its title leaves out. */
     function editDetails(id) {
@@ -1542,7 +1601,10 @@
     }
     function sendQuestion() {
       var q = askInput.value.trim();
-      if (!q || st.asking) return;
+      if ((!q && !askAtt.count()) || st.asking) return;
+      if (!q) q = "What does this image tell us about the board?";
+      var pending = askAtt.take();
+      askAtt.clear();
       askInput.value = "";
       var a = h("div", { class: "dge-ask-a dge-muted" }, [opts.ai ? "✦ Drawing an answer…" : "✦ Waiting for the reply you paste…"]);
       askThread.appendChild(h("div", { class: "dge-ask-q" }, [q]));
@@ -1553,15 +1615,16 @@
       var board = st.answer ? st.answer.main.session : st.session;
       var prompt = board.answer_board_prompt(JSON.stringify(history), q, isoDay(today()));
       st.asking = true;
+      var images = [];
       var round = function (p, n) {
-        return ask(p, "✦ Ask: " + q).then(function (text) {
+        return ask(p, "✦ Ask: " + q, images).then(function (text) {
           var r = JSON.parse(wasm.answer_parts(String(text || "")));
           if (!r.ok && opts.ai && n < 2) return round(wasm.ask_again(prompt, String(text || ""), r.error), n + 1);
           if (!r.ok) throw new Error(r.error);
           return r;
         });
       };
-      round(prompt, 0).then(function (r) {
+      pending.then(function (got) { images = got.images; return round(prompt, 0); }).then(function (r) {
         st.askHistory = history.concat([[q, r.summary]]);
         a.className = "dge-ask-a";
         a.textContent = r.summary || "Answered on its own canvas.";
@@ -1712,9 +1775,9 @@
     }
     /* `where`: the canvas the reply's ops are about ([]: the top board,
        where `in` ops reach into canvases). */
-    function askRound(prompt, round, req, busy, where) {
+    function askRound(prompt, round, req, busy, where, images) {
       if (opts.ai) flash(round ? "✦ The reply did not fit; asking again…" : busy || "✦ Thinking…", false, 180000);
-      ask(prompt, "✦ " + req).then(function (text) {
+      ask(prompt, "✦ " + req, images).then(function (text) {
         text = String(text || "");
         var test = new wasm.Diagram();
         test.set_source(st.text);
@@ -1722,7 +1785,7 @@
         var res = JSON.parse(test.apply(text));
         if (!res.ok) {
           test.free();
-          if (opts.ai && round < 2) return askRound(wasm.ask_again(prompt, text, res.error || "invalid reply"), round + 1, req, busy, where);
+          if (opts.ai && round < 2) return askRound(wasm.ask_again(prompt, text, res.error || "invalid reply"), round + 1, req, busy, where, images);
           return flash("The AI's reply did not apply: " + (res.error || "no ops in it"), true);
         }
         var next = test.source("dsl");
