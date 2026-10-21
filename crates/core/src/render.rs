@@ -626,7 +626,14 @@ fn draw(doc: &Document, opts: &RenderOptions, def: Option<crate::model::ThemeDef
     let opens: Vec<(&layout::NodeBox, &crate::model::Canvas)> = lay
         .nodes
         .iter()
-        .filter_map(|nb| Some((nb, doc.canvas(doc.node(&nb.id)?.canvas.as_deref()?)?)))
+        .filter_map(|nb| {
+            let node = doc.node(&nb.id)?;
+            // a gantt task has its badge by its name
+            if node.group.as_deref().and_then(|g| doc.group(g)).is_some_and(|g| g.gantt) {
+                return None;
+            }
+            Some((nb, doc.canvas(node.canvas.as_deref()?)?))
+        })
         .collect();
     if !opens.is_empty() {
         s.push_str(r#"<g class="dg-opens">"#);
@@ -1023,6 +1030,51 @@ fn gantt_svg(
             p.fg,
             esc(node.display())
         );
+        // a task that opens a canvas: a badge at the end of its name that opens
+        // it, with how many risks it holds (in the worst one's colour)
+        if let Some(c) = node.canvas.as_deref().and_then(|c| doc.canvas(c)) {
+            let (bx, by) = (
+                ox + g.x0 - layout::GANTT_GAP - 16.0,
+                top + k as f64 * layout::GANTT_ROW + layout::GANTT_ROW / 2.0,
+            );
+            let mark = crate::dashboard::risk_mark(c);
+            let (fill, title, inside) = match mark {
+                Some((k, worst)) => (
+                    if worst >= 20.0 {
+                        "#e03131"
+                    } else if worst >= 12.0 {
+                        "#e8590c"
+                    } else {
+                        "#868e96"
+                    },
+                    format!(
+                        "Open “{}”: {k} {}, the worst {worst:.0} of 25",
+                        c.display(),
+                        if k == 1 { "risk" } else { "risks" }
+                    ),
+                    format!(
+                        r##"<text x="0" y="4" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">{k}</text>"##
+                    ),
+                ),
+                None => (
+                    p.group_accent,
+                    format!("Open “{}” ({} inside)", c.display(), c.doc.size()),
+                    format!(
+                        r#"<rect x="-5" y="-3" width="8" height="7" rx="1.2" fill="none" stroke="{ink}" stroke-width="1.6"/><path d="M-2,-3 V-5.5 H5.5 V1.5 H3" fill="none" stroke="{ink}" stroke-width="1.6" stroke-linejoin="round"/>"#,
+                        ink = p.node_fill
+                    ),
+                ),
+            };
+            let _ = write!(
+                s,
+                r#"<g class="dg-open" data-node="{}" data-canvas="{}" transform="translate({},{})"><title>{}</title><rect x="-13" y="-9" width="26" height="18" rx="9" fill="{fill}"/>{inside}</g>"#,
+                esc(&node.id),
+                esc(&c.id),
+                n(bx),
+                n(by),
+                esc(&title)
+            );
+        }
     }
     // dependencies: from the end of a task to the start of the one after it
     for id in &g.rows {

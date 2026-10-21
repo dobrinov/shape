@@ -640,6 +640,12 @@ fn edit_lines(
             statement(new, &e, "", &mut chunk);
         }
     }
+    for p in &new.perspectives {
+        let e = Elem::Setting(format!("perspective {}", p.id));
+        if !done.contains(&e) {
+            statement(new, &e, "", &mut chunk);
+        }
+    }
     add(at.settings, 0, std::mem::take(&mut chunk));
     let after_settings = at.settings.unwrap_or(0);
     for n in &new.nodes {
@@ -773,6 +779,29 @@ mod tests {
     }
 
     const SRC: &str = "title: Shop\n\n# people\nweb, mobile -> cdn -> gw\n\ngroup back: Backend [blue] {\n  # the main one\n  api: Orders API\n  db: Postgres [cylinder]\n}\n\napi -> db\ncomment on api by deyan: Split it?\n";
+
+    #[test]
+    fn a_new_perspective_leaves_the_canvases_as_written() {
+        let src = "title: Programme\n\nshop_link: Shop [pill, canvas: shop]\n\ncanvas shop: Shop {\n  # the part people see\n  web -> api\n\n  table people: People {\n    name | role\n    Ana  | design\n  }\n}\n";
+        let out = edited(
+            src,
+            r#"{"ops":[{"op":"perspective","id":"delivery","label":"Delivery","tags":["delivery"]}]}"#,
+        );
+        assert_eq!(
+            out,
+            src.replacen(
+                "title: Programme\n",
+                "title: Programme\nperspective delivery: Delivery [tags: delivery]\n",
+                1
+            )
+        );
+        // and changing it rewrites only its line
+        let again = edited(
+            &out,
+            r#"{"ops":[{"op":"perspective","id":"delivery","label":"Squad","tags":["delivery"]}]}"#,
+        );
+        assert_eq!(again, out.replace("Delivery [", "Squad ["));
+    }
 
     #[test]
     fn untouched_lines_stay_as_written() {

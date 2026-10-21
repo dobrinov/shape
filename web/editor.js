@@ -455,16 +455,20 @@
       openComposer({ on: m[2], path: m[1] ? m[1].split("/") : [], label: label }, cx, cy);
       return true;
     }
-    function openFromDash(rowId, thread) {
-      var m = /^@dash\/[^/]*\/(.*):(.*)$/.exec(rowId);
-      if (!m || !m[2] || m[2].charAt(0) === "#") return;
-      var path = m[1] ? m[1].split("/") : [], id = m[2];
+    /* From a summary to the full board, at canvas `path` (← goes back). */
+    function leaveDash(path) {
       st.backTo = st.perspective.id;
       st.perspective = null;
       if (toolbar.persp) toolbar.persp.value = "";
       fillPerspectives();
       if (path.join("/") !== (st.canvasPath || []).join("/")) openCanvas(path); else render();
       showBack();
+    }
+    function openFromDash(rowId, thread) {
+      var m = /^@dash\/[^/]*\/(.*):(.*)$/.exec(rowId);
+      if (!m || !m[2] || m[2].charAt(0) === "#") return;
+      var path = m[1] ? m[1].split("/") : [], id = m[2];
+      leaveDash(path);
       setTimeout(function () {
         if (node(id) || group(id)) { select([id]); reveal(id); }
         // from a comment's pin: open its thread
@@ -882,6 +886,38 @@
         ]);
         if (res.ok) { select([id]); flash("Double-click “" + title + "” (or its badge) to open it"); }
       });
+    }
+    /* Whole boards from files, each as a canvas inside this one with a button here that opens it. */
+    function importBoards(at) {
+      var input = h("input", { type: "file", accept: ".shape,.diagram,.json,.mmd,.mermaid,text/plain", multiple: "multiple" });
+      input.onchange = function () {
+        Array.prototype.slice.call(input.files).forEach(function (f, i) {
+          f.text().then(function (src) {
+            var r = JSON.parse(wasm.convert(src, "dsl"));
+            if (!r.ok) { flash("“" + f.name + "” is not a board: " + ((r.errors || [])[0] || {}).message, true); return; }
+            var json = JSON.parse(wasm.convert(src, "json"));
+            var title = (json.ok && JSON.parse(json.text).title) || f.name.replace(/\.[^.]+$/, "");
+            var id = freshId(slug(title) + "-link"), cid = canvasIdFor(title);
+            var res = applyOps([
+              { op: "add_canvas", id: cid, title: title },
+              { op: "add_node", id: id, label: title, shape: "pill", canvas: cid, x: Math.round(at.x - 70), y: Math.round(at.y - 22 + i * 64) },
+              { op: "in", canvas: cid, ops: [{ op: "merge", dsl: r.text }] }
+            ]);
+            if (res.ok) { select([id]); flash("“" + title + "” is a canvas of this board now: double-click its button to open it"); }
+          });
+        });
+      };
+      input.click();
+    }
+    /* A canvas of its own for a gantt task: where its risks and the rest of its delivery go. */
+    function taskCanvas(id) {
+      var title = labelOf(id), cid = canvasIdFor(title);
+      var res = applyOps([
+        { op: "add_canvas", id: cid, title: title },
+        { op: "update_node", id: id, canvas: cid },
+        { op: "in", canvas: cid, ops: [{ op: "merge", dsl: "risks risks: Risks to " + JSON.stringify(title).slice(1, -1).replace(/[{}\[\]]/g, "") + " {\n}\n" }] }
+      ]);
+      if (res.ok) openCanvas(st.canvasPath.concat([cid]));
     }
     /* The id add_canvas will give a canvas with this title. */
     function canvasIdFor(title) {
@@ -2313,6 +2349,8 @@
       if (t.type === "node" && !view && chartOf(t.id)) {
         var tk = node(t.id);
         return [
+          canvasOf(t.id) ? ["Open its canvas", function () { openLinked(t.id); }, "Its risks and everything about delivering it (or double-click the task)"]
+            : ["Give it a canvas", function () { taskCanvas(t.id); }, "A board inside this one for its risks, blockers and everything about delivering it; the chart shows how many risks it holds"],
           ["Rename", function () { editLabel(t.id); }],
           tk.milestone ? null : ["Duration…", function () { askDuration(t.id); }, "Or drag the end of the bar"],
           ["Starts after…", function () { afterMenu(t.id); }, "Or draw an arrow from the task it waits for (in any chart)"],
@@ -2769,6 +2807,7 @@
         ["✦ Rethink the board", function () { rethink(); }, "The AI acts on the open comments and brings the whole board up to date; you see the changes first"],
         ["Copy the board as a prompt", function () { copyBoardPrompt(); }, "Everything on it, canvases too, as a spec to build from (" + MOD + "⇧C)"],
         ["New canvas here…", function () { newCanvas(at); }, "A board inside this one, opened from a button here"],
+        ["Bring in a board…", function () { importBoards(at); }, "Another .shape file, whole, as a canvas of this board: a board of boards shows a roadmap across them"],
         ["Insert recipe…", function () { recipeMenu(); }, "Incidents, OKRs, a burndown, a retro…: ready-made arrangements of blocks"],
         ["Insert image…", function () { pickImages(at); }, "Or paste an image, or drop image files on the board"]
       ];
@@ -2810,7 +2849,13 @@
       // link or canvas badge is part of its box: nothing is followed
       if (t && (t.type === "link" || t.type === "open") && st.tool !== "select" && st.tool !== "hand" && !view) t = { type: "node", id: t.id };
       if (e.button === 0 && t && t.type === "link" && !st.linking) { e.preventDefault(); followLink(t.link); return; }
-      if (e.button === 0 && t && t.type === "open") { e.preventDefault(); openCanvas(st.canvasPath.concat([t.canvas])); return; }
+      if (e.button === 0 && t && t.type === "open") {
+        e.preventDefault();
+        // on a summary, the badge stands for a canvas of the board: its path is its id
+        if (dashOn()) { leaveDash(t.canvas.split("/")); return; }
+        openCanvas(st.canvasPath.concat([t.canvas]));
+        return;
+      }
       // a to-do item's checkbox: a click ticks it
       // (the connector handle on its left sits on the box: a click there ticks too)
       if (t && (t.type === "node" || t.type === "handle") && !view && e.button === 0 && todoOf(t.id) && st.tool === "select") {

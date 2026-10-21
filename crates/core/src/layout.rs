@@ -1191,6 +1191,12 @@ fn gantt_block(ctx: &mut Ctx, g: usize) -> (f64, f64) {
                 + n.owner
                     .as_deref()
                     .map_or(0.0, |o| text::width(o, 12.0) + 10.0)
+                // a task that opens a canvas: room for its badge
+                + if n.canvas.as_deref().is_some_and(|c| ctx.doc.canvas(c).is_some()) {
+                    34.0
+                } else {
+                    0.0
+                }
                 + 8.0
         })
         .fold(80.0, f64::max)

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.71.0 — 2026-10-21
+
+- **A board of boards.** Bring whole boards into one, each as a canvas with a button that opens it: right-click the empty board → *Bring in a board…*, or `shape import FILE BOARD…`. A board without perspectives of its own takes its canvases' set, so its summaries work straight away.
+- **A roadmap across them.** When a board is made of several pieces of work, Delivery, Product, Business, Investors, Client and Marketing show a *Roadmap*: a bar per canvas for what is left of it, coloured by its worst light, and its milestones with their lights (*Beta → Nov 2* when forecast later). Canvases without dates are listed below it, and a bar opens that canvas's plan.
+- **Delivery shows the whole plan** when there is more than one thing to ship: every gantt chart, as it is, named after whose it is.
+- **A gantt task can open a canvas of its own** for its risks, blockers and the rest of delivering it: right-click it → *Give it a canvas*, or `canvas: id` on the task. A badge by its name says how many risks it holds, in the worst one's colour, and opens it. On the Roadmap, each canvas's bar has the same badge.
+- Each milestone says whose it is (*Now delivering: Web shop · Beta*), and Product shows each canvas's map in its own section.
+- Summaries leave out empty risk matrices.
+- Fixed: adding or changing a perspective rewrote the whole file, dropping its `#` notes and its own layout. Now only that line changes, and changing the set of a board written with `type:` rewrites that line too.
+
 ## 0.70.0 — 2026-10-20
 
 - **Marketing, Design, Legal and Users open on their own summaries**, like Delivery, Business, Product and Technical:

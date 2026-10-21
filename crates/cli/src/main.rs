@@ -89,6 +89,8 @@ FOR AGENTS
                                      owner:NAME · tag:NAME · color:NAME · comments:open
   shape add   FILE [DSL|-] [--dry-run]   add statements (new elements; one written again by its
                                      id gets the attributes given: `api [red]`)
+  shape import FILE BOARD... [--dry-run]   bring whole boards in, each as a canvas of FILE
+                                     (created if missing) with a button on FILE that opens it
 
 CHECK
   shape check FILE...                validate (exit 1 on errors)
@@ -180,7 +182,7 @@ impl Args {
             "new", "open", "svg", "png", "html", "convert", "brief", "comments", "comment",
             "reply", "resolve", "prompt", "apply", "check", "fmt", "diff", "spec", "embed",
             "skills", "version", "help", "outline", "expand", "query", "add", "schedule", "ask",
-            "merge", "schema",
+            "merge", "schema", "import",
         ];
         let cmd = match pos.first() {
             Some(c) if COMMANDS.contains(&c.as_str()) || c == "install-app" => pos.remove(0),
@@ -1478,6 +1480,53 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 }
             } else {
                 print!("{}", shape_core::query::query(&doc, &sels)?);
+            }
+            ok
+        }
+        "import" => {
+            let file = args.file(0)?;
+            let others = &args.pos[1..];
+            if others.is_empty() {
+                return Err("usage: shape import FILE BOARD... (each BOARD becomes a canvas of FILE)".into());
+            }
+            let mut doc = if Path::new(file).exists() {
+                load(file)?
+            } else {
+                Document::default()
+            };
+            let before = doc.clone();
+            for other in others {
+                let sub = parse_doc(&read_text(other)?, other)?;
+                let title = sub.title.clone().unwrap_or_else(|| {
+                    Path::new(other)
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| "Board".into())
+                });
+                let dsl = shape_core::export(&sub, "dsl")?;
+                let added = shape_core::ops::apply(
+                    &mut doc,
+                    &[serde_json::from_value(serde_json::json!({"op": "add_canvas", "title": title}))
+                        .map_err(|e| e.to_string())?],
+                )
+                .map_err(|e| e.message)?;
+                let cid = added.created[0].clone();
+                let ops: Vec<Op> = serde_json::from_value(serde_json::json!([
+                    {"op": "add_node", "id": format!("{cid}-link"), "label": title, "shape": "pill", "canvas": cid},
+                    {"op": "in", "canvas": cid, "ops": [{"op": "merge", "dsl": dsl}]}
+                ]))
+                .map_err(|e| e.to_string())?;
+                shape_core::ops::apply(&mut doc, &ops).map_err(|e| e.message)?;
+                eprintln!("{other} → canvas `{cid}` ({title})");
+            }
+            print!(
+                "{}",
+                shape_core::diff::markdown(&shape_core::diff::diff(&before, &doc), &before, &doc)
+            );
+            if args.flag("--dry-run") {
+                eprintln!("dry run: {file} not changed");
+            } else {
+                save(file, &doc)?;
             }
             ok
         }

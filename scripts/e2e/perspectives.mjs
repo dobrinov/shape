@@ -116,7 +116,7 @@ try {
   assert.match(await p.locator(".dge-modal").innerText(), /Use the Product team perspectives\?[\s\S]*Product, Technical, Users[\s\S]*rethink/);
   if (process.env.SHOTS) await p.screenshot({ path: process.env.SHOTS + "/type-change.png" });
   await p.getByRole("button", { name: "Cancel" }).click(); await sleep(200);
-  assert.match(saved(), /perspectives: project/);
+  assert.match(saved(), /\ntype: project\n/);
   await p.locator('[data-act="board"]').click();
   await p.locator(".dge-board-menu select").first().selectOption("product"); await sleep(300);
   await p.getByRole("button", { name: "Only change the perspectives" }).click(); await sleep(600);

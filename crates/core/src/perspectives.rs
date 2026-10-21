@@ -110,7 +110,11 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
         }
         BoardKind::Agency => {
             let mut v = vec![client, delivery];
-            v.extend(around().into_iter().filter(|x| x.id == "design" || x.id == "business"));
+            v.extend(
+                around()
+                    .into_iter()
+                    .filter(|x| x.id == "design" || x.id == "business"),
+            );
             v.push(tech);
             v
         }
@@ -158,7 +162,17 @@ pub fn headline(id: &str) -> &'static [&'static str] {
 /// Every perspective of a board: the built-in ones of its type, with the
 /// ones written on it overriding (same id) or added after them.
 pub fn all(doc: &Document) -> Vec<Perspective> {
-    let mut out = builtins(doc.settings.kind);
+    // a board without a set of its own takes the first one of its canvases
+    let kind = if doc.settings.kind == BoardKind::Sketch && doc.perspectives.is_empty() {
+        doc.canvases
+            .iter()
+            .map(|c| c.doc.settings.kind)
+            .find(|k| *k != BoardKind::Sketch)
+            .unwrap_or(BoardKind::Sketch)
+    } else {
+        doc.settings.kind
+    };
+    let mut out = builtins(kind);
     for own in &doc.perspectives {
         match out.iter_mut().find(|x| x.id == own.id) {
             Some(x) => *x = own.clone(),
@@ -514,14 +528,32 @@ mod tests {
         assert_eq!(doc.settings.kind, BoardKind::Project);
         assert_eq!(dsl::print(&doc), src);
         // written as before: `type:` is the same setting
-        assert_eq!(dsl::parse(&src.replace("perspectives: project", "type: project")).unwrap(), doc);
+        assert_eq!(
+            dsl::parse(&src.replace("perspectives: project", "type: project")).unwrap(),
+            doc
+        );
         // the named sets
-        let names = |k: &str| builtins(BoardKind::parse(k).unwrap()).into_iter().map(|p| p.label).collect::<Vec<_>>().join(", ");
-        assert_eq!(names("startup"), "Investors, Product, Delivery, Technical, Business, Marketing, Design");
-        assert_eq!(names("agency"), "Client, Delivery, Business, Design, Technical");
+        let names = |k: &str| {
+            builtins(BoardKind::parse(k).unwrap())
+                .into_iter()
+                .map(|p| p.label)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        assert_eq!(
+            names("startup"),
+            "Investors, Product, Delivery, Technical, Business, Marketing, Design"
+        );
+        assert_eq!(
+            names("agency"),
+            "Client, Delivery, Business, Design, Technical"
+        );
         assert_eq!(names("none"), "");
         // a box called perspectives stays a box too
-        assert!(dsl::parse("perspectives: Who looks at it\n").unwrap().node("perspectives").is_some());
+        assert!(dsl::parse("perspectives: Who looks at it\n")
+            .unwrap()
+            .node("perspectives")
+            .is_some());
         assert_eq!(crate::from_json(&crate::to_json(&doc)).unwrap(), doc);
         // a box called type stays a box
         let d = dsl::parse("type: Database\n").unwrap();
@@ -567,7 +599,7 @@ mod tests {
         assert_eq!(c.apply_top(r#"{"ops":[{"op":"perspective","id":"audit","label":"Audit"},{"op":"set","key":"type","value":"product"}]}"#)["ok"], true);
         let out = c.source("dsl").unwrap();
         assert!(
-            out.starts_with("perspectives: product\n\nperspective audit: Audit\n"),
+            out.starts_with("perspectives: product\nperspective audit: Audit\n"),
             "{out}"
         );
         assert!(c.doc.node("x").is_some(), "still in the canvas");

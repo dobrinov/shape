@@ -612,7 +612,9 @@ impl Parser {
     }
 
     fn setting(&mut self, key: &str, value: &str) -> Result<(), String> {
-        self.touched.push(Elem::Setting(key.to_string()));
+        // `type:` is the old name of `perspectives:`
+        let line = if key == "type" { "perspectives" } else { key };
+        self.touched.push(Elem::Setting(line.to_string()));
         let value = unquote(value);
         let s = &mut self.doc.settings;
         match key {
@@ -923,6 +925,7 @@ impl Parser {
                 }
             }
         }
+        self.touched.push(Elem::Setting(format!("perspective {id}")));
         self.doc.perspectives.retain(|x| x.id != id);
         self.doc.perspectives.push(p);
         Ok(())
@@ -3932,7 +3935,13 @@ pub(crate) fn setting_line(doc: &Document, key: &str) -> Option<String> {
             Some(p) => Some(format!("theme: {p}")),
             None => (s.theme != def.theme).then(|| format!("theme: {}", s.theme.as_str())),
         },
-        _ => None,
+        // a perspective of the board's own: `perspective ID`
+        _ => key.strip_prefix("perspective ").and_then(|id| {
+            doc.perspectives
+                .iter()
+                .find(|p| p.id == id)
+                .map(perspective_line)
+        }),
     }
 }
 
