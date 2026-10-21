@@ -3,6 +3,7 @@ mod app;
 mod assets;
 mod export;
 mod history;
+mod log;
 mod png;
 mod server;
 mod skills;
@@ -114,6 +115,16 @@ SERVER OPTIONS
   --browser                          open the editor in a browser tab instead of a window
   --no-open                          neither: just the server (no FILE then makes untitled.shape)
   --idle-exit                        stop once no editor tab has been heard from for 3 minutes
+  --debug                            log the details too: every change, each perspective and
+                                     canvas opened, the editor's warnings (see `shape logs`)
+
+LOGS
+  shape logs [ai|errors] [--session N|NAME] [--full] [--json]
+                                     what a session did: the board, each AI request (prompt,
+                                     reply, time), saves and what they changed, errors
+                                     (1 is the latest; logs stay on this machine, the last 30)
+  shape logs --list | --clear        the sessions logged / delete them all
+                                     (SHAPE_NO_LOG=1: no logs; SHAPE_LOG_DIR: elsewhere)
 
 FILE may be `-` for stdin. Formats are chosen by extension: .shape or .diagram (DSL),
 .json, .mmd (Mermaid). See https://github.com/dobrinov/shape
@@ -151,6 +162,7 @@ const VALUE_FLAGS: &[&str] = &[
     "--perspective",
     "--only",
     "--label",
+    "--session",
 ];
 
 struct Args {
@@ -182,7 +194,7 @@ impl Args {
             "new", "open", "svg", "png", "html", "convert", "brief", "comments", "comment",
             "reply", "resolve", "prompt", "apply", "check", "fmt", "diff", "spec", "embed",
             "skills", "version", "help", "outline", "expand", "query", "add", "schedule", "ask",
-            "merge", "schema", "import",
+            "merge", "schema", "import", "logs",
         ];
         let cmd = match pos.first() {
             Some(c) if COMMANDS.contains(&c.as_str()) || c == "install-app" => pos.remove(0),
@@ -878,6 +890,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 (Open::Browser, _) => server::Show::Browser,
             };
             let ai = ai::command(args.val("--ai"));
+            log::set_debug(args.flag("--debug"));
             server::serve(file, port, show, ai, args.flag("--idle-exit"))?;
             ok
         }
@@ -1481,6 +1494,14 @@ fn run(args: Args) -> Result<ExitCode, String> {
             } else {
                 print!("{}", shape_core::query::query(&doc, &sels)?);
             }
+            ok
+        }
+        "logs" => {
+            log::show(
+                args.pos.first().map(String::as_str),
+                |f| args.flag(f),
+                |v| args.val(v).map(str::to_string),
+            )?;
             ok
         }
         "import" => {

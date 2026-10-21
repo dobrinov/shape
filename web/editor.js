@@ -171,6 +171,8 @@
 
     function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } }
+    /* The session log, when the host keeps one (`shape logs`). */
+    function log(kind, data) { if (opts.log) try { opts.log(kind, data); } catch (e) { /* never in the way */ } }
     function emit(name, arg) { (listeners[name] || []).forEach(function (fn) { fn(arg, api); }); }
 
     // ------------------------------------------------------------- layout
@@ -504,6 +506,7 @@
       st.perspective = (st.perspectives || []).find(function (p) { return p.id === id; }) || null;
       st.perspOpen = null;
       st.perspDash = true; // it starts with the summary
+      log("perspective", { id: id || "full board" });
       st.backTo = null; showBack();
       try { if (id) localStorage.setItem(perspectiveKey(), id); else localStorage.removeItem(perspectiveKey()); } catch (e) { /* fine */ }
       fillPerspectives();
@@ -869,6 +872,7 @@
       render();
       fit();
       emit("canvas", st.canvasPath.slice());
+      log("canvas", { path: st.canvasPath.join("/") });
       return true;
     }
     function openLinked(id) {
@@ -1032,8 +1036,10 @@
       var res = JSON.parse(top ? st.session.apply_top(JSON.stringify({ ops: ops })) : st.session.apply(JSON.stringify({ ops: ops })));
       if (!res.ok) {
         flash(res.error || "could not apply the change", true);
+        log("op-error", { error: res.error, ops: JSON.stringify(ops).slice(0, 2000) });
         return res;
       }
+      if (!live) log("op", { ops: JSON.stringify(ops).slice(0, 2000) });
       refreshDoc();
       st.errors = [];
       if (live) {
@@ -1895,6 +1901,7 @@
     };
     function busyStart(kind, title, what) {
       busyEnd(st.busy);
+      log("ai-action", { action: kind, title: title, request: what || "" });
       var steps = BUSY_STEPS[kind] || BUSY_STEPS.add;
       var job = { stopped: false, t0: Date.now(), step: 0 };
       var stepEl = h("span", { class: "dge-busy-step" }, [steps[0] + "…"]);
@@ -1906,7 +1913,7 @@
         what ? h("span", { class: "dge-busy-what", title: what }, [what]) : null,
         stepEl, dots,
         h("div", { class: "dge-busy-foot" }, [timeEl, h("span", { class: "dge-muted" }, ["You see the changes before keeping them"])]),
-        h("button", { onclick: function () { job.stopped = true; busyEnd(job); flash("Stopped waiting: the AI's answer will be ignored"); } }, ["Stop waiting"])
+        h("button", { onclick: function () { job.stopped = true; log("ai-result", { stopped: true, after_s: Math.round((Date.now() - job.t0) / 1000) }); busyEnd(job); flash("Stopped waiting: the AI's answer will be ignored"); } }, ["Stop waiting"])
       ]);
       job.el = h("div", { class: "dge-busy" }, [card]);
       ["pointerdown", "dblclick", "contextmenu", "wheel"].forEach(function (ev) { job.el.addEventListener(ev, function (e) { if (!card.contains(e.target)) e.preventDefault(); e.stopPropagation(); }, { passive: false }); });
@@ -1980,6 +1987,7 @@
     }
     function acceptPreview() {
       if (!st.preview) return;
+      log("ai-result", { kept: true });
       var pv = endPreview();
       st.undo.push(pv.before);
       st.redo = [];
@@ -1989,6 +1997,7 @@
     }
     function discardPreview() {
       if (!st.preview) return;
+      log("ai-result", { kept: false });
       var pv = endPreview();
       st.session.set_source(pv.before);
       refreshDoc();
@@ -5359,6 +5368,7 @@
     var toastTimer = null;
     function flash(msg, isError, ms) {
       clearTimeout(toastTimer);
+      if (msg && isError) log("error", { message: msg });
       // an empty message hides the toast
       if (!msg) { toast.className = "dge-toast"; return; }
       toast.textContent = msg;

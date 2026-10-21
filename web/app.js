@@ -122,7 +122,14 @@
       fileEl.textContent = f.path;
       fileEl.title = f.path;
       document.title = f.name + " — Shape";
+      // the session log (`shape logs`): what the editor saw go wrong, and the AI's work
+      var log = function (kind, data) {
+        try { fetch("api/log", { method: "POST", body: JSON.stringify(Object.assign({ kind: kind }, data || {})) }).catch(function () {}); } catch (e) { /* no server: nothing to log */ }
+      };
+      window.addEventListener("error", function (e) { log("error", { message: String(e.message), where: (e.filename || "").replace(/^.*\//, "") + ":" + e.lineno }); });
+      window.addEventListener("unhandledrejection", function (e) { log("error", { message: String(e.reason && e.reason.message || e.reason) }); });
       mount(wasm, f.source, {
+        log: log,
         themeFiles: f.themes || {},
         author: f.author || undefined,
         file: f.path,

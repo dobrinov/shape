@@ -290,6 +290,7 @@ mod native {
                     | Event::UserEvent(Ev::CloseRequested) => {
                         if !closing {
                             closing = true;
+                            crate::log::event("stop", serde_json::json!({ "why": "the window was closed" }));
                             // a page that cannot answer must not keep the window open
                             if webview.evaluate_script(FLUSH).is_err() {
                                 *flow = ControlFlow::Exit;

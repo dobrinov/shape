@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.72.0 — 2026-10-21
+
+- **Session logs.** Every Shape session keeps a log on your machine: the board it opened, each AI request (what you asked, the prompt, the reply, the model, how long it took, or why it failed), whether you kept or discarded the changes, every save and what it changed, and the editor's errors. `shape logs` shows the latest session; `shape logs ai` and `shape logs errors` show just those, `--list` the sessions, `--session N` one of them, `--full` everything, and `--clear` deletes them. So when something goes wrong, an agent helping you can see what happened.
+- `--debug` logs the details too: every change you make, each perspective and canvas opened, the editor's warnings.
+- Logs stay on your machine (`~/Library/Logs/Shape` on macOS) and hold board content; the last 30 sessions are kept. `SHAPE_NO_LOG=1` turns them off, `SHAPE_LOG_DIR` puts them elsewhere.
+
 ## 0.71.0 — 2026-10-21
 
 - **A board of boards.** Bring whole boards into one, each as a canvas with a button that opens it: right-click the empty board → *Bring in a board…*, or `shape import FILE BOARD…`. A board without perspectives of its own takes its canvases' set, so its summaries work straight away.

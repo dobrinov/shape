@@ -242,6 +242,14 @@ pub fn serve(
             eprintln!("shape: no AI harness (use --ai CMD); ✦ actions will show the prompt to copy")
         }
     }
+    crate::log::start(json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "file": display,
+        "url": url,
+        "ai": ai,
+        "debug": crate::log::debug(),
+        "window": matches!(show, Show::Window(_)),
+    }));
     crate::update::start();
     match show {
         Show::None => listen(server, file, display, ai, idle_exit),
@@ -291,6 +299,7 @@ fn listen(
                 .unwrap_or(false)
             {
                 eprintln!("shape: no editor open for 3 minutes; stopping");
+                crate::log::event("stop", json!({ "why": "no editor open for 3 minutes" }));
                 std::process::exit(0);
             }
         });
@@ -469,14 +478,38 @@ fn listen(
                     continue;
                 };
                 // models take seconds; keep serving saves and polls meanwhile
-                std::thread::spawn(move || match crate::ai::run_with_images(&cmd, &prompt, &images) {
-                    Ok(text) => respond_json(req, 200, json!({ "ok": true, "text": text })),
-                    Err(e) => respond_json(
-                        req,
-                        200,
-                        json!({ "ok": false, "hint": crate::ai::hint(&cmd, &e), "error": e }),
-                    ),
+                std::thread::spawn(move || {
+                    let t0 = std::time::Instant::now();
+                    let res = crate::ai::run_with_images(&cmd, &prompt, &images);
+                    let ms = t0.elapsed().as_millis() as u64;
+                    match res {
+                        Ok(text) => {
+                            crate::log::event("ai", json!({ "ok": true, "command": cmd, "ms": ms, "images": images.len(), "prompt": prompt, "reply": text }));
+                            respond_json(req, 200, json!({ "ok": true, "text": text }))
+                        }
+                        Err(e) => {
+                            crate::log::event("ai", json!({ "ok": false, "command": cmd, "ms": ms, "images": images.len(), "prompt": prompt, "error": e }));
+                            respond_json(
+                                req,
+                                200,
+                                json!({ "ok": false, "hint": crate::ai::hint(&cmd, &e), "error": e }),
+                            )
+                        }
+                    }
                 });
+            }
+            // what the editor reports for the session log: `{kind, …}`
+            (Method::Post, "/api/log") => {
+                let mut body = String::new();
+                let _ = req.as_reader().read_to_string(&mut body);
+                if let Ok(Value::Object(mut v)) = serde_json::from_str::<Value>(&body) {
+                    let kind = v
+                        .remove("kind")
+                        .and_then(|k| k.as_str().map(str::to_string))
+                        .unwrap_or_else(|| "editor".into());
+                    crate::log::event(&kind, Value::Object(v));
+                }
+                respond_json(req, 200, json!({ "ok": true, "debug": crate::log::debug() }));
             }
             (Method::Get, "/api/version") => {
                 respond_json(req, 200, json!({ "mtime": mtime(&file).to_string() }))
@@ -512,6 +545,17 @@ fn listen(
                     .or_else(|| author.clone())
                     .unwrap_or_default();
                 let written = text.and_then(|t| {
+                    // the session log: what this save changed
+                    let before = std::fs::read_to_string(&file).unwrap_or_default();
+                    let changes = match (shape_core::parse(&before), shape_core::parse(&t)) {
+                        (Ok(a), Ok(b)) => {
+                            shape_core::diff::markdown(&shape_core::diff::diff(&a, &b), &a, &b)
+                        }
+                        _ => String::new(),
+                    };
+                    if before != t {
+                        crate::log::event("save", json!({ "bytes": t.len(), "by": who, "changes": changes }));
+                    }
                     std::fs::write(&file, &t).map_err(|e| e.to_string())?;
                     // a board git does not track keeps snapshots instead
                     crate::history::snapshot(&file, &t, &who);
