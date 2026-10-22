@@ -83,6 +83,13 @@ impl Diagram {
         Value::Array(t).to_string()
     }
 
+    /// What a perspective's summary is of on day `today` (`YYYY-MM-DD`): the
+    /// canvas path (ids) its rows' paths are from.
+    pub fn summary_path(&self, today: &str) -> String {
+        let day = shape_core::gantt::parse_date(today).unwrap_or(0);
+        json!(self.inner.summary_path(day)).to_string()
+    }
+
     /// Replace the open canvas with a document (JSON); the rest of the board
     /// stays as written. Returns `{ok}` or `{ok: false, error}`.
     pub fn replace_here(&mut self, json: &str) -> String {

@@ -1,6 +1,7 @@
 // End-to-end test of a board of boards: right-click → Bring in a board… makes
 // other .shape files canvases of this one, and its perspectives (taken from
-// the canvases) open on summaries with a roadmap across them.
+// the canvases) open on summaries with a roadmap across them; a project on
+// it opens its own summary, with its plan and burndown.
 //   make e2e   (or: cd scripts/e2e && node programme.mjs)
 import { chromium } from "playwright";
 import { spawn } from "node:child_process";
@@ -19,7 +20,7 @@ const file = join(dir, "shop.shape");
 const web = join(dir, "web.shape"), app = join(dir, "app.shape");
 const day = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 writeFileSync(web, `title: Web shop\nperspectives: project\n\n# what we build\nmindmap scope: Web shop [tags: product] {\n  Checkout\n}\n\ngantt plan: Web plan [start: ${day(-10)}] {\n  Build [${day(-10)}, 3w, done: 40%]\n  Web beta [${day(12)}, milestone]\n}\n\nrisks r: Risks {\n  Card fraud [p: 4, i: 5]\n}\n`);
-writeFileSync(app, `title: Mobile app\n\ngantt plan: App plan [start: ${day(-5)}] {\n  App build [${day(-5)}, 4w]\n  App launch [${day(30)}, milestone]\n}\n`);
+writeFileSync(app, `title: Mobile app\n\ngantt plan: App plan [start: ${day(-5)}] {\n  App build [${day(-5)}, 4w]\n  Store review [${day(23)}, 1w]\n  App launch [${day(30)}, milestone]\n}\n`);
 writeFileSync(file, "title: Shop\n");
 const server = spawn(join(root, "target/debug/shape"), [file, "--no-open", "--port", String(port)], { env: { ...process.env, SHAPE_WEB_DIR: join(root, "web"), SHAPE_NO_UPDATE_CHECK: "1" }, stdio: "ignore" });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -58,18 +59,35 @@ try {
     assert.match(await p.locator('[data-id="@dash/head/:"]').textContent(), /Now delivering: Web shop · Web beta/);
     assert.equal(await p.locator('[data-id="roadmap"]').count() > 0, true);
     assert.equal(await p.locator('[data-id="@dash/rm/mobile-app:plan"]').count() > 0, true);
+    // the projects' details are theirs: no burndown here
+    assert.equal(await p.locator('[data-id="burndown"]').count(), 0);
     if (process.env.SHOTS) await p.screenshot({ path: join(process.env.SHOTS, "programme-" + scheme + ".png") });
-    // a bar opens that piece of work's plan, in its canvas
+    // a bar opens that project's own summary: its plan and burndown
     await p.locator('.dg-node[data-id="@dash/rm/mobile-app:plan"]').click(); await sleep(600);
     assert.equal(await p.locator(".dge-crumbs").textContent(), "Shop/Mobile app");
+    assert.equal(await p.locator(".dge-persp").inputValue(), "delivery");
+    assert.match(await p.locator('[data-id="@dash/head/:"]').textContent(), /Now delivering: App launch/);
+    assert.ok(await p.locator('[data-id="burndown"]').count() > 0, "its burndown");
+    assert.equal(await p.locator('[data-id="roadmap"]').count(), 0);
+    assert.ok(await p.locator('[data-id="gantt"]').count() > 0, "its plan");
+    if (process.env.SHOTS) await p.screenshot({ path: join(process.env.SHOTS, "programme-project-" + scheme + ".png") });
+    // its rows open what they stand for on the board, in that canvas (← back to its summary)
+    await p.locator('.dg-node[data-id="@dash/ga/:app-build"]').click(); await sleep(600);
+    assert.equal(await p.locator(".dge-persp").inputValue(), "");
+    assert.equal(await p.locator(".dge-crumbs").textContent(), "Shop/Mobile app");
+    await p.locator(".dge-back").click(); await sleep(600);
+    assert.equal(await p.locator(".dge-persp").inputValue(), "delivery");
+    assert.ok(await p.locator('[data-id="burndown"]').count() > 0, "back on its summary");
     if (scheme === "light") {
-      // on the summary, a bar's badge says how many risks its canvas holds, and opens it
-      await p.locator(".dge-back").click(); await sleep(600);
+      // up to the whole board's summary; a bar's badge says how many risks its canvas holds, and opens its summary
+      await p.locator(".dge-crumbs button", { hasText: "Shop" }).click(); await sleep(600);
       const badge = p.locator('.dg-open[data-canvas="web-shop"]');
       assert.match(await badge.locator("title").textContent(), /Open “Web shop”: 1 risk, the worst 20 of 25/);
       await badge.click(); await sleep(600);
       assert.equal(await p.locator(".dge-crumbs").textContent(), "Shop/Web shop");
-      // a task gets a canvas of its own, for its risks and the rest of its delivery
+      assert.ok(await p.locator('[data-id="burndown"]').count() > 0, "the web shop's burndown");
+      // on its board, a task gets a canvas of its own, for its risks and the rest of its delivery
+      await p.selectOption(".dge-persp", ""); await sleep(600);
       await p.locator('.dg-node[data-id="build"]').click({ button: "right" }); await sleep(200);
       await p.locator(".dge-menu").getByText("Give it a canvas").click(); await sleep(700);
       assert.equal(await p.locator(".dge-crumbs").textContent(), "Shop/Web shop/Build");

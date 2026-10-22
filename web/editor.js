@@ -450,7 +450,8 @@
     }
     /* A perspective opens on its summary (a dashboard Shape computes from
        the whole board: see dashboard.rs); it is read-only, and a row opens
-       what it stands for on the full board, with a way back. */
+       what it stands for on the full board, with a way back. In a project's
+       canvas it is that project's; a row's path is from there (summary_path). */
     function dashOn() { return !!(st.perspective && st.perspDash); }
     /* A comment from a summary goes on the element a row stands for, in its canvas. */
     function commentOnDash(rowId, cx, cy) {
@@ -458,22 +459,30 @@
       if (!m || !m[2] || m[2].charAt(0) === "#") return false;
       var el0 = canvas.querySelector('[data-id="' + rowId.replace(/"/g, '\\"') + '"]');
       var label = el0 ? (el0.textContent || "").trim().split("\n")[0].slice(0, 60) : m[2];
-      openComposer({ on: m[2], path: m[1] ? m[1].split("/") : [], label: label }, cx, cy);
+      openComposer({ on: m[2], path: dashPath(m[1]), label: label }, cx, cy);
       return true;
+    }
+    function dashPath(rel) { return JSON.parse(st.session.summary_path(isoDay(today()))).concat(rel ? rel.split("/") : []); }
+    /* Into the summary of canvas `path` (a project's, from the roadmap). */
+    function drillDash(path) {
+      openCanvas(path);
     }
     /* From a summary to the full board, at canvas `path` (← goes back). */
     function leaveDash(path) {
       st.backTo = st.perspective.id;
+      st.backPath = (st.canvasPath || []).slice();
       st.perspective = null;
       if (toolbar.persp) toolbar.persp.value = "";
       fillPerspectives();
       if (path.join("/") !== (st.canvasPath || []).join("/")) openCanvas(path); else render();
       showBack();
     }
-    function openFromDash(rowId, thread) {
+    function openFromDash(rowId, thread, onBoard) {
       var m = /^@dash\/[^/]*\/(.*):(.*)$/.exec(rowId);
       if (!m || !m[2] || m[2].charAt(0) === "#") return;
-      var path = m[1] ? m[1].split("/") : [], id = m[2];
+      var path = dashPath(m[1]), id = m[2];
+      // a project on the roadmap: its own summary, with its plan and the rest
+      if (/^@dash\/rm\//.test(rowId) && m[1] && !thread && !onBoard) return drillDash(dashPath(m[1].split("/")[0]));
       leaveDash(path);
       setTimeout(function () {
         if (node(id) || group(id)) { select([id]); reveal(id); }
@@ -489,8 +498,8 @@
       if (p) toolbar.back.textContent = "← " + p.label;
     }
     function goBack() {
-      var id = st.backTo;
-      if ((st.canvasPath || []).length) openCanvas([]);
+      var id = st.backTo, back = st.backPath || [];
+      if ((st.canvasPath || []).join("/") !== back.join("/")) openCanvas(back);
       if (toolbar.persp) toolbar.persp.value = id;
       pickPerspective(id);
     }
@@ -2887,7 +2896,7 @@
       if (dashOn()) {
         e.preventDefault();
         var dt = st.r && hit(e.target);
-        if (dt && dt.id && /^@dash\//.test(dt.id)) openMenu({ x: e.clientX, y: e.clientY }, [["Open it on the board", function () { openFromDash(dt.id); }]]);
+        if (dt && dt.id && /^@dash\//.test(dt.id)) openMenu({ x: e.clientX, y: e.clientY }, [["Open it on the board", function () { openFromDash(dt.id, false, true); }]]);
         else openMenu({ x: e.clientX, y: e.clientY }, [["Details", function () { toggleFolds(); }, "The blocks behind this summary"]]);
         return;
       }
@@ -2943,7 +2952,11 @@
       if (e.button === 0 && t && t.type === "open") {
         e.preventDefault();
         // on a summary, the badge stands for a canvas of the board: its path is its id
-        if (dashOn()) { leaveDash(t.canvas.split("/")); return; }
+        if (dashOn()) {
+          // a project on the roadmap: its summary; anything else: its canvas on the board
+          if (/^@dash\/rm\//.test(t.id || "")) drillDash(dashPath(t.canvas)); else leaveDash(dashPath(t.canvas));
+          return;
+        }
         openCanvas(st.canvasPath.concat([t.canvas]));
         return;
       }

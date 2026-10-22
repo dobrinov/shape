@@ -48,9 +48,9 @@ pub mod tables;
 pub mod text;
 pub mod theme;
 pub mod timeline;
-pub mod upgrades;
 pub mod schemas;
 pub mod todo;
+pub mod upgrades;
 
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -368,6 +368,26 @@ impl Session {
         Ok(())
     }
 
+    /// What a summary is of, as of day `today`: the project whose canvas is
+    /// open (on a board of several projects, each has a summary of its own,
+    /// and so on down), else the whole board. The summary's rows have paths
+    /// from there.
+    pub fn summary_path(&self, today: i64) -> Vec<String> {
+        let root = self.whole();
+        let mut cur = &root;
+        let mut out = Vec::new();
+        for id in self.canvas_path() {
+            let ms = dashboard::milestones(cur, today);
+            if !dashboard::parts(cur, &ms).iter().any(|(c, _)| *c == id) {
+                break;
+            }
+            let Some(c) = cur.canvas(&id) else { break };
+            cur = &c.doc;
+            out.push(id);
+        }
+        out
+    }
+
     /// The titles along the open canvas's path, the top board first.
     pub fn canvas_trail(&self) -> Vec<(Vec<String>, String)> {
         let root = self.whole();
@@ -462,15 +482,23 @@ impl Session {
     pub fn render(&self, opts: &RenderOptions) -> Rendered {
         let mut o = opts.clone();
         o.themes.extend(self.themes.iter().cloned());
-        // a perspective's dashboard: computed from the whole board
+        // a perspective's dashboard: computed from the whole board, or in a
+        // project's canvas, from that project (see `summary_path`)
         if let (Some(p), true) = (&o.perspective, o.dashboard) {
             let today = o
                 .today
                 .as_deref()
                 .and_then(gantt::parse_date)
                 .unwrap_or_else(|| gantt::parse_date("2026-01-01").unwrap_or(0));
-            let before = o.before.as_deref().and_then(|s| parse(s).ok());
-            let doc = dashboard::build(&self.whole(), p, today, before.as_ref());
+            let whole = self.whole();
+            let path = self.summary_path(today);
+            let before = o
+                .before
+                .as_deref()
+                .and_then(|s| parse(s).ok())
+                .and_then(|b| b.at(&path).cloned());
+            let doc = whole.at(&path).unwrap_or(&whole);
+            let doc = dashboard::build(doc, p, today, before.as_ref());
             return render::render(&doc, &o);
         }
         // a perspective shows its part of the board (and of the base, to compare)
@@ -816,6 +844,28 @@ mod tests {
         assert!(s.doc.node("r").is_none());
         // a link to a canvas that is not there is reported
         assert!(dsl::parse("x [canvas: gone]\n").is_err());
+    }
+
+    #[test]
+    fn a_projects_canvas_has_a_summary_of_its_own() {
+        let mut s = Session::new();
+        s.set_source(
+            "web_link: Web shop [canvas: web]\napp_link: Mobile app [canvas: app]\n\n\
+             canvas web: Web shop {\n  canvas tests: Test scenarios {\n    a: A\n  }\n}\n\n\
+             canvas app: Mobile app {\n  b: B\n}\n",
+        );
+        let today = gantt::parse_date("2026-10-15").unwrap();
+        assert!(s.summary_path(today).is_empty());
+        s.open_canvas(&["web".into()]).unwrap();
+        assert_eq!(s.summary_path(today), ["web"]);
+        // a canvas inside a project is part of its summary
+        s.open_canvas(&["web".into(), "tests".into()]).unwrap();
+        assert_eq!(s.summary_path(today), ["web"]);
+        // one project's canvases are part of the whole board's
+        let mut one = Session::new();
+        one.set_source("a: A [canvas: tests]\n\ncanvas tests: Tests {\n  b: B\n}\n");
+        one.open_canvas(&["tests".into()]).unwrap();
+        assert!(one.summary_path(today).is_empty());
     }
 
     #[test]

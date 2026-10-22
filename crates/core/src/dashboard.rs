@@ -986,8 +986,12 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
 
     for tile in tiles(&p.id) {
         // a board of several projects: Delivery shows them on one chart, and
-        // each project's plans, boards and risks are a click away, in its canvas
-        if !parts.is_empty() && p.id == "delivery" && matches!(*tile, "gantt" | "kanban" | "matrix") {
+        // each project's plans, burndown, boards and risks are a click away, on
+        // its canvas's own summary
+        if !parts.is_empty()
+            && p.id == "delivery"
+            && matches!(*tile, "gantt" | "burndown" | "kanban" | "matrix")
+        {
             continue;
         }
         match *tile {
@@ -2654,6 +2658,11 @@ mod tests {
         // the projects' own plans, boards and risks are in their canvases, not here
         assert_eq!(dash.groups.iter().filter(|g| g.gantt).count(), 1);
         assert!(!dash.groups.iter().any(|g| g.risks || g.kanban));
+        assert!(dash.group("burndown").is_none(), "the burndown is the project's");
+        // a project's canvas has a summary of its own, with the detail
+        let mine = build(doc.at(&["web".to_string()]).unwrap(), p, today, None);
+        assert!(mine.groups.iter().any(|g| g.gantt) && mine.group("roadmap").is_none());
+        assert!(mine.group("burndown").is_some() && mine.groups.iter().any(|g| g.risks));
         let lay = crate::layout::layout(&dash);
         let beta = road.iter().find(|n| n.label.starts_with("Web beta")).unwrap();
         let (b, m) = (lay.rect(&road[0].id).unwrap(), lay.rect(&beta.id).unwrap());

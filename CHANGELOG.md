@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.75.0 — 2026-10-22
+
+- **Each project has a summary of its own.** On a board of several projects, a project's row on the roadmap (or its badge) opens that project's summary instead of its canvas: its plans, its burndown, its kanban boards and its risks, in whichever perspective you are in. The crumbs take you back up to the roadmap, and *←* returns from the board to the summary you came from. Canvases inside a project, such as a task's risks or its test scenarios, are part of the project's summary.
+- The burndown is no longer on the summary of a board of several projects, where it showed whichever project's milestone came next. Each project's burndown is on its own summary.
+
 ## 0.74.0 — 2026-10-22
 
 - **Rethink after an upgrade brings in what is new.** A board records the version of Shape that last rethought it (`rethought: 0.74.0`, one line in the file, so it travels with git). After an upgrade, the next *✦ Rethink* is told what the new version's built-in perspectives can show (test scenarios for QA, a canvas per project for Delivery…) and reshapes the board for them where it fits, from what is already on it. On opening such a board, Shape offers that Rethink once. Boards with only custom perspectives, or none, are left as they are.
