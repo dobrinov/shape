@@ -47,6 +47,15 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
         &["screen", "lanes", "sticky", "mindmap"],
         true,
     );
+    let qa = p(
+        "qa",
+        "QA",
+        &["qa", "test", "testing"],
+        &[
+            "sequence", "lanes", "screen", "table", "entity", "adr", "risks",
+        ],
+        true,
+    );
     let delivery = p(
         "delivery",
         "Delivery",
@@ -104,7 +113,7 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
     match kind {
         BoardKind::Sketch => Vec::new(),
         BoardKind::Startup => {
-            let mut v = vec![investors, product, delivery, tech];
+            let mut v = vec![investors, product, delivery, tech, qa];
             v.extend(around().into_iter().filter(|x| x.id != "legal"));
             v
         }
@@ -116,15 +125,16 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
                     .filter(|x| x.id == "design" || x.id == "business"),
             );
             v.push(tech);
+            v.push(qa);
             v
         }
         BoardKind::Product => {
-            let mut v = vec![product, tech, user];
+            let mut v = vec![product, tech, user, qa];
             v.extend(around());
             v
         }
         BoardKind::Project => {
-            let mut v = vec![delivery, product, tech];
+            let mut v = vec![delivery, product, tech, qa];
             v.extend(around());
             v
         }
@@ -144,6 +154,7 @@ pub fn purpose(id: &str) -> Option<&'static str> {
         "design" => "Screens, flows and the user journey",
         "investors" => "Where the money goes, what it brings and what could go wrong",
         "client" => "What they get and when, and what we need from them",
+        "qa" => "How it works, and the scenarios that test it",
         _ => return None,
     })
 }
@@ -542,11 +553,11 @@ mod tests {
         };
         assert_eq!(
             names("startup"),
-            "Investors, Product, Delivery, Technical, Business, Marketing, Design"
+            "Investors, Product, Delivery, Technical, QA, Business, Marketing, Design"
         );
         assert_eq!(
             names("agency"),
-            "Client, Delivery, Business, Design, Technical"
+            "Client, Delivery, Business, Design, Technical, QA"
         );
         assert_eq!(names("none"), "");
         // a box called perspectives stays a box too
@@ -583,6 +594,7 @@ mod tests {
                 "product",
                 "tech",
                 "user",
+                "qa",
                 "legal",
                 "business",
                 "marketing",
@@ -619,6 +631,7 @@ mod tests {
                 "delivery",
                 "product",
                 "tech",
+                "qa",
                 "legal",
                 "business",
                 "marketing",

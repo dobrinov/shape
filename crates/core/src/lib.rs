@@ -36,6 +36,7 @@ pub mod ops;
 pub mod patch;
 pub mod perspectives;
 pub mod prompt;
+pub mod qa;
 pub mod query;
 pub mod recipes;
 pub mod render;
@@ -47,6 +48,7 @@ pub mod tables;
 pub mod text;
 pub mod theme;
 pub mod timeline;
+pub mod upgrades;
 pub mod schemas;
 pub mod todo;
 

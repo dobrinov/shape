@@ -620,6 +620,24 @@ mod tests {
     }
 
     #[test]
+    fn a_milestone_can_sit_on_a_tasks_row() {
+        let src = "gantt g: Plan [start: 2026-10-12] {\n  Build [5d]\n  Beta [2026-10-14, milestone, row: build]\n  Launch [2026-10-20, milestone]\n}\n";
+        let mut doc = crate::dsl::parse(src).unwrap();
+        assert_eq!(crate::dsl::print(&doc), src);
+        let lay = crate::layout::layout(&doc);
+        let (b, m) = (lay.rect("build").unwrap(), lay.rect("beta").unwrap());
+        assert!((b.cy() - m.cy()).abs() < 0.5, "on Build's row");
+        assert!(
+            lay.rect("launch").unwrap().cy() > b.cy(),
+            "a row of its own"
+        );
+        // renaming the task keeps it there
+        let ops = crate::ops::parse_ops(r#"{"op":"rename","id":"build","to":"make"}"#).unwrap();
+        crate::ops::apply(&mut doc, &ops).unwrap();
+        assert_eq!(doc.node("beta").unwrap().row.as_deref(), Some("make"));
+    }
+
+    #[test]
     fn late_work_pushes_what_waits_for_it() {
         let d = crate::dsl::parse(
             "gantt a: A [start: 2026-10-12] {\n  Build [10d, done: 20%]\n  Test [5d, after: build]\n  Ship [after: test, milestone]\n}\ngantt b: B [start: 2026-10-12] {\n  Launch [3d, after: ship]\n  Docs [2d, done]\n}\n",

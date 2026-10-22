@@ -175,6 +175,10 @@ pub struct Settings {
     /// What the board is for (`type: product`): sketch, product or project.
     #[serde(rename = "type")]
     pub kind: BoardKind,
+    /// The version of Shape that last rethought the board (`rethought:
+    /// 0.75.0`): the next Rethink brings in what newer versions can do.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rethought: Option<String>,
 }
 
 impl Settings {
@@ -375,6 +379,10 @@ pub struct Node {
     /// Gantt task: a milestone, a point in time instead of a bar.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub milestone: bool,
+    /// Gantt milestone: the task whose row it sits on (a release on its
+    /// project's bar), instead of a row of its own.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub row: Option<String>,
     /// Gantt task: how much is done, in percent (0–100).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub done: Option<f64>,

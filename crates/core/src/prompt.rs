@@ -322,6 +322,7 @@ pub const RETHINK_DEFAULT: &str = "Bring this canvas up to date and make it easy
 4. Show each kind of information in the block that communicates it best (see below): loose boxes, stickies and text that are really dates, tasks, a plan, risks, a decision, numbers or screens read better as a timeline, a to-do list, a gantt chart, a risk matrix, a decision record, a chart or a wireframe. Move them in, then remove the loose ones.
 5. Give every item a short, specific title, and put the context the title leaves out in its details.
 6. Fix arrows that no longer make sense, and add the ones that are missing.
+7. Fit the structure to the size: a board holding several projects, each with its own plan, risks, blockers and details, reads better as a board of boards: give each project a canvas of its own (`add_canvas`, then its items moved in with an `in` op and removed here), with a box on this board that opens it. A big project can do the same for its parts. A simple board stays flat: do not add canvases it does not need.
 
 Keep every piece of information: reorganise, merge and move it, but never drop it.";
 
@@ -415,6 +416,7 @@ pub fn rethink(
         .filter(|i| !i.is_empty())
         .unwrap_or(RETHINK_DEFAULT);
     s.push_str(&format!("## What to do\n\n{what}\n\n"));
+    s.push_str(&crate::upgrades::prompt_section(root));
     s.push_str(BEST_BLOCKS);
     s.push_str(&perspectives_section(root));
     s.push_str("How to change the board:\n- Keep ids; to merge, keep one item and remove the others only after moving what they said into it.\n- Ops apply to the top board. For anything inside a canvas, wrap them in an `in` op with the canvas path: `{\"op\": \"in\", \"canvas\": \"plan\", \"ops\": [...]}` (`plan/details` for a canvas inside `plan`). A comment's own ops (`resolve_comment`, `reply`) go in the `in` of the canvas it is in.\n- A box's `detail` holds the context its title leaves out; on a kanban card it shows on hover.\n- Do not set `x`/`y` or move things: the layout follows the structure.\n- Leave the data inside blocks (gantt dates, table cells, chart values, columns) as it is unless the instructions or the information say otherwise.\n- If nothing needs to change, change nothing and say so in the note.\n\n");

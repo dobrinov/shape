@@ -78,6 +78,7 @@
     timeline: '<path d="M4.5 5H16a3.5 3.5 0 010 7H8a3.5 3.5 0 000 7h11.5"/><circle cx="4.5" cy="5" r="2.7" fill="currentColor" stroke="none"/><circle cx="19.5" cy="19" r="2.7" fill="currentColor" stroke="none"/><circle cx="10.5" cy="5" r="2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="19" r="2" fill="currentColor" stroke="none"/>',
     ask: '<path d="M4 5.5A2.5 2.5 0 016.5 3h11A2.5 2.5 0 0120 5.5v8a2.5 2.5 0 01-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 014 14.5z"/><path d="M10 7.8a2 2 0 113 1.7c-.7.4-1 .8-1 1.5"/><circle cx="12" cy="13.2" r=".6" fill="currentColor"/>',
     rethink: '<rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M14 7h3.5a2 2 0 012 2v2M10 17H6.5a2 2 0 01-2-2v-2"/><path d="M17.5 9.5l2 2 2-2M6.5 14.5l-2-2-2 2"/>',
+    tests: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><path d="M8.5 13l2.5 2.5 4.5-4.5"/>',
     add: '<path d="M5 4h14v11l-5 5H5z"/><path d="M12 8v7M8.5 11.5h7"/>'
   };
   function icon(name) {
@@ -278,6 +279,9 @@
       aiItem("add", "Add what you know", "Details, facts or notes: the AI puts them in place",
         "Add what you know (" + MOD + "K): write down details or information you have, about the selection or the whole canvas; the AI adds them where they belong, or makes the change you ask for. You see the changes before keeping them.",
         MOD + "K", function () { askAI(); }),
+      aiItem("tests", "Draft test scenarios", "What to test, from how the board says it works",
+        "Draft test scenarios: the AI reads how this canvas works (its flows, screens, rules, data and risks) and writes the scenarios a tester would run, each with steps, the expected result and what it covers, in a table on a canvas of test scenarios. Run again for more: it adds new ones only. Right-click a scenario to mark it passed or failed. You see the changes before keeping them.",
+        "", function () { draftTests(); }),
       opts.ai && opts.aiSetup ? h("button", { class: "dge-ai-foot", title: "Which AI is used, and whether it works", onclick: function () { closeAiMenu(); setupAI(); } }, ["Your AI: check it, or change it…"]) : null
     ].filter(Boolean));
     var aiFab = h("button", { class: "dge-ai-fab", "aria-haspopup": "menu", "aria-label": "AI", title: "AI features: Rethink this canvas, or Add what you know. They run on your own AI subscription, and you see every change before keeping it.", html: icon("magic"), onclick: function () {
@@ -563,6 +567,19 @@
       toolbar.setList.textContent = names.length ? names.join(" · ") : "No perspectives: one view of the whole board";
     }
     /* A board with things on it but no perspectives yet asks once which set fits. */
+    /* After an upgrade: what this Shape can now do with the board, for its
+       built-in perspectives, until a Rethink brings it in (asked once per
+       version and board). */
+    function offerUpgrade() {
+      if (view || !st.session.upgrade_notes) return;
+      // after the dialog that opens a board (which perspective), not over it
+      if (!modal.hidden) return setTimeout(offerUpgrade, 1000);
+      var u = JSON.parse(st.session.upgrade_notes());
+      if (!u.notes.length) return;
+      var key = "shape.upgrade." + u.version + "." + (opts.file || opts.name || "board");
+      try { if (localStorage.getItem(key)) return; localStorage.setItem(key, "1"); } catch (e) { return; }
+      flashAction("Shape " + u.version.replace(/\.0$/, "") + " can do more with this board: " + u.notes.join(", "), "✦ Rethink", function () { rethink(); });
+    }
     function askSet() {
       if (view || !modal.hidden || !st.doc || (st.perspectives || []).length) return;
       // a board with work on it: a dozen things, and two kinds of planning block
@@ -1605,6 +1622,60 @@
       ]);
       setTimeout(function () { input.focus(); }, 0);
     }
+    /* Draft test scenarios: the AI replies with a table, put on the board
+       (a canvas of test scenarios, or new rows in the one there) as ops. */
+    function draftTests() {
+      if (st.preview) return flash("Keep or discard the AI's changes first", true);
+      closeAiMenu();
+      if (dashOn()) leaveDash(st.canvasPath || []);
+      var prompt = st.session.tests_prompt(), where = (st.canvasPath || []).slice();
+      var job = opts.ai ? busyStart("tests", "Drafting test scenarios") : null;
+      var round = function (p, n) {
+        return ask(p, "✦ Draft test scenarios").then(function (text) {
+          if (job && job.stopped) return;
+          text = String(text || "");
+          var ops = JSON.parse(st.session.tests_ops(text)), res = null, test = null;
+          if (!ops.error) {
+            test = new wasm.Diagram();
+            test.set_source(st.text);
+            if (where.length) test.open_canvas(JSON.stringify(where));
+            res = JSON.parse(test.apply(JSON.stringify(ops)));
+          }
+          var why = ops.error || (!res.ok && (res.error || "it did not apply"));
+          if (why) {
+            if (test) test.free();
+            if (opts.ai && n < 2 && !/only repeats/.test(why)) { busyStep(job, "The reply did not fit; asking again (" + (n + 2) + " of 3)"); return round(wasm.ask_again(prompt, text, why), n + 1); }
+            busyEnd(job);
+            return flash(/only repeats/.test(why) ? "The AI found no new scenarios to add" : "The AI's scenarios did not fit: " + why, !/only repeats/.test(why));
+          }
+          var next = test.source("dsl");
+          test.free();
+          busyEnd(job);
+          startPreview(next, res.count, null);
+        }, function (e) {
+          if (job && job.stopped) return;
+          busyEnd(job);
+          if (e && e.shown) flash("");
+          else if (String(e && e.message) !== "cancelled") flash("AI: " + (e && e.message || e), true);
+        });
+      };
+      round(prompt, 0);
+    }
+    /* A table of test scenarios has an "expected" column; its status column
+       says how each went. */
+    function testsTable(g) {
+      return g && g.table && (g.columns || []).some(function (c) { return /^\s*expected/i.test(c); }) ? g : null;
+    }
+    function markScenario(n, g, word) {
+      var at = (g.columns || []).findIndex(function (c) { return /^\s*(status|result)/i.test(c); });
+      var cells = (n.cells || []).slice(), op = { op: "update_node", id: n.id, color: { pass: "green", fail: "red", blocked: "orange" }[word] || "" };
+      if (at > 0) {
+        while (cells.length < at) cells.push("");
+        cells[at - 1] = word;
+        op.cells = cells;
+      }
+      applyOps([op]);
+    }
     /* Images that go with a request to the AI: pasted into `input`, dropped
        on it or picked with the 📎 button; thumbnails to take them off, and
        with `keep`, a tick to also put one on the board. */
@@ -1878,6 +1949,8 @@
           busyEnd(job);
           return flash("The AI's reply did not apply: " + (res.error || "no ops in it"), true);
         }
+        // a rethink: the board remembers which Shape went over it last
+        if (busy && !where.length && wasm.version) test.apply(JSON.stringify({ op: "set", key: "rethought", value: wasm.version() }));
         var next = test.source("dsl");
         test.free();
         var note = wasm.reply_note(text);
@@ -1897,7 +1970,8 @@
        answer is then thrown away). */
     var BUSY_STEPS = {
       rethink: ["Reading the board, every canvas and comment", "Working out what changed and where it belongs", "Choosing the right block for each thing", "Writing the changes"],
-      add: ["Reading what you added", "Finding where each thing belongs", "Writing the changes"]
+      add: ["Reading what you added", "Finding where each thing belongs", "Writing the changes"],
+      tests: ["Reading how it works: the flows, screens and rules", "Working out what could go wrong", "Writing the scenarios"]
     };
     function busyStart(kind, title, what) {
       busyEnd(st.busy);
@@ -2455,10 +2529,17 @@
             applyOps([{ op: "add_node", id: freshId(tg.id + ".new-row"), label: "New row", group: tg.id, index: all.indexOf(tr) + 1 }]);
           }],
           ["Colour…", function () { colourMenu(t.id, "update_node", tr.color); }, "Tint the row"],
-          ["Edit as text…", function () { editTable(tg.id); }, "The whole table"],
+          ["Edit as text…", function () { editTable(tg.id); }, "The whole table"]
+        ].concat(testsTable(tg) ? [
+          "-",
+          ["Passed", function () { markScenario(tr, tg, "pass"); }, "The scenario works as expected"],
+          ["Failed", function () { markScenario(tr, tg, "fail"); }, "It did not do what was expected"],
+          ["Blocked", function () { markScenario(tr, tg, "blocked"); }, "It cannot be run yet"],
+          ["To run", function () { markScenario(tr, tg, "to run"); }, "Not run since it changed"]
+        ] : []).concat([
           "-",
           ["Delete row", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
-        ];
+        ]);
       }
       if (t.type === "node" && !view && timelineOf(t.id)) {
         var ev = node(t.id), tlg = timelineOf(t.id);
@@ -2814,6 +2895,7 @@
       var at = toDiagram(e.clientX, e.clientY);
       var items = t ? contextItems(t) : view ? [] : [
         ["✦ Rethink the board", function () { rethink(); }, "The AI acts on the open comments and brings the whole board up to date; you see the changes first"],
+        ["✦ Draft test scenarios", function () { draftTests(); }, "The AI writes what a tester should run, from how this canvas works; you see them first"],
         ["Copy the board as a prompt", function () { copyBoardPrompt(); }, "Everything on it, canvases too, as a spec to build from (" + MOD + "⇧C)"],
         ["New canvas here…", function () { newCanvas(at); }, "A board inside this one, opened from a button here"],
         ["Bring in a board…", function () { importBoards(at); }, "Another .shape file, whole, as a canvas of this board: a board of boards shows a roadmap across them"],
@@ -5903,6 +5985,8 @@
       var then = function () { if (opts.askPerspective) { askPerspective(); askSet(); } };
       if (opts.requireName && !st.author && !view) askName(then); else then();
     }, 300);
+    // a newer Shape can do more with this board: offer a Rethink, once
+    setTimeout(offerUpgrade, 1500);
     // a team's recipes reach the AI's prompts and Insert recipe…
     // what changed in the last week, for the summaries
     loadBefore();

@@ -581,7 +581,27 @@ fn draw(doc: &Document, opts: &RenderOptions, def: Option<crate::model::ThemeDef
         let node = doc.node(&nb.id).unwrap();
         let change = opts.changes.get(&node.id).copied();
         match nb.map.as_ref().and_then(|m| m.style) {
-            _ if nb.task => task_svg(&mut s, node, nb, p, t, change),
+            _ if nb.task => {
+                // a milestone on a bar: its name has room up to the next one there
+                let room = node.row.as_ref().filter(|_| node.milestone).map(|_| {
+                    let r = nb.rect;
+                    let bar = node.row.as_deref().and_then(|b| lay.rect(b));
+                    lay.nodes
+                        .iter()
+                        .filter(|o| {
+                            o.task
+                                && o.id != nb.id
+                                && (o.rect.cy() - r.cy()).abs() < 1.0
+                                && o.rect.x > r.x
+                                && doc.node(&o.id).is_some_and(|m| m.milestone)
+                        })
+                        .map(|o| o.rect.x)
+                        .fold(bar.map_or(f64::MAX, |b| b.right().max(r.right() + 160.0)), f64::min)
+                        - r.right()
+                        - 6.0
+                });
+                task_svg(&mut s, node, nb, p, t, change, room)
+            }
             _ if nb.risk => risk_svg(&mut s, doc, node, nb, p, t, change),
             _ if nb.datum => datum_svg(&mut s, doc, node, nb, p, change),
             _ if node.image.is_some() => image_svg(&mut s, doc, node, nb, p, change),
@@ -1484,6 +1504,7 @@ fn task_svg(
     p: &Palette,
     t: Theme,
     change: Option<Change>,
+    room: Option<f64>,
 ) {
     let r = nb.rect;
     let k = theme::tint(node.color.as_deref().unwrap_or("blue"), t);
@@ -1496,10 +1517,15 @@ fn task_svg(
         stroke = st.clone();
         fill = st;
     }
+    // a milestone on a bar's row: outlined, so it shows on the bar
+    let on_bar = node.milestone && node.row.is_some();
+    if on_bar {
+        fill = p.node_fill.to_string();
+    }
     if node.milestone {
         let _ = write!(
             s,
-            r#"<g class="dg-node dg-task dg-milestone" data-id="{}"><path class="dg-shape" d="M{},{} L{},{} L{},{} L{},{} Z" fill="{}" stroke="{}" stroke-width="1"/></g>"#,
+            r#"<g class="dg-node dg-task dg-milestone" data-id="{}"><path class="dg-shape" d="M{},{} L{},{} L{},{} L{},{} Z" fill="{}" stroke="{}" stroke-width="{}"/></g>"#,
             esc(&node.id),
             n(r.cx()),
             n(r.y),
@@ -1510,8 +1536,37 @@ fn task_svg(
             n(r.x),
             n(r.cy()),
             fill,
-            stroke
+            stroke,
+            if on_bar { 2.5 } else { 1.0 }
         );
+        if on_bar {
+            // its name beside it, readable on the bar and off it, cut short
+            // before the next milestone (all of it on hover)
+            let full = node.display();
+            let room = room.unwrap_or(f64::MAX);
+            let chars: Vec<char> = full.chars().collect();
+            let mut keep = chars.len();
+            let mut shown = full.to_string();
+            while keep > 0 && text::width(&shown, 10.5) > room {
+                keep -= 1;
+                let head: String = chars[..keep].iter().collect();
+                shown = if keep == 0 {
+                    String::new()
+                } else {
+                    format!("{}…", head.trim_end())
+                };
+            }
+            let _ = write!(
+                s,
+                r#"<text x="{}" y="{}" font-size="10.5" font-weight="600" fill="{}" stroke="{}" stroke-width="3" paint-order="stroke" pointer-events="none"><title>{}</title>{}</text>"#,
+                n(r.right() + 3.0),
+                n(r.cy() + 3.5),
+                p.fg,
+                p.node_fill,
+                esc(full),
+                esc(&shown)
+            );
+        }
         return;
     }
     let days = crate::gantt::task_days(node);

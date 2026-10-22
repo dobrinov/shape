@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.74.0 — 2026-10-22
+
+- **Rethink after an upgrade brings in what is new.** A board records the version of Shape that last rethought it (`rethought: 0.74.0`, one line in the file, so it travels with git). After an upgrade, the next *✦ Rethink* is told what the new version's built-in perspectives can show (test scenarios for QA, a canvas per project for Delivery…) and reshapes the board for them where it fits, from what is already on it. On opening such a board, Shape offers that Rethink once. Boards with only custom perspectives, or none, are left as they are.
+- **Delivery on a board of several projects is one gantt chart**: a row per project, with a bar for its whole plan coloured by how it stands and shaded for what is done, and its milestones (betas, launches) as diamonds on that row with their names. A project with no dates yet is a row without a bar. Each project's own plans, kanban boards and risks are no longer copied in. Its bar and badge open its canvas, where they are. A simple board still shows its own plan.
+- `row: TASK` puts a gantt milestone on another task's row (*Beta* on the *Build* bar) instead of a row of its own.
+- *✦ Rethink* fits a board's structure to its size: when a board has grown into several projects, it gives each project a canvas of its own. A simple board stays flat.
+- **A QA perspective**, in every set (project, product, startup, agency). It opens on **how it works**: the sequences, journeys and screens as they are on the board. Then come the **test scenarios**, failing ones first, the parts with **no scenario yet**, the decision records and the risks. The headline counts them (*Tests: 14 scenarios · 9 pass · 2 fail · 3 to run · Not covered yet: Refund*).
+- **✦ Draft test scenarios** (the ✦ button, or right-click the board): the AI reads how the canvas works (its flows, screens, data, decisions and risks) and writes what a tester should run, each with steps, the expected result and the part it covers. The main paths come first, then edge cases, errors and permissions. They go in a table on a canvas of test scenarios, and running it again adds new ones only. You see them before keeping them.
+- Any table with an `expected` column is a table of test scenarios. Right-click a scenario → *Passed*, *Failed*, *Blocked* or *To run* sets its status and tints the row.
+
 ## 0.73.0 — 2026-10-22
 
 - **Install in one line on every system.** The website shows the install for the system you're on, with the others a tab away. On Windows, paste `irm https://dobrinov.github.io/shape/install.ps1 | iex` into PowerShell: it installs Shape for you (no admin rights), puts it on your `PATH` and in the Start menu, and makes `.shape` files open with a double-click. On macOS and Linux, `curl -fsSL https://dobrinov.github.io/shape/install.sh | sh` does the same without Homebrew. Run either again to upgrade, and the *New* badge says which one to run.

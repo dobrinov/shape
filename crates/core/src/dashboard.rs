@@ -104,7 +104,7 @@ pub fn target(row: &str) -> Option<(Vec<String>, String)> {
 }
 
 /// Every document of the board with its canvas path, the top board first.
-fn docs(doc: &Document) -> Vec<(Vec<String>, &Document)> {
+pub(crate) fn docs(doc: &Document) -> Vec<(Vec<String>, &Document)> {
     fn walk<'a>(d: &'a Document, path: Vec<String>, out: &mut Vec<(Vec<String>, &'a Document)>) {
         out.push((path.clone(), d));
         for c in &d.canvases {
@@ -627,6 +627,7 @@ fn tiles(id: &str) -> &'static [&'static str] {
         "tech" => &["records", "unrecorded", "blockers", "risks"],
         "legal" => &["obligations", "matrix", "records"],
         "user" | "users" => &["journey", "voices", "comments"],
+        "qa" => &["howitworks", "scenarios", "untested", "records", "matrix"],
         _ => &["roadmap", "milestones", "decisions", "risks", "blockers"],
     }
 }
@@ -825,6 +826,74 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                 },
             )
         }
+        ("qa", _) => {
+            let all = crate::qa::scenarios(doc);
+            let what = crate::qa::parts(doc);
+            let open: Vec<String> = what
+                .iter()
+                .filter(|x| !crate::qa::covered(doc, x, &all))
+                .map(|x| x.label.clone())
+                .collect();
+            let count = |o: crate::qa::Outcome| all.iter().filter(|s| s.outcome == o).count();
+            let uncovered = if open.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "Not covered yet: {}{}",
+                    open.iter().take(4).cloned().collect::<Vec<_>>().join(", "),
+                    if open.len() > 4 {
+                        format!(" and {} more", open.len() - 4)
+                    } else {
+                        String::new()
+                    }
+                )
+            };
+            if all.is_empty() {
+                (
+                    if what.is_empty() {
+                        "How it works".to_string()
+                    } else {
+                        format!(
+                            "How it works: {} {} to test",
+                            what.len(),
+                            if what.len() == 1 { "part" } else { "parts" }
+                        )
+                    },
+                    "blue",
+                    "No test scenarios yet: ✦ → Draft test scenarios writes them from the board"
+                        .to_string(),
+                )
+            } else {
+                let mut bits = vec![format!(
+                    "{} {}",
+                    all.len(),
+                    if all.len() == 1 { "scenario" } else { "scenarios" }
+                )];
+                for o in [
+                    crate::qa::Outcome::Pass,
+                    crate::qa::Outcome::Fail,
+                    crate::qa::Outcome::Blocked,
+                    crate::qa::Outcome::ToRun,
+                ] {
+                    if count(o) > 0 {
+                        bits.push(format!("{} {}", count(o), o.word()));
+                    }
+                }
+                (
+                    format!("Tests: {}", bits.join(" · ")),
+                    if count(crate::qa::Outcome::Fail) > 0 {
+                        "red"
+                    } else if count(crate::qa::Outcome::Blocked) > 0 || !open.is_empty() {
+                        "orange"
+                    } else if count(crate::qa::Outcome::ToRun) > 0 {
+                        "blue"
+                    } else {
+                        "green"
+                    },
+                    uncovered,
+                )
+            }
+        }
         ("tech", _) => {
             let records = docs(doc)
                 .iter()
@@ -916,6 +985,11 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
     out.nodes.push(h);
 
     for tile in tiles(&p.id) {
+        // a board of several projects: Delivery shows them on one chart, and
+        // each project's plans, boards and risks are a click away, in its canvas
+        if !parts.is_empty() && p.id == "delivery" && matches!(*tile, "gantt" | "kanban" | "matrix") {
+            continue;
+        }
         match *tile {
             "milestones" if !ms.is_empty() => {
                 out.groups.push(table(
@@ -1257,32 +1331,37 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                 }
             }
             "roadmap" if !parts.is_empty() => {
-                // each piece of work on one time axis: a bar for what is left of
-                // it (from today to its last milestone, or later when that is
-                // forecast later), then its milestones
+                // one gantt chart of the projects: a row each, a bar for its
+                // whole plan (and further when forecast later) with how much
+                // is done, its milestones on the same row; one without dates
+                // is a row with no bar. A row opens its canvas, for the detail.
                 let mut tasks = Vec::new();
-                let mut unplanned = Vec::new();
+                let mut first = today;
                 for (cid, title) in &parts {
                     let mine: Vec<&Milestone> = plain
                         .iter()
                         .filter(|m| m.at.path.first() == Some(cid))
                         .collect();
-                    let Some(head) = mine.first() else {
-                        unplanned.push((cid.clone(), title.clone()));
-                        continue;
-                    };
-                    let end = mine
-                        .iter()
-                        .map(|m| m.forecast.max(m.due))
-                        .max()
-                        .unwrap_or(head.due);
-                    let mut bar = Node::new(&row_id(
-                        "rm",
-                        &At {
-                            path: head.at.path.clone(),
-                            id: head.chart.clone(),
-                        },
-                    ));
+                    // the plans in it: when they start and end, how much is done
+                    let (mut from, mut to, mut work, mut done) = (i64::MAX, i64::MIN, 0.0, 0.0);
+                    let mut chart = None;
+                    for (path, d) in docs(doc).into_iter().filter(|(p, _)| p.first() == Some(cid)) {
+                        for g in d.groups.iter().filter(|g| g.gantt) {
+                            let sc = gantt::schedule(d, &g.id);
+                            let Some(o) = sc.origin else { continue };
+                            chart.get_or_insert((path.clone(), g.id.clone()));
+                            for &(i, st, len) in &sc.tasks {
+                                from = from.min(o + st as i64);
+                                to = to.max(o + (st + len) as i64 - 1);
+                                if !d.nodes[i].milestone {
+                                    work += len;
+                                    done += len * d.nodes[i].done.unwrap_or(0.0).clamp(0.0, 100.0) / 100.0;
+                                }
+                            }
+                        }
+                    }
+                    let (path, gid) = chart.clone().unwrap_or((vec![cid.clone()], cid.clone()));
+                    let mut bar = Node::new(&row_id("rm", &At { path, id: gid }));
                     bar.label = title.clone();
                     if let Some(cv) = doc.canvas(cid) {
                         if out.canvas(cid).is_none() {
@@ -1290,13 +1369,29 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                         }
                         bar.canvas = Some(cid.clone());
                     }
-                    bar.start = Some(gantt::format_date(today));
-                    bar.days = Some((end - today + 1).max(1) as f64);
-                    bar.color = mine
-                        .iter()
-                        .map(|m| m.light)
-                        .max()
-                        .map(|l| l.color().to_string());
+                    if chart.is_none() {
+                        bar.owner = Some("no dates yet".into());
+                        bar.days = Some(0.0);
+                        bar.color = Some("gray".into());
+                        tasks.push(bar);
+                        continue;
+                    }
+                    let to = mine.iter().map(|m| m.forecast.max(m.due)).fold(to, i64::max);
+                    first = first.min(from);
+                    bar.start = Some(gantt::format_date(from));
+                    bar.days = Some((to - from + 1).max(1) as f64);
+                    if work > 0.0 {
+                        bar.done = Some((100.0 * done / work).round());
+                    }
+                    bar.color = Some(
+                        mine.iter()
+                            .map(|m| m.light)
+                            .max()
+                            .unwrap_or(Light::Green)
+                            .color()
+                            .to_string(),
+                    );
+                    let bar_id = bar.id.clone();
                     tasks.push(bar);
                     for m in mine {
                         let mut n = Node::new(&row_id("rm", &m.at));
@@ -1307,42 +1402,22 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                         };
                         n.start = Some(gantt::format_date(m.due));
                         n.milestone = true;
+                        n.row = Some(bar_id.clone());
                         n.color = Some(m.light.color().to_string());
                         tasks.push(n);
                     }
                 }
-                if !tasks.is_empty() {
-                    out.groups.push(Group {
-                        id: "roadmap".into(),
-                        label: "Roadmap".into(),
-                        gantt: true,
-                        start: Some(gantt::format_date(today)),
-                        scale: Some(crate::model::Scale::Month),
-                        ..Default::default()
-                    });
-                    for mut n in tasks {
-                        n.group = Some("roadmap".into());
-                        out.nodes.push(n);
-                    }
-                }
-                if !unplanned.is_empty() {
-                    out.groups
-                        .push(table("unplanned", "No dates yet", &["Piece of work", ""]));
-                    for (cid, title) in unplanned {
-                        out.nodes.push(row(
-                            row_id(
-                                "np",
-                                &At {
-                                    path: vec![cid.clone()],
-                                    id: cid,
-                                },
-                            ),
-                            "unplanned",
-                            &format!("{title} ↗"),
-                            &["no plan with dates on it yet".into()],
-                            None,
-                        ));
-                    }
+                out.groups.push(Group {
+                    id: "roadmap".into(),
+                    label: "Roadmap".into(),
+                    gantt: true,
+                    start: Some(gantt::format_date(first)),
+                    scale: Some(crate::model::Scale::Month),
+                    ..Default::default()
+                });
+                for mut n in tasks {
+                    n.group = Some("roadmap".into());
+                    out.nodes.push(n);
                 }
             }
             "plan" => {
@@ -1757,6 +1832,79 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                             c.label = format!("{w} · {}", g.display());
                         }
                     }
+                }
+            }
+            "howitworks" => {
+                // the sequences, journeys and screens, as on the board
+                let before = out.groups.len();
+                for (path, d) in docs(doc) {
+                    let ids: Vec<String> = d
+                        .groups
+                        .iter()
+                        .filter(|g| {
+                            g.parent.is_none()
+                                && (g.sequence || (g.lanes && !g.kanban) || g.screen.is_some())
+                        })
+                        .map(|g| g.id.clone())
+                        .collect();
+                    copy_trees(&mut out, d, &path, &ids, "hw");
+                }
+                wrap(&mut out, before, "howitworks", "How it works");
+            }
+            "scenarios" => {
+                let mut all = crate::qa::scenarios(doc);
+                if all.is_empty() {
+                    continue;
+                }
+                // what needs a look first: failing, blocked, to run, passing
+                all.sort_by_key(|s| s.outcome);
+                out.groups.push(table(
+                    "scenarios",
+                    &format!("Test scenarios ({})", all.len()),
+                    &["Scenario", "Covers", "Status"],
+                ));
+                for x in all.iter().take(12) {
+                    out.nodes.push(row(
+                        row_id("qa", &x.at),
+                        "scenarios",
+                        &x.label,
+                        &[x.covers.clone(), x.outcome.word().into()],
+                        x.outcome.color(),
+                    ));
+                }
+            }
+            "untested" => {
+                let all = crate::qa::scenarios(doc);
+                let open: Vec<crate::qa::Part> = crate::qa::parts(doc)
+                    .into_iter()
+                    .filter(|x| !crate::qa::covered(doc, x, &all))
+                    .collect();
+                if open.is_empty() {
+                    continue;
+                }
+                out.groups.push(table(
+                    "untested",
+                    &format!("No scenario yet ({})", open.len()),
+                    &["Part", "What", "Where"],
+                ));
+                for x in open.iter().take(10) {
+                    let where_ = match part_of(&x.at) {
+                        Some(t) => t,
+                        None => x
+                            .at
+                            .path
+                            .last()
+                            .and_then(|c| doc.at(&x.at.path[..x.at.path.len() - 1])?.canvas(c))
+                            .map(|c| c.display().to_string())
+                            .unwrap_or_else(|| "The board".into()),
+                    };
+                    out.nodes.push(row(
+                        row_id("un", &x.at),
+                        "untested",
+                        &x.label,
+                        &[x.kind.into(), where_],
+                        None,
+                    ));
                 }
             }
             "matrix" => {
@@ -2482,25 +2630,34 @@ mod tests {
         let dash = build(&doc, p, today, None);
         // a milestone says whose it is
         assert_eq!(dash.nodes[0].label, "Now delivering: Web shop · Web beta");
-        // the roadmap: a bar per piece of work and its milestones, on one axis
-        let road: Vec<&str> = dash
+        // one chart of the projects: a row each (one without dates too), its
+        // milestones on its bar's row
+        let road: Vec<&Node> = dash
             .nodes
             .iter()
             .filter(|n| n.group.as_deref() == Some("roadmap"))
+            .collect();
+        let rows: Vec<&str> = road
+            .iter()
+            .filter(|n| n.row.is_none())
             .map(|n| n.label.as_str())
             .collect();
-        assert_eq!(road[0], "Web shop");
-        assert!(road[1].starts_with("Web beta"), "{road:?}");
-        assert_eq!(&road[2..], ["Web launch", "Mobile app", "App launch"]);
-        assert!(dash.group("roadmap").is_some_and(|g| g.gantt));
-        // the whole delivery plan: every chart, named after whose it is
-        let plans: Vec<&str> = dash
-            .groups
+        assert_eq!(rows, ["Web shop", "Mobile app", "Help centre"]);
+        let on_web: Vec<&str> = road
             .iter()
-            .filter(|g| g.gantt && g.id != "roadmap")
-            .map(|g| g.label.as_str())
+            .filter(|n| n.row.as_deref() == Some(road[0].id.as_str()))
+            .map(|n| n.label.as_str())
             .collect();
-        assert_eq!(plans, ["Web shop · Web plan", "Mobile app · App plan"]);
+        assert!(on_web[0].starts_with("Web beta") && on_web[1] == "Web launch", "{on_web:?}");
+        assert_eq!(road.last().unwrap().owner.as_deref(), Some("no dates yet"));
+        assert!(dash.group("roadmap").is_some_and(|g| g.gantt));
+        // the projects' own plans, boards and risks are in their canvases, not here
+        assert_eq!(dash.groups.iter().filter(|g| g.gantt).count(), 1);
+        assert!(!dash.groups.iter().any(|g| g.risks || g.kanban));
+        let lay = crate::layout::layout(&dash);
+        let beta = road.iter().find(|n| n.label.starts_with("Web beta")).unwrap();
+        let (b, m) = (lay.rect(&road[0].id).unwrap(), lay.rect(&beta.id).unwrap());
+        assert!((b.cy() - m.cy()).abs() < 0.5, "on its bar's row");
         // a bar opens its canvas, which says how many risks it holds
         let web = dash.node(&row_id("rm", &At { path: vec!["web".into()], id: "plan".into() })).unwrap();
         assert_eq!(web.canvas.as_deref(), Some("web"));
@@ -2515,12 +2672,9 @@ mod tests {
                 id: "plan".into(),
             },
         ));
-        assert!(bar.is_some_and(|b| b.start.as_deref() == Some("2026-10-15")));
-        let help = dash
-            .nodes
-            .iter()
-            .find(|n| n.group.as_deref() == Some("unplanned"))
-            .unwrap();
+        // from the start of its plan, with how much of it is done
+        assert!(bar.is_some_and(|b| b.start.as_deref() == Some("2026-10-01") && b.done.is_some()));
+        let help = road.last().unwrap();
         assert_eq!(
             target(&help.id),
             Some((vec!["help".to_string()], "help".to_string()))

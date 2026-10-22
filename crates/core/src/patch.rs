@@ -275,7 +275,9 @@ fn statement(doc: &Document, e: &Elem, pad: &str, out: &mut Vec<String>) {
 /// Where new statements of each kind go: after the last one of their kind.
 #[derive(Default)]
 struct Anchors {
+    /// After the last setting (a perspective's line too) / plain setting.
     settings: Option<usize>,
+    head: Option<usize>,
     nodes: Option<usize>,
     blocks: Option<usize>,
     edges: Option<usize>,
@@ -612,7 +614,12 @@ fn edit_lines(
         }
         for e in &li.elems {
             match e {
-                Elem::Setting(_) => at.settings = Some(out.len()),
+                Elem::Setting(k) => {
+                    at.settings = Some(out.len());
+                    if !k.starts_with("perspective ") {
+                        at.head = Some(out.len());
+                    }
+                }
                 Elem::Node(_) if li.depth == 0 => at.nodes = Some(out.len()),
                 Elem::Edge(_) => at.edges = Some(out.len()),
                 Elem::Comment(_) => {
@@ -640,6 +647,8 @@ fn edit_lines(
             statement(new, &e, "", &mut chunk);
         }
     }
+    // a plain setting goes with the others at the top
+    add(at.head.or(at.settings), 0, std::mem::take(&mut chunk));
     for p in &new.perspectives {
         let e = Elem::Setting(format!("perspective {}", p.id));
         if !done.contains(&e) {
@@ -801,6 +810,20 @@ mod tests {
             r#"{"ops":[{"op":"perspective","id":"delivery","label":"Squad","tags":["delivery"]}]}"#,
         );
         assert_eq!(again, out.replace("Delivery [", "Squad ["));
+    }
+
+    #[test]
+    fn a_new_setting_goes_with_the_others_at_the_top() {
+        let src = "title: Shop\nperspectives: project\n\n# what we sell\nweb -> api\n\nperspective ops: Ops [tags: ops]\n";
+        let out = edited(src, r#"{"op":"set","key":"rethought","value":"0.74.0"}"#);
+        assert_eq!(
+            out,
+            src.replacen(
+                "perspectives: project\n",
+                "perspectives: project\nrethought: 0.74.0\n",
+                1
+            )
+        );
     }
 
     #[test]

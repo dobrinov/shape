@@ -70,6 +70,9 @@ pub enum Op {
         /// Gantt task: a milestone (a point in time, not a bar).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         milestone: Option<bool>,
+        /// Gantt milestone: the task whose row it sits on ("" gives it its own row).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        row: Option<String>,
         /// Timeline event: when, as people write it (`2026-10-28`, `Oct 2026`,
         /// `7–14 May 2026`; "" clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -163,6 +166,9 @@ pub enum Op {
         /// Gantt task: a milestone (a point in time, not a bar).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         milestone: Option<bool>,
+        /// Gantt milestone: the task whose row it sits on ("" gives it its own row).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        row: Option<String>,
         /// Timeline event: when, as people write it (`2026-10-28`, `Oct 2026`,
         /// `7–14 May 2026`; "" clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -997,6 +1003,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             days,
             after,
             milestone,
+            row,
             date,
             important,
             widget,
@@ -1044,6 +1051,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 n.mindmap = Some(map_layout(m)?);
             }
             task(&mut n, start, days, after, milestone, done, owner)?;
+            if let Some(r) = opt(row) {
+                n.row = r;
+            }
             launch(&mut n, adds, ramp);
             event(&mut n, date, important)?;
             if let Some(w) = widget.as_deref().filter(|w| !w.is_empty()) {
@@ -1110,6 +1120,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             days,
             after,
             milestone,
+            row,
             date,
             important,
             widget,
@@ -1188,6 +1199,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 n.collapsed = *c;
             }
             task(n, start, days, after, milestone, done, owner)?;
+            if let Some(r) = opt(row) {
+                n.row = r;
+            }
             launch(n, adds, ramp);
             event(n, date, important)?;
             if let Some(l) = level {
@@ -1459,6 +1473,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                         if a == id {
                             *a = to.clone();
                         }
+                    }
+                    if n.row.as_deref() == Some(id) {
+                        n.row = Some(to.clone());
                     }
                 }
                 for n in &mut doc.nodes {
@@ -2217,6 +2234,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                     None if !v.is_empty() => s.palette = Some(v.to_string()),
                     None => s.palette = None,
                 },
+                "rethought" => s.rethought = Some(v.to_string()).filter(|v| !v.is_empty()),
                 k => {
                     return Err(format!(
                         "unknown setting `{k}` (use {})",

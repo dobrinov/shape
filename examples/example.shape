@@ -337,6 +337,17 @@ canvas data: Data & flows {
 
   comment on tested: Which browser tests run on CI?
 
+  tests-link: Test scenarios [pill, canvas: tests]
+  canvas tests: Test scenarios {
+    table scenarios: Test scenarios {
+      scenario             | steps                    | expected                 | covers     | status
+      Keep an AI edit      | 1. Ask for a change\n2. Keep it | The board shows the change, and it is saved | An AI edit | pass [green]
+      Discard an AI edit   | 1. Ask for a change\n2. Discard it | The board is as it was   | An AI edit | pass [green]
+      A reply that misfits | 1. Ask for a change the AI gets wrong | It asks again (3 tries), then says why | An AI edit | to run
+      A failing test       | 1. Ask for a change that breaks a test | Nothing is tagged, and the owner hears why | A release  | fail [red]
+    }
+  }
+
   cycle loop: The loop {
     Ask
     Build

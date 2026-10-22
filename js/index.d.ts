@@ -160,6 +160,8 @@ export interface Node {
   after?: string[];
   /** Gantt task: a point in time (drawn as a diamond), not a bar. */
   milestone?: boolean;
+  /** Gantt milestone: the task whose row it sits on ("" clears it in ops). */
+  row?: string;
   /** Gantt task: percent done, 0–100. */
   done?: number;
   /** Forecast launch: what it adds a month once ramped up. */
@@ -351,6 +353,8 @@ export interface AddNodeOp {
   after?: string[];
   /** Gantt task: a milestone (a point in time, not a bar). */
   milestone?: boolean;
+  /** Gantt milestone: the task whose row it sits on ("" clears it in ops). */
+  row?: string;
   /** Gantt task: percent done, 0–100. */
   done?: number;
   /** Forecast launch: what it adds a month once ramped up. */
@@ -412,6 +416,8 @@ export interface UpdateNodeOp {
   after?: string[];
   /** Gantt task: a milestone (a point in time, not a bar). */
   milestone?: boolean;
+  /** Gantt milestone: the task whose row it sits on ("" clears it in ops). */
+  row?: string;
   /** Gantt task: percent done, 0–100 (0 clears it). */
   done?: number;
   /** Forecast launch: what it adds a month once ramped up. */

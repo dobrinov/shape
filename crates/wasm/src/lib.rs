@@ -287,6 +287,34 @@ impl Diagram {
         shape_core::prompt::ask(&self.inner.doc, &ids, request, &self.inner.recipes)
     }
 
+    /// What this version of Shape can do with the board since it was last
+    /// rethought, for its built-in perspectives: `{version, rethought,
+    /// notes: [short, …]}` (no notes: nothing new for it).
+    pub fn upgrade_notes(&self) -> String {
+        let root = self.inner.whole();
+        json!({
+            "version": shape_core::upgrades::VERSION,
+            "rethought": root.settings.rethought,
+            "notes": shape_core::upgrades::since(&root).iter().map(|n| n.short).collect::<Vec<_>>(),
+        })
+        .to_string()
+    }
+
+    /// A prompt asking a model to draft test scenarios for the open canvas
+    /// (and the canvases inside it), from how the board says it works.
+    pub fn tests_prompt(&self) -> String {
+        shape_core::qa::draft_prompt(&self.inner.doc)
+    }
+
+    /// The ops that put a [`tests_prompt`](Self::tests_prompt) reply on the
+    /// open canvas: `{ops}` (to `apply`) or `{error}`.
+    pub fn tests_ops(&self, reply: &str) -> String {
+        match shape_core::qa::draft_ops(&self.inner.doc, reply) {
+            Ok(ops) => ops,
+            Err(e) => err(e),
+        }
+    }
+
     /// A prompt asking `question` about the whole board (canvases included).
     /// `history`: the conversation so far, `[[question, answer], …]` (JSON);
     /// `today`: `YYYY-MM-DD` for gantt forecasts ("" for none).

@@ -1185,6 +1185,7 @@ fn gantt_block(ctx: &mut Ctx, g: usize) -> (f64, f64) {
     let names = sched
         .tasks
         .iter()
+        .filter(|t| on_row(ctx.doc, &ctx.doc.nodes[t.0], &sched).is_none())
         .map(|t| {
             let n = &ctx.doc.nodes[t.0];
             text::width(n.display(), 13.0)
@@ -1218,12 +1219,28 @@ fn gantt_block(ctx: &mut Ctx, g: usize) -> (f64, f64) {
     let days = crate::gantt::axis_days(scale, sched.origin, span);
     let day = crate::gantt::day_width(scale, days);
     let x0 = names + GANTT_GAP;
-    for (k, &(i, start, len)) in sched.tasks.iter().enumerate() {
+    // a row per task; a milestone with `row:` (a task of this chart) sits
+    // on that task's row
+    let rows: Vec<String> = sched
+        .tasks
+        .iter()
+        .map(|t| &ctx.doc.nodes[t.0])
+        .filter(|n| on_row(ctx.doc, n, &sched).is_none())
+        .map(|n| n.id.clone())
+        .collect();
+    for &(i, start, len) in &sched.tasks {
+        let n = &ctx.doc.nodes[i];
+        let id = on_row(ctx.doc, n, &sched).unwrap_or(&n.id);
+        let k = rows.iter().position(|r| r == id).unwrap_or(0);
         let y = GANTT_HEAD + k as f64 * GANTT_ROW + (GANTT_ROW - GANTT_BAR) / 2.0;
-        if ctx.doc.nodes[i].milestone {
+        if n.milestone {
             // a diamond centred on its day
             ctx.sizes[i] = (GANTT_BAR, GANTT_BAR);
             ctx.node_pos[i] = (x0 + start * day - GANTT_BAR / 2.0, y);
+        } else if len <= 0.0 && n.start.is_none() {
+            // no dates: a name without a bar
+            ctx.sizes[i] = (0.0, GANTT_BAR);
+            ctx.node_pos[i] = (x0, y);
         } else {
             ctx.sizes[i] = ((len * day).max(4.0), GANTT_BAR);
             ctx.node_pos[i] = (x0 + start * day, y);
@@ -1235,18 +1252,28 @@ fn gantt_block(ctx: &mut Ctx, g: usize) -> (f64, f64) {
         day,
         days,
         origin: sched.origin,
-        rows: sched
-            .tasks
-            .iter()
-            .map(|t| ctx.doc.nodes[t.0].id.clone())
-            .collect(),
+        rows: rows.clone(),
         left: 0.0,
         scale,
     });
     (
         x0 + days * day,
-        GANTT_HEAD + sched.tasks.len().max(1) as f64 * GANTT_ROW,
+        GANTT_HEAD + rows.len().max(1) as f64 * GANTT_ROW,
     )
+}
+
+/// The task whose row milestone `n` sits on: its `row`, a task of the same chart.
+pub fn on_row<'a>(
+    doc: &Document,
+    n: &'a Node,
+    sched: &crate::gantt::Schedule,
+) -> Option<&'a String> {
+    let p = n.row.as_ref().filter(|_| n.milestone)?;
+    sched
+        .tasks
+        .iter()
+        .any(|t| doc.nodes[t.0].id == *p && !doc.nodes[t.0].milestone)
+        .then_some(p)
 }
 
 /// Cross-axis size of what band `b` holds.

@@ -30,6 +30,7 @@ pub const SETTINGS: &[&str] = &[
     "layout",
     "routing",
     "theme",
+    "rethought",
 ];
 
 /// Edge operators, longest first: (token, arrow, line, reversed).
@@ -640,6 +641,7 @@ impl Parser {
                     format!("unknown set of perspectives `{value}` (use {})", BoardKind::names())
                 })?
             }
+            "rethought" => s.rethought = Some(value).filter(|v| !v.is_empty()),
             "theme" => {
                 match Theme::parse(&value) {
                     Some(t) => {
@@ -2398,6 +2400,7 @@ const KEYS: &[&str] = &[
     "duration",
     "after",
     "milestone",
+    "row",
     "date",
     "important",
     "done",
@@ -2540,6 +2543,7 @@ pub fn apply_node_attrs(n: &mut Node, attrs: &Attrs) -> Result<(), String> {
             }
             ("after", Some(v)) => n.after = v.split_whitespace().map(String::from).collect(),
             ("milestone", None) => n.milestone = true,
+            ("row", Some(v)) => n.row = Some(v.clone()).filter(|s| !s.is_empty()),
             ("date" | "when", Some(v)) => {
                 if crate::timeline::parse(v).is_none() {
                     return Err(crate::timeline::date_error(v));
@@ -3703,6 +3707,9 @@ fn node_attrs(n: &Node) -> Vec<String> {
     if n.milestone {
         a.push("milestone".into());
     }
+    if let Some(r) = &n.row {
+        a.push(format!("row: {r}"));
+    }
     if let Some(d) = &n.date {
         a.push(format!("date: {}", attr_value(d)));
     }
@@ -3935,6 +3942,7 @@ pub(crate) fn setting_line(doc: &Document, key: &str) -> Option<String> {
             Some(p) => Some(format!("theme: {p}")),
             None => (s.theme != def.theme).then(|| format!("theme: {}", s.theme.as_str())),
         },
+        "rethought" => s.rethought.as_ref().map(|v| format!("rethought: {v}")),
         // a perspective of the board's own: `perspective ID`
         _ => key.strip_prefix("perspective ").and_then(|id| {
             doc.perspectives

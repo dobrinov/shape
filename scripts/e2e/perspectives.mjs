@@ -45,7 +45,7 @@ try {
 
   // a project board's built-in perspectives
   const names = await p.locator(".dge-persp option").allTextContents();
-  assert.deepEqual(names.slice(0, 5), ["Full board", "Delivery", "Product", "Technical", "Legal"]);
+  assert.deepEqual(names.slice(0, 6), ["Full board", "Delivery", "Product", "Technical", "QA", "Legal"]);
   assert.equal(await shown(p), "api,beta,fraud,note");
   assert.ok(!(await p.locator('[data-act="folds"]').isVisible()), "nothing to fold on the full board");
   // Delivery opens on its summary: computed from the board (here: the risk matrix, as it is), read-only; the file does not change
