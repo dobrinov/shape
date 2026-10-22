@@ -26,6 +26,7 @@ fn newest(dir: &Path) -> SystemTime {
 fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let root = manifest.join("../..").canonicalize().unwrap();
+    windows_icon(&manifest);
     let pkg = root.join("web/pkg");
     let wasm = pkg.join("shape_wasm_bg.wasm");
     for p in [
@@ -122,5 +123,24 @@ fn main() {
                 panic!("building the WASM bundle failed ({other:?}). Install wasm-pack (`cargo install wasm-pack`) and the wasm32-unknown-unknown target (`rustup target add wasm32-unknown-unknown`).");
             }
         }
+    }
+}
+
+/// shape.exe carries Shape's icon (Explorer, the taskbar, the Start menu) and
+/// its name. icons/app.ico is drawn from icons/app.svg (see app.rs's tests).
+fn windows_icon(manifest: &Path) {
+    println!(
+        "cargo:rerun-if-changed={}",
+        manifest.join("icons/app.ico").display()
+    );
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
+        return;
+    }
+    let mut res = winresource::WindowsResource::new();
+    res.set_icon(&manifest.join("icons/app.ico").to_string_lossy());
+    res.set("FileDescription", "Shape");
+    res.set("ProductName", "Shape");
+    if let Err(e) = res.compile() {
+        println!("cargo:warning=shape.exe is built without its icon: {e}");
     }
 }

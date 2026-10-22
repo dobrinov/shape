@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.73.0 — 2026-10-22
+
+- **Install in one line on every system.** The website shows the install for the system you're on, with the others a tab away. On Windows, paste `irm https://dobrinov.github.io/shape/install.ps1 | iex` into PowerShell: it installs Shape for you (no admin rights), puts it on your `PATH` and in the Start menu, and makes `.shape` files open with a double-click. On macOS and Linux, `curl -fsSL https://dobrinov.github.io/shape/install.sh | sh` does the same without Homebrew. Run either again to upgrade, and the *New* badge says which one to run.
+- **shape.exe has Shape's icon** in Explorer, the taskbar and the Start menu, and opened from there it no longer leaves a console window behind its own.
+- `shape install-app` on Windows adds Shape to the Start menu too (`--remove` takes it out).
+- The Windows download holds a single `shape.exe`. The old `diagram` name is now a tiny `diagram.cmd` next to it, instead of a second copy of the program.
+
 ## 0.72.0 — 2026-10-21
 
 - **Session logs.** Every Shape session keeps a log on your machine: the board it opened, each AI request (what you asked, the prompt, the reply, the model, how long it took, or why it failed), whether you kept or discarded the changes, every save and what it changed, and the editor's errors. `shape logs` shows the latest session; `shape logs ai` and `shape logs errors` show just those, `--list` the sessions, `--session N` one of them, `--full` everything, and `--clear` deletes them. So when something goes wrong, an agent helping you can see what happened.

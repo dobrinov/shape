@@ -121,7 +121,21 @@ brew install dobrinov/tap/shape
 
 Had it installed as `diagram` (its name before October 2026)? Run `brew migrate diagram` once, then `brew upgrade shape` as usual.
 
-**Binaries:** download an archive for macOS (Apple silicon or Intel), Linux (x86_64 or arm64) or Windows (x86_64) from the [latest release](https://github.com/dobrinov/shape/releases/latest), unpack it and put `shape` on your `PATH` (the archive also holds `diagram`, the old name, as an alias). `SHA256SUMS` lists the checksums.
+**Windows**, in PowerShell (for your user, no admin rights; run it again to upgrade):
+
+```powershell
+irm https://dobrinov.github.io/shape/install.ps1 | iex
+```
+
+It puts `shape.exe` in `%LOCALAPPDATA%\Programs\Shape` and on your `PATH`, adds Shape to the Start menu and runs `shape install-app`.
+
+**macOS and Linux without Homebrew** (into `~/.local/bin`, or `SHAPE_INSTALL_DIR`; run it again to upgrade):
+
+```bash
+curl -fsSL https://dobrinov.github.io/shape/install.sh | sh
+```
+
+**Binaries:** download an archive for macOS (Apple silicon or Intel), Linux (x86_64 or arm64) or Windows (x86_64) from the [latest release](https://github.com/dobrinov/shape/releases/latest), unpack it and put `shape` on your `PATH` (the archive also holds `diagram`, the old name, as an alias: a link on macOS and Linux, `diagram.cmd` on Windows). `SHA256SUMS` lists the checksums.
 
 **From source:** you need Rust with the `wasm32-unknown-unknown` target, and `wasm-pack`.
 
@@ -142,7 +156,7 @@ A plain `cargo install --path crates/cli` also works. Its `build.rs` runs wasm-p
 shape install-app        # once; `shape install-app --remove` undoes it
 ```
 
-After this, `.shape` files get their own document icon, and double-clicking one opens it in the editor's window (opening Shape.app itself starts a new board). Closing the window stops it; where it falls back to a browser tab, the server stops by itself a few minutes after you close the tab. On macOS this is a small Shape.app in `~/Applications` (or `~/Library/Application Support/shape`). On Linux it is a MIME type, an icon and a `.desktop` entry in `~/.local/share`. On Windows it is a file association for your user. Run it again after moving or reinstalling Shape.
+After this, `.shape` files get their own document icon, and double-clicking one opens it in the editor's window (opening Shape.app itself starts a new board). Closing the window stops it; where it falls back to a browser tab, the server stops by itself a few minutes after you close the tab. On macOS this is a small Shape.app in `~/Applications` (or `~/Library/Application Support/shape`). On Linux it is a MIME type, an icon and a `.desktop` entry in `~/.local/share`. On Windows it is a file association for your user and a Start menu entry. Run it again after moving or reinstalling Shape.
 
 **New versions:** once a day, the editor asks GitHub whether a newer release exists. If one does, the terminal says so (with `brew upgrade shape` when Homebrew installed it), and a *New* badge in the top bar links to the release notes. Set `SHAPE_NO_UPDATE_CHECK=1` to turn this off; it is also off when `CI` is set.
 

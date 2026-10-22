@@ -36,6 +36,8 @@ assert "</script" not in board.lower()
 open(page, "w").write(html.replace("{{HERO}}", board.rstrip("\n"), 1))
 PY
 cp "$ROOT/site/site.css" "$ROOT/site/og.png" "$ROOT/site/apple-touch-icon.png" "$ROOT/site/merge.png" "$ROOT/web/favicon.svg" "$OUT/"
+# the installers the install section points to (irm …/install.ps1 | iex, curl …/install.sh | sh)
+cp "$ROOT/site/install.ps1" "$ROOT/site/install.sh" "$OUT/"
 # the feature tour: a picture per feature, drawn from site/tour/*.shape
 "$ROOT/scripts/render-tour.sh" "$BIN" "$OUT/tour"
 

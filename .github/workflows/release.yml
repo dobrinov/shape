@@ -103,9 +103,10 @@ jobs:
           # `diagram`, the command's name before the rename, stays as an alias
           if [[ "${{ matrix.os }}" == windows* ]]; then
             cp "target/${{ matrix.target }}/release/shape.exe" dist/
-            cp dist/shape.exe dist/diagram.exe
+            # no links in a zip: a two-line script instead of a second copy
+            printf '@echo off\r\n"%%~dp0shape.exe" %%*\r\n' > dist/diagram.cmd
             cp README.md LICENSE* dist/ 2>/dev/null || true
-            (cd dist && 7z a -tzip "../${name}.zip" shape.exe diagram.exe README.md LICENSE* >/dev/null)
+            (cd dist && 7z a -tzip "../${name}.zip" shape.exe diagram.cmd README.md LICENSE* >/dev/null)
             asset="${name}.zip"
           else
             cp "target/${{ matrix.target }}/release/shape" dist/
@@ -127,6 +128,12 @@ jobs:
           "$bin" --version
           "$bin" check examples/example.shape
           "$bin" svg examples/example.shape --canvas metrics -o smoke.svg
+          # shape.exe carries its icon and name (build.rs)
+          if [[ "${{ matrix.os }}" == windows* ]]; then
+            desc=$(powershell -NoProfile -Command "(Get-Item '$bin').VersionInfo.FileDescription")
+            [[ "$desc" == Shape* ]] || { echo "shape.exe has no icon or name (got '$desc')"; exit 1; }
+            powershell -NoProfile -Command "& .\\dist\\diagram.cmd --version"
+          fi
 
       - uses: actions/upload-artifact@v7
         with:

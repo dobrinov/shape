@@ -324,7 +324,10 @@ fn windows(remove: bool) -> Result<(), String> {
             let _ = reg(&["delete", &format!(r"{classes}\{ext}"), "/f"]);
         }
         let _ = reg(&["delete", &format!(r"{classes}\shape.board"), "/f"]);
-        eprintln!("removed the .shape and .diagram file associations");
+        if let Some(lnk) = start_menu() {
+            let _ = std::fs::remove_file(lnk);
+        }
+        eprintln!("removed the .shape and .diagram file associations and the Start menu entry");
         return Ok(());
     }
     let bin = binary()?;
@@ -363,8 +366,32 @@ fn windows(remove: bool) -> Result<(), String> {
         &open,
         "/f",
     ])?;
-    eprintln!(".shape and .diagram files now have their own icon and open in Shape (sign out and in if Explorer keeps the old icon)");
+    // Shape in the Start menu, with its icon: it asks where to save a new board
+    if let Some(lnk) = start_menu() {
+        let q = |p: &Path| format!("'{}'", p.to_string_lossy().replace('\'', "''"));
+        let script = format!(
+            "$s = (New-Object -ComObject WScript.Shell).CreateShortcut({lnk}); \
+             $s.TargetPath = {bin}; $s.Arguments = '--idle-exit'; $s.IconLocation = {bin} + ',0'; \
+             $s.WorkingDirectory = {home}; $s.Description = 'One board for the whole project, with your AI'; $s.Save()",
+            lnk = q(&lnk),
+            bin = q(&bin),
+            home = q(&home()?),
+        );
+        run(Command::new("powershell").args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &script,
+        ]))?;
+    }
+    eprintln!(".shape and .diagram files now have their own icon and open in Shape, and Shape is in the Start menu (sign out and in if Explorer keeps the old icon)");
     Ok(())
+}
+
+/// The user's Start menu entry for Shape.
+fn start_menu() -> Option<PathBuf> {
+    std::env::var_os("APPDATA")
+        .map(|d| PathBuf::from(d).join(r"Microsoft\Windows\Start Menu\Programs\Shape.lnk"))
 }
 
 #[cfg(test)]
@@ -381,5 +408,21 @@ mod tests {
         let at = u32::from_le_bytes(i[18..22].try_into().unwrap()) as usize;
         assert_eq!(&i[at + 1..at + 4], b"PNG");
         assert_eq!(applescript_string(r#"a "b" \c"#), r#""a \"b\" \\c""#);
+    }
+
+    /// icons/app.ico, built into shape.exe (build.rs), is app.svg's.
+    /// `SHAPE_WRITE_ICONS=1 cargo test -p shape exe_icon` redraws it.
+    #[test]
+    fn the_exe_icon_is_the_apps() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("icons/app.ico");
+        let made = ico(APP_SVG).unwrap();
+        if std::env::var_os("SHAPE_WRITE_ICONS").is_some() {
+            std::fs::write(&path, &made).unwrap();
+        }
+        let have = std::fs::read(&path).unwrap();
+        assert!(
+            have == made,
+            "icons/app.ico is not app.svg's: SHAPE_WRITE_ICONS=1 cargo test -p shape exe_icon"
+        );
     }
 }

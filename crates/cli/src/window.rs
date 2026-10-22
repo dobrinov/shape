@@ -175,6 +175,8 @@ mod native {
             {
                 return None;
             }
+            #[cfg(windows)]
+            hide_console();
             let made =
                 std::panic::catch_unwind(|| EventLoopBuilder::<Ev>::with_user_event().build());
             made.ok().map(|event_loop| Native { event_loop })
@@ -308,6 +310,24 @@ mod native {
                     _ => {}
                 }
             })
+        }
+    }
+
+    /// Opened from Explorer or the Start menu, shape.exe (a console program)
+    /// gets a console window of its own: with a window of Shape's coming, it goes.
+    /// A terminal it was started from stays.
+    #[cfg(windows)]
+    fn hide_console() {
+        extern "system" {
+            fn GetConsoleProcessList(list: *mut u32, count: u32) -> u32;
+            fn FreeConsole() -> i32;
+        }
+        let mut ids = [0u32; 2];
+        // SAFETY: plain kernel32 calls on a buffer of the size given
+        unsafe {
+            if GetConsoleProcessList(ids.as_mut_ptr(), 2) == 1 {
+                FreeConsole();
+            }
         }
     }
 

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-os="mac">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -47,9 +47,16 @@
       <a class="btn" href="examples/">Explore a finished board</a>
     </div>
     <div class="install-line">
-      <code id="brew-cmd">brew install dobrinov/tap/shape</code>
-      <button type="button" id="brew-copy" title="Copy to clipboard">Copy</button>
-      <a href="#install">Windows, Linux &amp; source ↓</a>
+      <div class="os-tabs" role="tablist" aria-label="Your system">
+        <button type="button" data-os-tab="mac">macOS</button>
+        <button type="button" data-os-tab="windows">Windows</button>
+        <button type="button" data-os-tab="linux">Linux</button>
+      </div>
+      <code class="for-mac">brew install dobrinov/tap/shape</code>
+      <code class="for-windows">irm {{SITE_URL}}install.ps1 | iex</code>
+      <code class="for-linux">curl -fsSL {{SITE_URL}}install.sh | sh</code>
+      <button type="button" class="copy" title="Copy to clipboard">Copy</button>
+      <a href="#install"><span class="for-windows">Paste in PowerShell · </span>more ways ↓</a>
     </div>
     <ul class="promises">
       <li>Free and open source</li>
@@ -330,15 +337,40 @@ import { init, Board } from "@dobrinov/shape";</pre>
 <section id="install" class="install">
   <h2>Get Shape</h2>
   <p class="sub">Or just <a href="app/">try it in your browser</a> first, with nothing to install.</p>
+  <div class="os-tabs big" role="tablist" aria-label="Your system">
+    <button type="button" data-os-tab="mac">macOS</button>
+    <button type="button" data-os-tab="windows">Windows</button>
+    <button type="button" data-os-tab="linux">Linux</button>
+  </div>
   <div class="install-grid">
-    <div>
-      <h3>Homebrew <span>macOS · Linux</span></h3>
+    <div class="for-mac">
+      <h3>Homebrew <span>recommended</span></h3>
 <pre class="code">brew install dobrinov/tap/shape</pre>
-      <p class="sub">Later: <code>brew upgrade shape</code>.</p>
+      <p class="sub">Later: <code>brew upgrade shape</code>. Then <code>shape install-app</code> puts Shape in your Applications and makes <code>.shape</code> files open with a double-click.</p>
     </div>
-    <div>
-      <h3>Download <span>macOS · Linux · Windows</span></h3>
-      <p class="sub">Grab an archive from the <a href="{{REPO_URL}}/releases/latest">latest release</a> (Apple silicon and Intel, Linux x86_64 and arm64, Windows x86_64), unpack it and put <code>shape</code> on your <code>PATH</code>.</p>
+    <div class="for-mac">
+      <h3>Without Homebrew</h3>
+<pre class="code">curl -fsSL {{SITE_URL}}install.sh | sh</pre>
+      <p class="sub">Paste it in Terminal. It puts <code>shape</code> in <code>~/.local/bin</code> and Shape in your Applications. Run it again to upgrade.</p>
+    </div>
+    <div class="for-windows">
+      <h3>In PowerShell <span>recommended</span></h3>
+<pre class="code">irm {{SITE_URL}}install.ps1 | iex</pre>
+      <p class="sub">Open <b>PowerShell</b> from the Start menu and paste it. It installs Shape for you (no admin rights), adds it to the Start menu and makes <code>.shape</code> files open with a double-click. Run it again to upgrade.</p>
+    </div>
+    <div class="for-windows">
+      <h3>Or download it</h3>
+      <p class="sub">Get <code>shape-…-windows-x86_64.zip</code> from the <a href="{{REPO_URL}}/releases/latest">latest release</a>, unpack it anywhere and run <code>shape.exe install-app</code> once from there.</p>
+    </div>
+    <div class="for-linux">
+      <h3>One line <span>x86_64 · arm64</span></h3>
+<pre class="code">curl -fsSL {{SITE_URL}}install.sh | sh</pre>
+      <p class="sub">It puts <code>shape</code> in <code>~/.local/bin</code> and makes <code>.shape</code> files open with a double-click. Run it again to upgrade.</p>
+    </div>
+    <div class="for-linux">
+      <h3>Homebrew</h3>
+<pre class="code">brew install dobrinov/tap/shape</pre>
+      <p class="sub">Later: <code>brew upgrade shape</code>. Or get an archive from the <a href="{{REPO_URL}}/releases/latest">latest release</a>.</p>
     </div>
     <div>
       <h3>From source</h3>
@@ -347,7 +379,7 @@ make install</pre>
       <p class="sub">Needs Rust with the <code>wasm32-unknown-unknown</code> target and <code>wasm-pack</code>.</p>
     </div>
   </div>
-  <p class="sub">Then run <code>shape</code>: it asks where to save your first board and opens it in its own window. <code>shape install-app</code> makes <code>.shape</code> files open with a double-click.</p>
+  <p class="sub">Then open Shape: it asks where to save your first board and opens it in its own window.</p>
 </section>
 
 <section id="faq" class="faq">
@@ -398,14 +430,40 @@ make install</pre>
       document.getElementById("persp-cap").textContent = caps[p][0];
     });
   });
-  // the install one-liner in the hero: copy on click
-  var brewCopy = document.getElementById("brew-copy");
-  if (brewCopy) brewCopy.addEventListener("click", function () {
-    var text = document.getElementById("brew-cmd").textContent;
-    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
-      brewCopy.textContent = "Copied";
-      setTimeout(function () { brewCopy.textContent = "Copy"; }, 1500);
-    }, function () { window.prompt("Copy:", text); });
+  // install: the visitor's system first, the others a tab away
+  function showOS(os) {
+    document.documentElement.setAttribute("data-os", os);
+    document.querySelectorAll("[data-os-tab]").forEach(function (b) {
+      b.setAttribute("aria-selected", String(b.getAttribute("data-os-tab") === os));
+    });
+  }
+  var ua = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "";
+  showOS(/win/i.test(ua) ? "windows" : /linux|x11|cros/i.test(ua) && !/android/i.test(navigator.userAgent) ? "linux" : "mac");
+  document.querySelectorAll("[data-os-tab]").forEach(function (b) {
+    b.setAttribute("role", "tab");
+    b.addEventListener("click", function () { showOS(b.getAttribute("data-os-tab")); });
+  });
+  // the install commands: copy on click
+  function copyOn(button, text) {
+    button.addEventListener("click", function () {
+      var t = text();
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () {
+        button.textContent = "Copied";
+        setTimeout(function () { button.textContent = "Copy"; }, 1500);
+      }, function () { window.prompt("Copy:", t); });
+    });
+  }
+  var copy = document.querySelector(".install-line .copy");
+  if (copy) copyOn(copy, function () {
+    var os = document.documentElement.getAttribute("data-os");
+    return document.querySelector(".install-line code.for-" + os).textContent;
+  });
+  document.querySelectorAll(".install-grid pre.code").forEach(function (pre) {
+    var text = pre.textContent;
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "copy"; b.textContent = "Copy"; b.title = "Copy to clipboard";
+    pre.appendChild(b);
+    copyOn(b, function () { return text; });
   });
 </script>
 </body>

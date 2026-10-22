@@ -203,8 +203,22 @@ fn how() -> String {
         .ok()
         .and_then(|p| p.canonicalize().ok())
         .is_some_and(|p| p.to_string_lossy().contains("/Cellar/"));
+    // where the site's installers put it: running one again upgrades
+    let exe = std::env::current_exe().unwrap_or_default();
+    let installed = |tail: &[&str]| {
+        let parts: Vec<_> = exe.components().rev().skip(1).take(tail.len()).collect();
+        parts
+            .iter()
+            .rev()
+            .map(|c| c.as_os_str())
+            .eq(tail.iter().map(std::ffi::OsStr::new))
+    };
     if brew {
         "brew upgrade shape".into()
+    } else if cfg!(windows) && installed(&["Programs", "Shape"]) {
+        "irm https://dobrinov.github.io/shape/install.ps1 | iex".into()
+    } else if !cfg!(windows) && installed(&[".local", "bin"]) {
+        "curl -fsSL https://dobrinov.github.io/shape/install.sh | sh".into()
     } else {
         format!("https://github.com/{REPO}/releases/latest")
     }
