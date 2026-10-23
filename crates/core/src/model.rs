@@ -665,8 +665,12 @@ impl Group {
 #[serde(default)]
 pub struct Comment {
     pub id: String,
+    /// What it is about (its pin is by it)…
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on: Option<String>,
+    /// … and the other elements it is about too.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub also: Vec<String>,
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
@@ -681,6 +685,16 @@ pub struct Comment {
     pub x: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub y: Option<f64>,
+}
+
+impl Comment {
+    /// Every element it is about: `on`, then `also`.
+    pub fn targets(&self) -> impl Iterator<Item = &str> {
+        self.on
+            .as_deref()
+            .into_iter()
+            .chain(self.also.iter().map(String::as_str))
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -1091,7 +1105,7 @@ impl Document {
                     format!("duplicate comment id `{}`", c.id),
                 ));
             }
-            if let Some(on) = &c.on {
+            for on in c.targets() {
                 if self.element(on).is_none() {
                     out.push(Diagnostic::new(
                         0,

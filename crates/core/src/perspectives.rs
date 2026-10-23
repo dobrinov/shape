@@ -304,14 +304,22 @@ pub fn view(doc: &Document, p: &Perspective) -> Document {
         .filter(|e| present(&e.from) && present(&e.to))
         .cloned()
         .collect();
+    // a comment shows with what it is about (on several: with those shown)
+    let shown = |o: &str| present(o) || edges.iter().any(|e| e.id == o);
     let comments: Vec<_> = doc
         .comments
         .iter()
-        .filter(|c| {
-            c.on.as_deref()
-                .is_none_or(|o| present(o) || edges.iter().any(|e| e.id == o))
+        .filter_map(|c| {
+            if c.on.is_none() {
+                return Some(c.clone());
+            }
+            let on: Vec<String> = c.targets().filter(|o| shown(o)).map(String::from).collect();
+            let (first, rest) = on.split_first()?;
+            let mut c = c.clone();
+            c.on = Some(first.clone());
+            c.also = rest.to_vec();
+            Some(c)
         })
-        .cloned()
         .collect();
     v.edges = edges;
     v.comments = comments;
@@ -523,6 +531,14 @@ pub fn fold(doc: &Document, p: &Perspective, open: &[String]) -> Document {
         if let Some(on) = c.on.clone() {
             c.on = Some(to(&on));
         }
+        let mut also: Vec<String> = Vec::new();
+        for a in &c.also {
+            let a = to(a);
+            if c.on.as_deref() != Some(a.as_str()) && !also.contains(&a) {
+                also.push(a);
+            }
+        }
+        c.also = also;
     }
     out
 }

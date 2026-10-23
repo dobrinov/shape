@@ -1142,10 +1142,11 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 );
             }
             for c in list {
-                let on =
-                    c.on.as_deref()
-                        .map(|o| doc.describe(o))
-                        .unwrap_or_else(|| "canvas".into());
+                let on = if c.on.is_some() {
+                    c.targets().map(|o| doc.describe(o)).collect::<Vec<_>>().join(" and ")
+                } else {
+                    "canvas".into()
+                };
                 let by = c
                     .author
                     .as_deref()
@@ -1184,11 +1185,17 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 "comment" => {
                     let text = args.pos[1..].join(" ");
                     if text.trim().is_empty() {
-                        return Err("usage: shape comment FILE [--on ID] TEXT".into());
+                        return Err("usage: shape comment FILE [--on ID[,ID…]] TEXT".into());
                     }
+                    // --on a,b: about several elements
+                    let on: Vec<String> = args
+                        .val("--on")
+                        .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+                        .unwrap_or_default();
                     Op::AddComment {
                         id: None,
-                        on: args.val("--on").map(String::from),
+                        on: on.first().cloned(),
+                        also: Some(on.iter().skip(1).cloned().collect()).filter(|a: &Vec<String>| !a.is_empty()),
                         text,
                         author: author(&args),
                         x: None,

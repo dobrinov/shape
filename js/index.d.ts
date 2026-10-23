@@ -295,6 +295,8 @@ export interface Comment {
   id: string;
   /** Id of a node, edge or group; absent for a canvas comment. */
   on?: string;
+  /** The other elements it is about too (its pin is by `on`). */
+  also?: string[];
   text: string;
   author?: string;
   /** Default `open`. */
@@ -706,6 +708,8 @@ export interface AddCommentOp {
   id?: string;
   /** Element id; omit (and give `x`, `y`) for a canvas comment. */
   on?: string;
+  /** The other elements it is about too. */
+  also?: string[];
   text: string;
   author?: string;
   x?: number;

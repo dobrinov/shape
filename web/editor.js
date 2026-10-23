@@ -487,7 +487,7 @@
       setTimeout(function () {
         if (node(id) || group(id)) { select([id]); reveal(id); }
         // from a comment's pin: open its thread
-        var c = thread && (st.doc.comments || []).find(function (x) { return x.on === id && x.status !== "resolved"; });
+        var c = thread && (st.doc.comments || []).find(function (x) { return commentTargets(x).indexOf(id) >= 0 && x.status !== "resolved"; });
         if (c) { var g = geom(id), p = g && toScreen(g.x + g.w, g.y), r = canvas.getBoundingClientRect(); openThread(c.id, p ? r.left + p.x : r.left + 200, p ? r.top + p.y : r.top + 200); }
       }, 60);
     }
@@ -2160,7 +2160,7 @@
       });
       if (st.comment) {
         var c = comment(st.comment);
-        if (c && c.on) stage.querySelectorAll('[data-id="' + cssEsc(c.on) + '"]').forEach(function (e) { e.classList.add("cmt"); });
+        if (c) commentTargets(c).forEach(function (on) { stage.querySelectorAll('[data-id="' + cssEsc(on) + '"]').forEach(function (e) { e.classList.add("cmt"); }); });
       }
     }
     function cssEsc(s) { return String(s).replace(/["\\]/g, "\\$&"); }
@@ -2414,13 +2414,14 @@
       var items = itemsFor(t);
       var many = st.sel.length > 1 && st.sel.indexOf(t.id) >= 0;
       if (many) return [
+        view ? null : ["Comment on these…", function () { commentOnSelection(t.id, st.menuAt.x, st.menuAt.y); }, "One comment about all " + st.sel.length + " of them"],
         ["Copy as text", function () { copyAsText(); }, "What they show, to paste for people: no details"],
         ["Copy as prompt", function () { copyPrompt(); }, "The selected blocks, the arrows between them and their open comments, as Markdown (" + MOD + "⇧C)"]
       ].concat(view ? [] : [
         ["Put in a section", function () { groupSelection(); }, MOD + "G"],
         "-",
         ["Delete", function () { deleteSelection(); }]
-      ]);
+      ]).filter(Boolean);
       if (t.type === "edge" || t.type === "dep" || mapInfo(t.id)) return items;
       var asText = ["Copy as text", function () { copyAsText([t.id]); }, "What it shows, to paste for people (a list as a checklist): no details"];
       var copy = ["Copy as prompt", function () { copyPrompt([t.id]); }, "Everything in it, details included, to paste into a prompt (" + MOD + "⇧C)"];
@@ -3012,6 +3013,9 @@
       if (st.tool === "comment") {
         var on = t && (t.type === "node" || t.type === "edge" || t.type === "group") ? t.id : null;
         e.preventDefault();
+        // ⇧-click gathers what the comment is about; a click on one of them comments on all
+        if (on && (e.shiftKey || e.metaKey)) { select([on], true); flash("Click one of them to comment on all " + st.sel.length); return; }
+        if (on && st.sel.length > 1 && st.sel.indexOf(on) >= 0) { commentOnSelection(on, e.clientX, e.clientY); return; }
         if (on) select([on]);
         openComposer(on ? { on: on } : { x: Math.round(p.x), y: Math.round(p.y) }, e.clientX, e.clientY);
         return;
@@ -5480,7 +5484,7 @@
       }
       var list = st.showResolved ? all : open;
       if (!list.length && !st.composer) {
-        commentsEl.appendChild(h("p", { class: "dge-muted" }, [view ? "No comments." : "No open comments. Press M and click something to comment on it."]));
+        commentsEl.appendChild(h("p", { class: "dge-muted" }, [view ? "No comments." : "No open comments. Press C and click something to comment on it (⇧-click several first to comment on them together)."]));
       }
       list.forEach(function (c) {
         var resolved = c.status === "resolved";
@@ -5488,11 +5492,11 @@
         card.addEventListener("click", function (e) {
           if (e.target.closest("button,textarea,input")) return;
           st.comment = c.id;
-          if (c.on && kindOf(c.on)) st.sel = [c.on];
+          if (c.on) st.sel = commentTargets(c).filter(function (i) { return kindOf(i); });
           markSelection();
           renderPanel();
         });
-        var target = c.on ? h("button", { class: "dge-link", onclick: function () { select([c.on]); } }, [labelOf(c.on)]) : h("span", { class: "dge-muted" }, ["canvas"]);
+        var target = c.on ? h("button", { class: "dge-link", onclick: function () { select(commentTargets(c)); } }, [namesOf(commentTargets(c))]) : h("span", { class: "dge-muted" }, ["canvas"]);
         card.appendChild(h("div", { class: "dge-card-head" }, [commentAvatar(c), h("b", {}, [c.author || "anonymous"]), " on ", target, h("code", { class: "dge-cid" }, [c.id])]));
         card.appendChild(h("div", { class: "dge-card-text" }, [c.text]));
         (c.replies || []).forEach(function (r) {
@@ -5577,11 +5581,25 @@
       });
       return { ta: ta, el: h("div", { class: "dge-bubble-box" }, [ta, h("button", { class: "dge-primary", title: "Enter (⇧Enter for a new line)", onclick: send }, [label])]) };
     }
+    /* What a comment is about, as people read it: "Orders API and Database". */
+    function commentTargets(c) { return c.on ? [c.on].concat(c.also || []) : []; }
+    function namesOf(ids) {
+      var names = ids.map(function (i) { return labelOf(i); });
+      return names.length > 2 ? names.slice(0, -1).join(", ") + " and " + names[names.length - 1] : names.join(" and ");
+    }
+    /* A comment on everything selected (the pin goes by `first`). */
+    function commentOnSelection(first, cx, cy) {
+      var ids = st.sel.filter(function (i) { return node(i) || group(i) || edge(i); });
+      if (first && ids.indexOf(first) > 0) ids = [first].concat(ids.filter(function (i) { return i !== first; }));
+      if (!ids.length) return;
+      openComposer({ on: ids[0], also: ids.slice(1) }, cx, cy);
+    }
     function openComposer(target, cx, cy) {
       bubble.innerHTML = "";
-      var box = commentBox(target.on ? "Comment on " + (target.label || labelOf(target.on)) + "…" : "Add a comment…", function (text) {
+      var about = target.on ? [target.on].concat(target.also || []) : [];
+      var box = commentBox(target.on ? "Comment on " + (target.label || namesOf(about)) + "…" : "Add a comment…", function (text) {
         var op = { op: "add_comment", text: text };
-        if (target.on) op.on = target.on; else { op.x = target.x; op.y = target.y; }
+        if (target.on) { op.on = target.on; if (target.also && target.also.length) op.also = target.also; } else { op.x = target.x; op.y = target.y; }
         if (st.author) op.author = st.author;
         closeBubble();
         setTool("select");
@@ -5603,7 +5621,7 @@
       var resolved = c.status === "resolved";
       var head = h("div", { class: "dge-bubble-head" }, [
         commentAvatar(c),
-        h("span", { class: "dge-muted" }, [(resolved ? "Resolved comment " : "Comment ") + (c.on ? "on " + labelOf(c.on) : "on the board")]),
+        h("span", { class: "dge-muted" }, [(resolved ? "Resolved comment " : "Comment ") + (c.on ? "on " + namesOf(commentTargets(c)) : "on the board")]),
         h("span", { class: "dge-spacer" }),
         view ? null : h("button", { title: resolved ? "Reopen" : "Resolve", onclick: function () { applyOps([{ op: resolved ? "reopen_comment" : "resolve_comment", id: cid }]); closeBubble(); } }, [resolved ? "Reopen" : "✓ Resolve"]),
         view ? null : h("button", { class: "danger", title: "Delete the thread", onclick: function () { applyOps([{ op: "remove", id: cid }]); closeBubble(); } }, ["Delete"])
@@ -6008,7 +6026,7 @@
       if (n.done) meta.push(n.done + "% done");
       (n.tags || []).forEach(function (t) { meta.push("#" + t); });
       if (n.link) meta.push("→ " + n.link.replace(/^https?:\/\//, ""));
-      var open = (st.doc.comments || []).filter(function (c) { return c.on === n.id && c.status !== "resolved"; }).length;
+      var open = (st.doc.comments || []).filter(function (c) { return commentTargets(c).indexOf(n.id) >= 0 && c.status !== "resolved"; }).length;
       if (open) meta.push(open + (open === 1 ? " open comment" : " open comments"));
       var body = n.detail || (summary && summary !== n.label && summary !== n.id ? summary : "");
       return { title: n.label || n.id, body: body, meta: meta };

@@ -2017,15 +2017,22 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
     let mut copies = Vec::new();
     for (path, d) in docs(doc) {
         for (i, c) in d.comments.iter().enumerate() {
-            let Some(on) = c.on.as_deref() else { continue };
-            // (not on the rows of a table of comments: they are the comments)
-            let shown = out.nodes.iter().find(|n| {
-                !n.group
-                    .as_deref()
-                    .is_some_and(|g| g == "comments" || g == "screencomments")
-                    && target(&n.id).is_some_and(|(p, id)| p == path && id == on)
-            });
-            if let Some(n) = shown {
+            // (not on the rows of a table of comments: they are the comments;
+            // on several elements: by the first the summary shows)
+            let Some((on, n)) = c.targets().find_map(|on| {
+                out.nodes
+                    .iter()
+                    .find(|n| {
+                        !n.group
+                            .as_deref()
+                            .is_some_and(|g| g == "comments" || g == "screencomments")
+                            && target(&n.id).is_some_and(|(p, id)| p == path && id == on)
+                    })
+                    .map(|n| (on, n))
+            }) else {
+                continue;
+            };
+            {
                 let mut copy = c.clone();
                 copy.id = row_id(
                     &format!("cm{i}"),
@@ -2035,6 +2042,7 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                     },
                 );
                 copy.on = Some(n.id.clone());
+                copy.also.clear();
                 copies.push(copy);
             }
         }

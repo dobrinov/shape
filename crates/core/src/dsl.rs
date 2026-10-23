@@ -346,7 +346,7 @@ pub(crate) fn parse_lines(src: &str) -> (Document, Vec<Diagnostic>, Vec<LineInfo
         }
     }
     for c in &p.doc.comments {
-        if let Some(on) = &c.on {
+        for on in c.targets() {
             if p.doc.element(on).is_none() {
                 p.errors.push(Diagnostic::new(
                     0,
@@ -2180,9 +2180,34 @@ impl Parser {
             }
             match c.peek_word() {
                 "on" => {
+                    // `on api, db`: about several elements
                     c.advance(2);
-                    c.skip_ws();
-                    cm.on = Some(c.target()?);
+                    loop {
+                        c.skip_ws();
+                        let quoted = c.peek() == Some('"');
+                        let t = c.target()?;
+                        let more = !quoted && t.ends_with(',');
+                        let parts: Vec<String> = if quoted {
+                            vec![t]
+                        } else {
+                            t.split(',').filter(|p| !p.is_empty()).map(String::from).collect()
+                        };
+                        for p in parts {
+                            if cm.on.is_none() {
+                                cm.on = Some(p);
+                            } else {
+                                cm.also.push(p);
+                            }
+                        }
+                        c.skip_ws();
+                        if more {
+                            continue;
+                        }
+                        if c.eat(',') {
+                            continue;
+                        }
+                        break;
+                    }
                 }
                 "at" => {
                     c.advance(2);
@@ -3915,15 +3940,18 @@ pub fn print_lean(doc: &Document) -> String {
 
 pub(crate) fn comment_lines(c: &Comment, out: &mut String) {
     let mut s = format!("comment {}", id_text(&c.id));
-    if let Some(on) = &c.on {
-        s.push_str(&format!(
-            " on {}",
-            if on.contains(char::is_whitespace) || on.contains(':') {
-                quote(on)
-            } else {
-                on.clone()
-            }
-        ));
+    if c.on.is_some() {
+        let on: Vec<String> = c
+            .targets()
+            .map(|on| {
+                if on.contains(char::is_whitespace) || on.contains([':', ',']) {
+                    quote(on)
+                } else {
+                    on.to_string()
+                }
+            })
+            .collect();
+        s.push_str(&format!(" on {}", on.join(", ")));
     }
     if let (Some(x), Some(y)) = (c.x, c.y) {
         s.push_str(&format!(" at {},{}", fmt_num(x), fmt_num(y)));

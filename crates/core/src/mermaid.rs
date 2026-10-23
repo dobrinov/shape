@@ -159,10 +159,11 @@ pub fn export(doc: &Document) -> String {
         if k == 0 {
             out.push_str("  %% review comments\n");
         }
-        let on =
-            c.on.as_deref()
-                .map(|o| format!(" on {o}"))
-                .unwrap_or_default();
+        let on = if c.on.is_some() {
+            format!(" on {}", c.targets().collect::<Vec<_>>().join(", "))
+        } else {
+            String::new()
+        };
         out.push_str(&format!(
             "  %% {}{on}: {}\n",
             c.id,

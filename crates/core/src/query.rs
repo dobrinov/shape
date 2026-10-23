@@ -193,7 +193,7 @@ fn pick(doc: &Document, sel: &str) -> Result<Vec<String>, String> {
                 .comments
                 .iter()
                 .filter(|c| low != "open" || c.status == Status::Open)
-                .flat_map(|c| std::iter::once(c.id.clone()).chain(c.on.clone()))
+                .flat_map(|c| std::iter::once(c.id.clone()).chain(c.targets().map(String::from)))
                 .collect(),
             _ => return Err(format!("unknown selector `{key}:` (use group:, chart:, map:, near:, kind:, owner:, tag:, color:, comments:, label~)")),
         });

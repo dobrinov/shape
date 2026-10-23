@@ -75,9 +75,11 @@ fn context_ids(doc: &Document, comments: &[&Comment], context: Context) -> Optio
         c => c,
     };
     let mut sels: Vec<String> = Vec::new();
-    for c in comments {
-        // a comment on the canvas is about the whole board
-        let on = c.on.as_deref()?;
+    // a comment on the canvas is about the whole board
+    if comments.iter().any(|c| c.on.is_none()) {
+        return None;
+    }
+    for on in comments.iter().flat_map(|c| c.targets()) {
         if let Some(e) = doc.edge(on) {
             sels.push(format!("near:{}", e.from));
             sels.push(format!("near:{}", e.to));
@@ -131,7 +133,7 @@ pub const OPS_REFERENCE: &str = r#"Operations (fields in [] are optional; ids ar
 - {"op":"rename","id":"api","to":"orders-api"}            (updates edges and comments)
 - {"op":"remove","id":"cache"}                            (node, group, edge or comment; a node's edges go too; a mindmap topic takes its branch; a block takes its items, a section's boxes stay unless "keep_members":false)
 - {"op":"move","id":"api","x":120,"y":40}  {"op":"unpin"[, "id":"api"]}
-- {"op":"add_comment","text":"…",["on":"api","author"]}  {"op":"reply","id":"c1","text":"…",["author"]}
+- {"op":"add_comment","text":"…",["on":"api","also":["db"],"author"]}   (about several elements: the first in on, the others in also)  {"op":"reply","id":"c1","text":"…",["author"]}
 - {"op":"resolve_comment","id":"c1",["resolution":"what was done"]}  {"op":"reopen_comment","id":"c1"}
 - {"op":"set","key":"title|description|type|direction|layout|routing|theme","value":"…"}   (type: sketch, product or project, which decides the built-in perspectives; theme: light, dark, a preset — paper, blueprint, midnight, contrast — or a theme's id)
 - {"op":"perspective","id":"exec",["label","tags":["exec"],"show":["adr","risks"],"details":false,"remove":true]}   (a way of looking at the board: elements with one of its tags, blocks of the kinds in show; elements carry tags such as tech, product, user, exec, team)
@@ -165,7 +167,10 @@ fn quote_block(text: &str) -> String {
 
 fn comment_md(doc: &Document, c: &Comment, n: usize) -> String {
     let target = match &c.on {
-        Some(on) => format!("on {}", doc.describe(on)),
+        Some(_) => format!(
+            "on {}",
+            c.targets().map(|t| doc.describe(t)).collect::<Vec<_>>().join(" and ")
+        ),
         None => "on the whole diagram".to_string(),
     };
     let by = c
@@ -351,11 +356,12 @@ pub const RETHINK_DEFAULT: &str = "Bring this canvas up to date and make it easy
 
 1. Act on every open comment: change the board as it says, wherever it matters (one new fact can change items on other canvases too), then resolve it with a short resolution saying what changed. If you cannot act on one, reply saying what is missing and leave it open.
 2. Take in what is new (recent changes, loose stickies, notes) and revise the older items around it: update what it changes, and mark what it supersedes instead of deleting it.
-3. Organise: put related items in clearly named sections, merge duplicates into one item that keeps everything they said, and fold settled discussion and stray notes into the items they are about.
-4. Show each kind of information in the block that communicates it best (see below): loose boxes, stickies and text that are really dates, tasks, a plan, risks, a decision, numbers or screens read better as a timeline, a to-do list, a gantt chart, a risk matrix, a decision record, a chart or a wireframe. Move them in, then remove the loose ones.
-5. Give every item a short, specific title, and put the context the title leaves out in its details.
-6. Fix arrows that no longer make sense, and add the ones that are missing.
-7. Fit the structure to the size: a board holding several projects, each with its own plan, risks, blockers and details, reads better as a board of boards: give each project a canvas of its own (`add_canvas`, then its items moved in with an `in` op and removed here), with a box on this board that opens it. A big project can do the same for its parts. A simple board stays flat: do not add canvases it does not need.
+3. Find what contradicts itself: items (or an item and a comment) that cannot both be true, such as two dates for the same thing, a decision and a plan that disagree, or two owners. When the board settles it (a newer, dated statement replaces an older one), apply it as in step 2. When it does not, change neither and do not pick one: leave an open comment on all the items involved (`add_comment` with `on` and `also`) saying what disagrees and asking which is right, so the people can decide now or later, and list each one in the note. Do not add another comment for a contradiction an open comment already asks about.
+4. Organise: put related items in clearly named sections, merge duplicates into one item that keeps everything they said, and fold settled discussion and stray notes into the items they are about.
+5. Show each kind of information in the block that communicates it best (see below): loose boxes, stickies and text that are really dates, tasks, a plan, risks, a decision, numbers or screens read better as a timeline, a to-do list, a gantt chart, a risk matrix, a decision record, a chart or a wireframe. Move them in, then remove the loose ones.
+6. Give every item a short, specific title, and put the context the title leaves out in its details.
+7. Fix arrows that no longer make sense, and add the ones that are missing.
+8. Fit the structure to the size: a board holding several projects, each with its own plan, risks, blockers and details, reads better as a board of boards: give each project a canvas of its own (`add_canvas`, then its items moved in with an `in` op and removed here), with a box on this board that opens it. A big project can do the same for its parts. A simple board stays flat: do not add canvases it does not need.
 
 Keep every piece of information: reorganise, merge and move it, but never drop it.";
 
@@ -397,10 +403,14 @@ pub fn rethink(
                     } else {
                         format!("in canvas `{}`", path.join("/"))
                     };
-                    let on =
-                        c.on.as_deref()
-                            .map(|o| format!(", on {}", doc.describe(o)))
-                            .unwrap_or_default();
+                    let on = if c.on.is_some() {
+                        format!(
+                            ", on {}",
+                            c.targets().map(|o| doc.describe(o)).collect::<Vec<_>>().join(" and ")
+                        )
+                    } else {
+                        String::new()
+                    };
                     let by = c
                         .author
                         .as_deref()
@@ -1506,17 +1516,14 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
         .comments
         .iter()
         .filter(|c| c.status == Status::Open)
-        .filter(|c| {
-            c.on.as_deref()
-                .is_some_and(|on| listed(on) || ids.iter().any(|i| i == on))
-        })
+        .filter(|c| c.targets().any(|on| listed(on) || ids.iter().any(|i| i == on)))
         .collect();
     if !comments.is_empty() {
         out.push_str("\n## Comments\n\n");
         for c in comments {
             out.push_str(&format!(
                 "- On {}: {}\n",
-                label(c.on.as_deref().unwrap()),
+                c.targets().map(&label).collect::<Vec<_>>().join(" and "),
                 c.text.replace('\n', " ")
             ));
             for r in &c.replies {

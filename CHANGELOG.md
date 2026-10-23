@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.77.0 — 2026-10-23
+
+- **A comment about several elements.** With the comment tool (C), ⇧-click the elements a comment is about, then click one of them. Or select them and right-click → *Comment on these…*. The comment names them all (*Comment on Database and Orders API*), and opening its thread highlights each one. In the file it is `comment on api, db: …`. Delete one of them and the comment stays on the others.
+- **✦ Rethink points out contradictions.** When two things on the board cannot both be true (two dates for one launch, two owners for one task, a decision and a note that disagree), Rethink no longer picks one quietly. If the board settles it (a newer, dated update), Rethink applies it. If not, it leaves an open comment on all the items involved, asking which is right, and lists them in its note. Decide now, or reply later: the next Rethink acts on your answer.
+- The comments panel says the comment tool's shortcut is C (it said M).
+
 ## 0.76.0 — 2026-10-23
 
 - **Groups in gantt charts.** A task written indented under another is part of it: a sub-project with its own stages (spike, build, beta, general availability, or whatever your team calls them), or any work made of parts. The group's bar spans its parts and shows how much of them is done. Click the mark by its name to fold it into one row, with its milestones on it. Parts can share names across sub-projects (each sub-project can have its own *Beta*), and milestones say whose they are (*Mobile app · Beta*).

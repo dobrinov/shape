@@ -543,6 +543,9 @@ pub enum Op {
         id: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         on: Option<String>,
+        /// The other elements it is about too (`on` is where its pin goes).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        also: Option<Vec<String>>,
         text: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         author: Option<String>,
@@ -1585,13 +1588,12 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 }
             }
             for c in &mut doc.comments {
-                if c.on.as_deref() == Some(id) {
-                    c.on = Some(to.clone());
-                } else if let Some((_, new)) = renamed
-                    .iter()
-                    .find(|(old, _)| Some(old.as_str()) == c.on.as_deref())
-                {
-                    c.on = Some(new.clone());
+                for t in c.on.iter_mut().chain(c.also.iter_mut()) {
+                    if t == id {
+                        *t = to.clone();
+                    } else if let Some((_, new)) = renamed.iter().find(|(old, _)| old == t) {
+                        *t = new.clone();
+                    }
                 }
             }
         }
@@ -1953,8 +1955,10 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             if auto && *id != format!("{f}->{t}") {
                 let fresh = doc.fresh_edge_id(&f, &t);
                 for c in &mut doc.comments {
-                    if c.on.as_deref() == Some(id.as_str()) {
-                        c.on = Some(fresh.clone());
+                    for t in c.on.iter_mut().chain(c.also.iter_mut()) {
+                        if t == id {
+                            *t = fresh.clone();
+                        }
                     }
                 }
                 doc.edge_mut(id).unwrap().id = fresh.clone();
@@ -2191,14 +2195,25 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
         Op::AddComment {
             id,
             on,
+            also,
             text,
             author,
             x,
             y,
         } => {
-            if let Some(on) = on.as_deref().filter(|s| !s.is_empty()) {
-                if doc.element(on).is_none() {
-                    return Err(format!("nothing has the id `{on}` to comment on"));
+            let on = on.clone().filter(|s| !s.is_empty());
+            let mut more: Vec<String> = Vec::new();
+            for a in also.iter().flatten().filter(|a| !a.is_empty()) {
+                if on.as_deref() != Some(a.as_str()) && !more.contains(a) {
+                    more.push(a.clone());
+                }
+            }
+            if on.is_none() && !more.is_empty() {
+                return Err("a comment on several elements names the first in `on`".into());
+            }
+            for t in on.iter().chain(&more) {
+                if doc.element(t).is_none() {
+                    return Err(format!("nothing has the id `{t}` to comment on"));
                 }
             }
             let id = match id.as_deref().filter(|s| !s.is_empty()) {
@@ -2210,7 +2225,8 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             };
             doc.comments.push(Comment {
                 id: id.clone(),
-                on: on.clone().filter(|s| !s.is_empty()),
+                on,
+                also: more,
                 text: text.clone(),
                 author: author.clone().filter(|s| !s.is_empty()),
                 x: *x,
@@ -2351,7 +2367,14 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
 /// Comments on a removed element stay, as canvas comments, so feedback is
 /// never lost silently.
 fn detach_comments(doc: &mut Document, id: &str, edges: &[String]) {
+    let gone = |t: &str| t == id || edges.iter().any(|e| e == t);
     for c in &mut doc.comments {
+        // about several: it stays on the others
+        c.also.retain(|t| !gone(t));
+        if c.on.as_deref().is_some_and(gone) && !c.also.is_empty() {
+            c.on = Some(c.also.remove(0));
+            continue;
+        }
         if c.on
             .as_deref()
             .is_some_and(|on| on == id || edges.iter().any(|e| e == on))
@@ -2751,5 +2774,26 @@ mod tests {
             "{}",
             e.message
         );
+    }
+
+    #[test]
+    fn a_comment_can_be_about_several_elements() {
+        let src = "api: Orders API\ndb: Database\nweb: Web app\n\ncomment c1 on api, db: Which one owns the orders?\n";
+        let mut d = crate::dsl::parse(src).unwrap();
+        assert_eq!(crate::dsl::print(&d), src);
+        let c = d.comment("c1").unwrap();
+        assert_eq!((c.on.as_deref(), c.also.clone()), (Some("api"), vec!["db".to_string()]));
+        let ops = |j: &str| parse_ops(j).unwrap();
+        apply(&mut d, &ops(r#"{"op":"add_comment","on":"web","also":["api","web"],"text":"Same?"}"#)).unwrap();
+        assert_eq!(d.comment("c2").unwrap().also, ["api"]);
+        assert!(apply(&mut d, &ops(r#"{"op":"add_comment","on":"web","also":["nope"],"text":"x"}"#)).is_err());
+        // a rename follows it; a removed one leaves it on the others
+        apply(&mut d, &ops(r#"{"op":"rename","id":"db","to":"store"}"#)).unwrap();
+        assert_eq!(d.comment("c1").unwrap().also, ["store"]);
+        apply(&mut d, &ops(r#"{"op":"remove","id":"api"}"#)).unwrap();
+        let c1 = d.comment("c1").unwrap();
+        assert_eq!((c1.on.as_deref(), c1.also.len()), (Some("store"), 0));
+        assert_eq!(d.comment("c2").unwrap().also.len(), 0);
+        assert!(crate::dsl::print(&d).contains("comment c1 on store: Which one"));
     }
 }
