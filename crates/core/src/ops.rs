@@ -73,6 +73,10 @@ pub enum Op {
         /// Gantt milestone: the task whose row it sits on ("" gives it its own row).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         row: Option<String>,
+        /// Gantt task: the task of its chart it is part of (a phase of a
+        /// sub-project; "" puts it back at the top).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        under: Option<String>,
         /// Timeline event: when, as people write it (`2026-10-28`, `Oct 2026`,
         /// `7–14 May 2026`; "" clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -169,6 +173,10 @@ pub enum Op {
         /// Gantt milestone: the task whose row it sits on ("" gives it its own row).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         row: Option<String>,
+        /// Gantt task: the task of its chart it is part of (a phase of a
+        /// sub-project; "" puts it back at the top).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        under: Option<String>,
         /// Timeline event: when, as people write it (`2026-10-28`, `Oct 2026`,
         /// `7–14 May 2026`; "" clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -612,8 +620,45 @@ pub fn apply(doc: &mut Document, ops: &[Op]) -> Result<Applied, OpError> {
         })?;
         applied.count += 1;
     }
+    check_parts(&mut work).map_err(|message| OpError {
+        index: ops.len().saturating_sub(1),
+        message,
+    })?;
     *doc = work;
     Ok(applied)
+}
+
+/// Gantt tasks are parts (`under`) of tasks in their own chart only: a task
+/// that leaves its chart takes no part with it (they move up), and a task
+/// cannot be part of itself.
+fn check_parts(doc: &mut Document) -> Result<(), String> {
+    let mut lift = Vec::new();
+    for n in &doc.nodes {
+        let Some(u) = n.under.as_deref() else { continue };
+        match doc.node(u) {
+            Some(p) if p.group == n.group && n.group.is_some() => {}
+            Some(_) => lift.push((n.id.clone(), None)),
+            None => return Err(format!("no task `{u}` for `{}` to be part of", n.id)),
+        }
+    }
+    for (id, to) in lift {
+        doc.node_mut(&id).unwrap().under = to;
+    }
+    for n in &doc.nodes {
+        let mut cur = n.under.as_deref();
+        let mut steps = 0;
+        while let Some(u) = cur {
+            if u == n.id || steps > doc.nodes.len() {
+                return Err(format!("`{}` cannot be part of a task that is part of it", n.id));
+            }
+            cur = doc.node(u).and_then(|p| p.under.as_deref());
+            steps += 1;
+        }
+    }
+    for c in &mut doc.canvases {
+        check_parts(&mut c.doc)?;
+    }
+    Ok(())
 }
 
 /// "no node `apii`" → "no node `apii` (did you mean `api`?)": the closest
@@ -1004,6 +1049,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             after,
             milestone,
             row,
+            under,
             date,
             important,
             widget,
@@ -1053,6 +1099,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             task(&mut n, start, days, after, milestone, done, owner)?;
             if let Some(r) = opt(row) {
                 n.row = r;
+            }
+            if let Some(u) = opt(under) {
+                n.under = u;
             }
             launch(&mut n, adds, ramp);
             event(&mut n, date, important)?;
@@ -1121,6 +1170,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             after,
             milestone,
             row,
+            under,
             date,
             important,
             widget,
@@ -1201,6 +1251,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             task(n, start, days, after, milestone, done, owner)?;
             if let Some(r) = opt(row) {
                 n.row = r;
+            }
+            if let Some(u) = opt(under) {
+                n.under = u;
             }
             launch(n, adds, ramp);
             event(n, date, important)?;
@@ -1477,6 +1530,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                     if n.row.as_deref() == Some(id) {
                         n.row = Some(to.clone());
                     }
+                    if n.under.as_deref() == Some(id) {
+                        n.under = Some(to.clone());
+                    }
                 }
                 for n in &mut doc.nodes {
                     if n.parent.as_deref() == Some(id) {
@@ -1595,6 +1651,38 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                     doc.edges.retain(|e| e.from != *nid && e.to != *nid);
                     detach_comments(doc, nid, &gone);
                 }
+            } else if crate::gantt::has_parts(doc, id) {
+                // a gantt group: its parts move up (keep_members), or go with it
+                let up = doc.node(id).and_then(|n| n.under.clone());
+                let parts: Vec<String> = doc
+                    .nodes
+                    .iter()
+                    .filter(|n| n.under.as_deref() == Some(id.as_str()))
+                    .map(|n| n.id.clone())
+                    .collect();
+                for p in parts {
+                    if keep_members.unwrap_or(false) {
+                        doc.node_mut(&p).unwrap().under = up.clone();
+                    } else {
+                        apply_one(
+                            doc,
+                            &Op::Remove {
+                                id: p,
+                                keep_members: None,
+                            },
+                            created,
+                        )?;
+                    }
+                }
+                doc.node_mut(id).unwrap().under = None;
+                return apply_one(
+                    doc,
+                    &Op::Remove {
+                        id: id.clone(),
+                        keep_members: None,
+                    },
+                    created,
+                );
             } else if doc.node(id).is_some() {
                 doc.nodes.retain(|n| n.id != *id);
                 let gone: Vec<String> = doc
@@ -1606,7 +1694,20 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
                 doc.edges.retain(|e| e.from != *id && e.to != *id);
                 detach_comments(doc, id, &gone);
             } else if let Some(g) = doc.group(id).cloned() {
-                let keep = keep_members.unwrap_or(true);
+                // a section's boxes stay; a block's items (a chart's tasks, a
+                // table's rows…) mean nothing without it, so they go with it
+                let block = g.gantt
+                    || g.risks
+                    || g.chart.is_some()
+                    || g.table
+                    || g.timeline
+                    || g.todo
+                    || g.cycle
+                    || g.entity
+                    || g.adr.is_some()
+                    || g.screen.is_some()
+                    || g.forecast;
+                let keep = keep_members.unwrap_or(!block);
                 if keep {
                     for n in &mut doc.nodes {
                         if n.group.as_deref() == Some(id) {

@@ -158,7 +158,7 @@
       session: new wasm.Diagram(),
       r: null, doc: null, text: "", errors: [],
       zoom: 1, panX: 0, panY: 0, fitted: false,
-      tool: "select", sel: [], hover: null, comment: null, composer: null, thinking: {},
+      tool: "select", sel: [], hover: null, comment: null, composer: null, thinking: {}, dashOpen: [],
       undo: [], redo: [], codeFormat: "dsl",
       dark: opts.theme ? opts.theme === "dark" : !!(root.matchMedia && root.matchMedia("(prefers-color-scheme: dark)").matches),
       showResolved: false, base: null, space: false,
@@ -1147,7 +1147,7 @@
     // --------------------------------------------------------------- render
     function render() {
       el.classList.toggle("dge-dash", dashOn());
-      var r = JSON.parse(st.session.render(JSON.stringify({ comments: st.showResolved ? "all" : "open", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null, dashboard: dashOn(), before: st.before || null })));
+      var r = JSON.parse(st.session.render(JSON.stringify({ comments: st.showResolved ? "all" : "open", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: dashOn() ? st.dashOpen : st.perspective ? st.perspOpen : null, dashboard: dashOn(), before: st.before || null })));
       if (r.error) {
         flash(r.error, true);
         return;
@@ -2297,6 +2297,9 @@
       if (h1) return { type: "handle", id: h1.getAttribute("data-node") };
       var ctl = target.closest(".dge-ctl");
       if (ctl) return { type: ctl.classList.contains("dge-plus") ? "plus" : "fold", id: ctl.getAttribute("data-node") };
+      // a gantt group's fold mark
+      var gf = target.closest(".dg-gfold");
+      if (gf) return { type: "gfold", id: gf.getAttribute("data-node") };
       var fold = target.closest(".dg-fold");
       if (fold) return { type: "fold", id: fold.getAttribute("data-fold") };
       var op = target.closest(".dg-open");
@@ -2452,8 +2455,14 @@
           ["Colour…", function () { colourMenu(t.id, "update_node", tk.color); }, "The colour of its bar"],
           tk.start ? ["Follow the task before", function () { applyOps([{ op: "update_node", id: t.id, start: "" }]); }, "Drop its fixed date"] : null,
           ["Add task after", function () { addTask(tk.group, t.id); }],
+          // groups: a sub-project and its phases, or any work made of parts
+          hasParts(t.id) ? [tk.collapsed ? "Show its parts" : "Fold it", function () { applyOps([{ op: "update_node", id: t.id, collapsed: !tk.collapsed }]); }, "Or click the mark by its name"] : null,
+          ["Add a part", function () { addPart(t.id); }, "A task inside this one (a phase of it); this one then spans its parts"],
+          taskAbove(t.id) ? ["Part of “" + labelOf(taskAbove(t.id)) + "”", function () { applyOps([{ op: "update_node", id: t.id, under: taskAbove(t.id) }]); }, "Indent it under the task above"] : null,
+          tk.under ? ["Out of “" + labelOf(tk.under) + "”", function () { applyOps([{ op: "update_node", id: t.id, under: node(tk.under).under || "" }]); }] : null,
           "-",
-          ["Delete", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }]
+          hasParts(t.id) ? ["Ungroup", function () { applyOps([{ op: "remove", id: t.id, keep_members: true }]); select([]); }, "Delete it and keep its parts"] : null,
+          ["Delete", function () { applyOps([{ op: "remove", id: t.id }]); select([]); }, hasParts(t.id) ? "With its parts" : undefined]
         ].filter(Boolean);
       }
       if (t.type === "node" && !view && entityOf(t.id)) {
@@ -2934,6 +2943,13 @@
         e.preventDefault();
         // a comment's pin: its thread, on the board
         if (e.button === 0 && t && t.type === "pin" && /^@dash\//.test(t.id)) return openFromDash(t.id, true);
+        // a project on the roadmap (or a part of it): unfolds in place
+        if (e.button === 0 && t && t.type === "gfold") {
+          var oi = st.dashOpen.indexOf(t.id);
+          if (oi >= 0) st.dashOpen.splice(oi, 1); else st.dashOpen.push(t.id);
+          render();
+          return;
+        }
         // the comment tool: a comment on what the item stands for, kept on the board
         if (e.button === 0 && st.tool === "comment") {
           if (t && t.id && /^@dash\//.test(t.id) && commentOnDash(t.id, e.clientX, e.clientY)) return;
@@ -3041,10 +3057,18 @@
         drawOverlay();
         return;
       }
-      if (t && t.type === "node" && !view && barEnd(t.id, e.clientX)) {
-        // the end of a bar: drag to change how long the task takes
+      // a gantt group's fold mark: shows or hides its parts
+      if (t && t.type === "gfold" && e.button === 0) {
+        e.preventDefault();
+        if (!view) applyOps([{ op: "update_node", id: t.id, collapsed: !node(t.id).collapsed }]);
+        return;
+      }
+      if (t && t.type === "node" && !view && (barEnd(t.id, e.clientX) || barStart(t.id, e.clientX))) {
+        // an end of a bar: drag to change when the task ends (or starts)
         select([t.id]);
-        st.drag = { type: "resize", id: t.id, sx: p.x, days: node(t.id).days || 1, before: st.text, moved: false };
+        var bg = geom(t.id), bc = chartBox(t.id);
+        st.drag = { type: "resize", id: t.id, sx: p.x, days: node(t.id).days || 1, before: st.text, moved: false,
+          start: barEnd(t.id, e.clientX) ? null : (bc.origin != null ? bc.origin : today()) + Math.round((bg.x - bc.left) / bc.day) };
         canvas.setPointerCapture(e.pointerId);
         return;
       }
@@ -3089,7 +3113,7 @@
       var d = st.drag;
       if (!d) {
         var t = hit(e.target);
-        canvas.classList.toggle("resizing", !!(t && t.type === "node" && !view && barEnd(t.id, e.clientX)));
+        canvas.classList.toggle("resizing", !!(t && t.type === "node" && !view && (barEnd(t.id, e.clientX) || barStart(t.id, e.clientX))));
         var hov = t && (t.type === "node" || t.type === "handle") ? t.id : null;
         if (hov !== st.hover) {
           st.hover = hov;
@@ -3106,10 +3130,16 @@
       var p = toDiagram(e.clientX, e.clientY);
       if (d.type === "resize") {
         var ch = chartBox(d.id), step = snapDays(ch.scale);
-        var days = Math.max(step, Math.round((d.days * ch.day + p.x - d.sx) / ch.day / step) * step);
         if (!d.moved && Math.abs(p.x - d.sx) < 3) return;
         d.moved = true;
-        if (days !== d.now) { d.now = days; applyOps([{ op: "update_node", id: d.id, days: days }], true); }
+        if (d.start != null) {
+          // the start: earlier or later, the end stays
+          var by = Math.min(d.days - 1, Math.round((p.x - d.sx) / ch.day / step) * step);
+          if (by !== d.by) { d.by = by; d.now = [{ op: "update_node", id: d.id, start: isoDay(d.start + by), days: d.days - by }]; applyOps(d.now, true); }
+          return;
+        }
+        var days = Math.max(step, Math.round((d.days * ch.day + p.x - d.sx) / ch.day / step) * step);
+        if (days !== d.days2) { d.days2 = days; d.now = [{ op: "update_node", id: d.id, days: days }]; applyOps(d.now, true); }
         return;
       }
       if (d.type === "size") {
@@ -3191,7 +3221,7 @@
         if (d.moved && d.now) {
           st.session.set_source(d.before);
           st.text = d.before;
-          applyOps([{ op: "update_node", id: d.id, days: d.now }]);
+          applyOps(d.now);
         }
         return;
       }
@@ -4438,12 +4468,40 @@
     }
     /* What dragging a bar snaps to, in days: a day, or a week / month on long scales. */
     function snapDays(scale) { return scale === "quarter" ? 30 : scale === "month" ? 7 : 1; }
-    /* Is the pointer on the right end of a task's bar? */
+    /* Is the pointer on the right (left) end of a task's bar? A group's
+       ends are its parts'. */
     function barEnd(id, clientX) {
-      var g = chartOf(id) && !node(id).milestone && geom(id);
+      var g = chartOf(id) && !node(id).milestone && !hasParts(id) && geom(id);
       if (!g) return false;
       var right = toScreen(g.x + g.w, 0).x + canvas.getBoundingClientRect().left;
       return Math.abs(clientX - right) <= 6;
+    }
+    function barStart(id, clientX) {
+      var g = chartOf(id) && !node(id).milestone && !hasParts(id) && geom(id);
+      if (!g || g.w < 24) return false;
+      var left = toScreen(g.x, 0).x + canvas.getBoundingClientRect().left;
+      return Math.abs(clientX - left) <= 6;
+    }
+    /* The task just above `id` at its level in its chart (to put it inside). */
+    function taskAbove(id) {
+      var n = node(id), sibs = st.doc.nodes.filter(function (c) { return c.group === n.group && (c.under || null) === (n.under || null) && !c.milestone; });
+      var i = sibs.indexOf(n);
+      return i > 0 ? sibs[i - 1].id : null;
+    }
+    /* A new part inside task `id`, a week long. */
+    function addPart(id) {
+      // (it follows the part before it, or starts where this one does)
+      var n = node(id), nid = freshId(id + "-part");
+      var res = applyOps([{ op: "add_node", id: nid, label: "New part", group: n.group, days: 7, under: id },
+        { op: "update_node", id: id, collapsed: false }]);
+      if (res.ok) { select([nid]); editLabel(nid, true); }
+    }
+    /* Gantt groups: a task made of parts (`under` it), and those parts, all the way down. */
+    function hasParts(id) { var n = node(id); return !!n && st.doc.nodes.some(function (c) { return c.under === id && c.group === n.group; }); }
+    function partsOf(id) {
+      var out = [];
+      st.doc.nodes.forEach(function (c) { if (c.under === id && c.group === node(id).group) out.push(c.id); });
+      return out.concat.apply(out, out.map(partsOf));
     }
     /* `id` starts when `on` ends. */
     function dependOn(id, on) {
@@ -5080,7 +5138,15 @@
           var at = m.x + d.dx + (node(m.id).milestone ? m.w / 2 : 0);
           var unit = snapDays(gt.scale), day = Math.round((at - gt.left) / gt.day / unit) * unit;
           if (gt.origin == null) ops.push({ op: "update_group", id: into, start: isoDay(origin) });
-          ops.push({ op: "update_node", id: m.id, start: isoDay(origin + day) });
+          if (hasParts(m.id)) {
+            // a group moves with all its parts: the dated ones move by as much
+            var by = day - Math.round((m.x - gt.left) / gt.day), parts = partsOf(m.id).filter(function (c) { return node(c).start; });
+            if (!parts.length) parts = partsOf(m.id).slice(0, 1);
+            parts.forEach(function (c) {
+              var cg = geom(c), was0 = node(c).start ? Date.parse(node(c).start) / 864e5 : origin + Math.round(((cg ? cg.x : m.x) - gt.left) / gt.day);
+              ops.push({ op: "update_node", id: c, start: isoDay(Math.round(was0) + by) });
+            });
+          } else ops.push({ op: "update_node", id: m.id, start: isoDay(origin + day) });
         }
       });
       return ops;
@@ -5730,11 +5796,11 @@
 
     // -------------------------------------------------------------- exports
     function exportSVG() {
-      return JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null, dashboard: dashOn(), before: st.before || null }))).svg;
+      return JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: dashOn() ? st.dashOpen : st.perspective ? st.perspOpen : null, dashboard: dashOn(), before: st.before || null }))).svg;
     }
     function exportPNG(scale) {
       scale = scale || 2;
-      var r = JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: st.perspective ? st.perspOpen : null, dashboard: dashOn(), before: st.before || null })));
+      var r = JSON.parse(st.session.render(JSON.stringify({ comments: "none", theme: st.dark ? "dark" : "light", today: isoDay(today()), perspective: st.perspective || null, open: dashOn() ? st.dashOpen : st.perspective ? st.perspOpen : null, dashboard: dashOn(), before: st.before || null })));
       return new Promise(function (resolve, reject) {
         var img = new Image();
         var url = URL.createObjectURL(new Blob([r.svg], { type: "image/svg+xml" }));

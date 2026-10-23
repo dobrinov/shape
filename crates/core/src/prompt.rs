@@ -129,7 +129,7 @@ pub const OPS_REFERENCE: &str = r#"Operations (fields in [] are optional; ids ar
 - {"op":"add_group","id":"backend","label":"Backend",["color","parent","members":["api","db"]]}
 - {"op":"update_group","id":"backend",["label","color","parent"]}
 - {"op":"rename","id":"api","to":"orders-api"}            (updates edges and comments)
-- {"op":"remove","id":"cache"}                            (node, group, edge or comment; a node's edges go too; a mindmap topic takes its branch)
+- {"op":"remove","id":"cache"}                            (node, group, edge or comment; a node's edges go too; a mindmap topic takes its branch; a block takes its items, a section's boxes stay unless "keep_members":false)
 - {"op":"move","id":"api","x":120,"y":40}  {"op":"unpin"[, "id":"api"]}
 - {"op":"add_comment","text":"…",["on":"api","author"]}  {"op":"reply","id":"c1","text":"…",["author"]}
 - {"op":"resolve_comment","id":"c1",["resolution":"what was done"]}  {"op":"reopen_comment","id":"c1"}
@@ -153,7 +153,7 @@ pub const OPS_REFERENCE: &str = r#"Operations (fields in [] are optional; ids ar
 - Table: {"op":"add_group","id":"opts","label":"Options","columns":["option","cost","notes"]}; its rows are add_node / update_node with "group":"opts","label":"Local" (the first cell),"cells":["$0","needs a GPU"]. Or merge: "table opts: Options {\n  option | cost | notes\n  Local | $0 | needs a GPU\n}"
 - Chart: {"op":"add_group","id":"rev","label":"Revenue","chart":"bar|line|area|pie|donut|scatter",["stacked":true,"horizontal":true,"unit":"%","series":["EU","US"],"axis":"quarter"]}; its rows are add_node / update_node with "group":"rev","label":"Q1","values":[120,80] (one per series, null for none). Or simpler, merge: "chart rev: Revenue [bar] {\n  quarter | EU | US\n  Q1 | 120 | 80\n}"
 - Risk matrix: {"op":"add_group","id":"risks","label":"Risks","risks":true,["levels":3|4|5]}; its risks are add_node / update_node with "group":"risks" and ["probability":1-5,"impact":1-5,"owner","detail" (the description)]
-- Gantt: a chart is {"op":"add_group","id":"plan","label":"Plan","gantt":true,["start":"YYYY-MM-DD","scale":"day|week|month|quarter"]}; its tasks are add_node / update_node with "group":"plan" and ["start","days","after":["id"],"milestone":true,"done":60,"owner":"ana"] (after may name tasks in other charts)
+- Gantt: a chart is {"op":"add_group","id":"plan","label":"Plan","gantt":true,["start":"YYYY-MM-DD","scale":"day|week|month|quarter"]}; its tasks are add_node / update_node with "group":"plan" and ["start","days","after":["id"],"milestone":true,"done":60,"owner":"ana","under":"id","collapsed":true] (after may name tasks in other charts; a chart takes no tags: perspectives that show plans show it whole). A task with parts (`under` it) is a group, a sub-project or a stage, that spans them; its parts' ids are its id, a dash and their own (`mobile-app-beta`). Or merge, parts indented: "gantt plan: Shop [start: 2026-08-03] {\n  Mobile app\n    Spike [2w, done]\n    Store approvals [9w, after: mobile-app-spike]\n    Beta [6w]\n    General availability [2027-02-01, milestone]\n}"
 Shapes: box, rounded, pill, circle, diamond, hexagon, cylinder, parallelogram, document, person, cloud, sticky, text.
 Colours: gray, blue, green, yellow, orange, red, purple, pink, teal or #rrggbb.
 Edge ids default to `from->to` (`from->to#2` for a second edge between the same nodes).
@@ -240,13 +240,33 @@ pub fn ask(
                 dsl::print_lean(&sub)
             ));
         }
-        None => s.push_str(&format!(
-            "## The board\n\n```shape\n{}```\n\n",
-            dsl::print_lean(doc)
-        )),
+        None => {
+            s.push_str(&format!(
+                "## The board\n\n```shape\n{}```\n\n",
+                dsl::print_lean(doc)
+            ));
+            // and what is inside its canvases: the request may be about them
+            let inside = canvases_of(doc);
+            if inside.len() > 1 {
+                s.push_str("Inside its canvases (boards inside this one, opened from a box with `canvas: ID`); change them with an `in` op naming the canvas path:\n\n");
+                for (path, d) in inside.into_iter().skip(1) {
+                    let title = doc
+                        .at(&path[..path.len() - 1])
+                        .and_then(|p| p.canvas(path.last().unwrap()))
+                        .map(|c| c.display().to_string())
+                        .unwrap_or_default();
+                    s.push_str(&format!(
+                        "### Canvas `{}` (“{title}”)\n\n```shape\n{}```\n\n",
+                        path.join("/"),
+                        dsl::print_lean(d)
+                    ));
+                }
+            }
+        }
     }
     s.push_str(&format!("## The request\n\n{}\n\n", request.trim()));
     s.push_str(BEST_BLOCKS);
+    s.push_str(PLANS);
     s.push_str(&crate::recipes::prompt_section(recipes));
     s.push('\n');
     s.push_str("## How to respond\n\nReply with a single ```json code block holding the operations, for example:\n\n```json\n{\"ops\": [\n  {\"op\": \"update_node\", \"id\": \"api\", \"color\": \"red\"},\n  {\"op\": \"merge\", \"dsl\": \"cache: Redis [cylinder]\\napi -> cache: reads\"}\n]}\n```\n\n");
@@ -311,6 +331,19 @@ Pick the block that lets someone get it at a glance; plain boxes are for parts o
 - Ideas, a problem broken down, scope: `mindmap`; a loop that repeats: `cycle`.
 - Who does which step, or how a request travels: `lanes` (swimlanes) or `sequence`; screens and the flow between them: `screen` (wireframes); database tables: `entity` (or a `schema` read from a file).
 - Each line's exact form is in the language reference; when unsure, keep the information as it is rather than force it into a block.
+
+";
+
+/// How a plan reads well: what Ask and Rethink go by when they write or
+/// reorganise a gantt chart.
+pub const PLANS: &str = "## A plan people can read
+
+- Name each task and milestone by what it delivers and whose it is (*Mobile app beta*, *App Store review*, *Web shop general availability*), never by a number (*Phase 2*, *Phase 2 beta*): a number means nothing to someone who was not in the meeting. When the team numbers its phases, keep the number in the detail.
+- A project made of sub-projects (products, workstreams, markets): a group per sub-project in one chart, its stages indented under it. Use the stages and words the board and the people use (spike, implementation, beta, general availability; or discovery, pilot, rollout): a group has only the stages it has, and teams differ.
+- What a stage waits for is a task of its own with `after:`, so a delay shows in the forecast: an approval by someone outside (an app store, a regulator, a partner), a spike that must answer a question first, another team's delivery. Its name says who and what.
+- Work done in parallel by different people or on different platforms is a task each (*Offline mode spike · iOS*, *… · Android*), with its owner.
+- Fold the groups that are not being delivered now (`collapsed`).
+- A task whose dates nobody gave has no date: it follows the one before it. Do not invent dates; say in the note what is missing.
 
 ";
 
@@ -418,6 +451,7 @@ pub fn rethink(
     s.push_str(&format!("## What to do\n\n{what}\n\n"));
     s.push_str(&crate::upgrades::prompt_section(root));
     s.push_str(BEST_BLOCKS);
+    s.push_str(PLANS);
     s.push_str(&perspectives_section(root));
     s.push_str("How to change the board:\n- Keep ids; to merge, keep one item and remove the others only after moving what they said into it.\n- Ops apply to the top board. For anything inside a canvas, wrap them in an `in` op with the canvas path: `{\"op\": \"in\", \"canvas\": \"plan\", \"ops\": [...]}` (`plan/details` for a canvas inside `plan`). A comment's own ops (`resolve_comment`, `reply`) go in the `in` of the canvas it is in.\n- A box's `detail` holds the context its title leaves out; on a kanban card it shows on hover.\n- Do not set `x`/`y` or move things: the layout follows the structure.\n- Leave the data inside blocks (gantt dates, table cells, chart values, columns) as it is unless the instructions or the information say otherwise.\n- If nothing needs to change, change nothing and say so in the note.\n\n");
     s.push_str(&crate::recipes::prompt_section(recipes));
@@ -1188,7 +1222,11 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
                 .with(|t| t.get())
                 .map(|t| crate::gantt::track(doc, &g.id, t))
                 .unwrap_or_default();
-            for (i, start, days) in s.tasks {
+            // a group's parts indented under it
+            for (i, depth) in crate::gantt::tree_order(doc, &g.id) {
+                let Some(&(_, start, days)) = s.tasks.iter().find(|t| t.0 == i) else {
+                    continue;
+                };
                 let n = &doc.nodes[i];
                 let when = match s.origin {
                     Some(o) => {
@@ -1217,7 +1255,7 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
                     format!(", after {}", after.join(", "))
                 };
                 let mut more = String::new();
-                match n.done {
+                match crate::gantt::done_of(doc, &n.id) {
                     Some(d) if d >= 100.0 => more.push_str(", done"),
                     Some(d) => more.push_str(&format!(", {}% done", d.round())),
                     None => {}
@@ -1248,7 +1286,8 @@ fn selection_core(doc: &Document, ids: &[String], titled: bool) -> String {
                 }
                 seen.push(n.id.clone());
                 out.push_str(&format!(
-                    "- {}: {when}{length}{after}{more}\n",
+                    "{}- {}: {when}{length}{after}{more}\n",
+                    "  ".repeat(depth),
                     item(doc, n)
                 ));
             }

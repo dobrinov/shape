@@ -66,6 +66,12 @@ pub const NOTES: &[Note] = &[
         short: "test scenarios for QA",
         text: "The QA summary reads how it works (sequences, swimlanes, screens) and the test scenarios: a table with the columns scenario | steps | expected | covers | status. If the board has flows or screens and no scenarios yet, add a canvas `tests` (\"Test scenarios\"), opened by a box, with such a table: the main scenarios a tester would run (steps numbered and separated by `\\n`, the expected result, `covers` naming the flow or screen, status `to run`).",
     },
+    Note {
+        version: "0.76.0",
+        perspective: "delivery",
+        short: "sub-projects and their stages on the roadmap for Delivery",
+        text: "A gantt task can be made of parts, written indented under it: a sub-project with its stages, which the roadmap unfolds from the project's row. When a project's plan holds several sub-projects (products, workstreams), group each one's tasks under it, with the stages the team uses, and fold the ones not being delivered now. Rename tasks and milestones named by a number (*Phase 2 beta*) after what they deliver and whose they are (*Mobile app beta*), and give what a stage waits for (an outside approval, a spike, another team) a task of its own with `after:`.",
+    },
 ];
 
 /// Whether version `a` is newer than `b` (`0.10.0` > `0.9.9`).

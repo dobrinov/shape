@@ -167,8 +167,9 @@ canvas plan: Roadmap {
   # when, what's in progress, what could go wrong, and why we chose what we chose
 
   gantt next: Next releases [start: 2026-10-20, scale: week] {
-    Schema block design [3d, owner: deyan]
-    Schema block [2w, after: schema-block-design, done: 10%]
+    Schema block
+      Design [3d, owner: deyan]
+      Build [2w, done: 10%]
     Linux window [1w, after: schema-block-design, purple]
     Beta round 2 [1w, after: schema-block, orange]
     v1.0 [after: beta-round-2 linux-window, milestone, green]

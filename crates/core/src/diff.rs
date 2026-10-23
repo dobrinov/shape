@@ -279,6 +279,54 @@ pub fn merge(old: &Document, new: &Document) -> (Document, HashMap<String, Chang
     (merged, changes)
 }
 
+/// [`markdown`] of the whole board: the top board's changes, then each
+/// canvas's that changed (`### In canvas `path` (“Title”)`).
+pub fn summary(old: &Document, new: &Document) -> String {
+    fn paths(d: &Document, at: &[String], out: &mut Vec<(Vec<String>, String)>) {
+        for c in &d.canvases {
+            let mut p = at.to_vec();
+            p.push(c.id.clone());
+            if !out.iter().any(|(q, _)| *q == p) {
+                out.push((p.clone(), c.display().to_string()));
+            }
+            paths(&c.doc, &p, out);
+        }
+    }
+    let mut all = Vec::new();
+    paths(old, &[], &mut all);
+    paths(new, &[], &mut all);
+    let top = diff(old, new);
+    let mut out = if top.is_empty() {
+        String::new()
+    } else {
+        markdown(&top, old, new)
+    };
+    let empty = Document::default();
+    for (path, title) in all {
+        let (a, b) = (
+            old.at(&path).unwrap_or(&empty),
+            new.at(&path).unwrap_or(&empty),
+        );
+        // a canvas's own canvases are shown on their own
+        let (mut a, mut b) = (a.clone(), b.clone());
+        a.canvases.clear();
+        b.canvases.clear();
+        let d = diff(&a, &b);
+        if !d.is_empty() {
+            out.push_str(&format!(
+                "\n### In canvas `{}` (“{title}”)\n\n",
+                path.join("/")
+            ));
+            out.push_str(&markdown(&d, &a, &b));
+        }
+    }
+    if out.is_empty() {
+        "No changes.\n".into()
+    } else {
+        out
+    }
+}
+
 pub fn markdown(d: &Diff, old: &Document, new: &Document) -> String {
     if d.is_empty() {
         return "No changes.\n".into();

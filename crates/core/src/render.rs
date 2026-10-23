@@ -582,10 +582,15 @@ fn draw(doc: &Document, opts: &RenderOptions, def: Option<crate::model::ThemeDef
         let change = opts.changes.get(&node.id).copied();
         match nb.map.as_ref().and_then(|m| m.style) {
             _ if nb.task => {
-                // a milestone on a bar: its name has room up to the next one there
-                let room = node.row.as_ref().filter(|_| node.milestone).map(|_| {
+                // a milestone on a bar (its `row`, or its folded group's): its
+                // name has room up to the next one there
+                let bar_row = node
+                    .milestone
+                    .then(|| crate::gantt::folded_into(doc, node).or_else(|| node.row.clone()))
+                    .flatten();
+                let room = bar_row.as_ref().map(|b| {
                     let r = nb.rect;
-                    let bar = node.row.as_deref().and_then(|b| lay.rect(b));
+                    let bar = lay.rect(b);
                     lay.nodes
                         .iter()
                         .filter(|o| {
@@ -600,7 +605,9 @@ fn draw(doc: &Document, opts: &RenderOptions, def: Option<crate::model::ThemeDef
                         - r.right()
                         - 6.0
                 });
-                task_svg(&mut s, node, nb, p, t, change, room)
+                let group = crate::gantt::has_parts(doc, &node.id)
+                    .then(|| (node.collapsed, crate::gantt::done_of(doc, &node.id)));
+                task_svg(&mut s, node, nb, p, t, change, room, group)
             }
             _ if nb.risk => risk_svg(&mut s, doc, node, nb, p, t, change),
             _ if nb.datum => datum_svg(&mut s, doc, node, nb, p, change),
@@ -1042,12 +1049,34 @@ fn gantt_svg(
                 )
             })
             .unwrap_or_default();
+        // a group's parts are indented under it; a group has a mark that folds it
+        let cy = top + k as f64 * layout::GANTT_ROW + layout::GANTT_ROW / 2.0;
+        let indent = crate::gantt::depth(doc, node) as f64 * layout::GANTT_INDENT;
+        let group = crate::gantt::has_parts(doc, &node.id);
+        if group {
+            let (x, open) = (ox + indent + 4.0, !node.collapsed);
+            let _ = write!(
+                s,
+                r#"<g class="dg-gfold" data-node="{}"><title>{}</title><rect x="{}" y="{}" width="14" height="16" fill="transparent"/><path d="{}" fill="{}"/></g>"#,
+                esc(&node.id),
+                if open { "Fold it" } else { "Show its parts" },
+                n(x - 4.0),
+                n(cy - 8.0),
+                if open {
+                    format!("M{},{} L{},{} L{},{} Z", n(x - 1.0), n(cy - 3.0), n(x + 7.0), n(cy - 3.0), n(x + 3.0), n(cy + 2.0))
+                } else {
+                    format!("M{},{} L{},{} L{},{} Z", n(x + 1.0), n(cy - 5.0), n(x + 6.0), n(cy - 0.5), n(x + 1.0), n(cy + 4.0))
+                },
+                p.muted
+            );
+        }
         let _ = write!(
             s,
-            r#"<text x="{}" y="{}" font-size="13" fill="{}">{}{owner}</text>"#,
-            n(ox),
-            n(top + k as f64 * layout::GANTT_ROW + layout::GANTT_ROW / 2.0 + 4.5),
+            r#"<text x="{}" y="{}" font-size="13" fill="{}"{}>{}{owner}</text>"#,
+            n(ox + indent + if group { layout::GANTT_FOLD } else { 0.0 }),
+            n(cy + 4.5),
             p.fg,
+            if group { r#" font-weight="600""# } else { "" },
             esc(node.display())
         );
         // a task that opens a canvas: a badge at the end of its name that opens
@@ -1505,6 +1534,8 @@ fn task_svg(
     t: Theme,
     change: Option<Change>,
     room: Option<f64>,
+    // a group of tasks: whether it is folded, and how much of it is done
+    group: Option<(bool, Option<f64>)>,
 ) {
     let r = nb.rect;
     let k = theme::tint(node.color.as_deref().unwrap_or("blue"), t);
@@ -1518,7 +1549,7 @@ fn task_svg(
         fill = st;
     }
     // a milestone on a bar's row: outlined, so it shows on the bar
-    let on_bar = node.milestone && node.row.is_some();
+    let on_bar = node.milestone && room.is_some();
     if on_bar {
         fill = p.node_fill.to_string();
     }
@@ -1570,7 +1601,58 @@ fn task_svg(
         return;
     }
     let days = crate::gantt::task_days(node);
-    let done = node.done.unwrap_or(0.0).clamp(0.0, 100.0);
+    let done = match group {
+        Some((_, d)) => d,
+        None => node.done,
+    }
+    .unwrap_or(0.0)
+    .clamp(0.0, 100.0);
+    if let Some((false, _)) = group {
+        // an open group: a bracket across its parts, shaded for what is done
+        let (y, h) = (r.y + 2.0, 7.0);
+        let _ = write!(
+            s,
+            r#"<g class="dg-node dg-task dg-task-group" data-id="{}"><path class="dg-shape" d="M{},{} H{} V{} L{},{} L{},{} H{} L{},{} L{},{} Z" fill="{}" fill-opacity="{}" stroke="{}" stroke-width="1"/>"#,
+            esc(&node.id),
+            n(r.x),
+            n(y),
+            n(r.right()),
+            n(y + h + 6.0),
+            n(r.right() - 5.0),
+            n(y + h),
+            n(r.right() - 5.0),
+            n(y + h),
+            n(r.x + 5.0),
+            n(r.x + 5.0),
+            n(y + h),
+            n(r.x),
+            n(y + h + 6.0),
+            fill,
+            if done > 0.0 && done < 100.0 { "0.45" } else { "1" },
+            stroke
+        );
+        if done > 0.0 && done < 100.0 {
+            let _ = write!(
+                s,
+                r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}" pointer-events="none"/>"#,
+                n(r.x),
+                n(y),
+                n(r.w * done / 100.0),
+                n(h),
+                fill
+            );
+        }
+        // the space below the bracket still takes a drag
+        let _ = write!(
+            s,
+            r#"<rect x="{}" y="{}" width="{}" height="{}" fill="transparent"/></g>"#,
+            n(r.x),
+            n(r.y),
+            n(r.w),
+            n(r.h)
+        );
+        return;
+    }
     let _ = write!(
         s,
         r#"<g class="dg-node dg-task" data-id="{}"><rect class="dg-shape" x="{}" y="{}" width="{}" height="{}" rx="5" fill="{}" stroke="{}" stroke-width="1"{}/>"#,
@@ -1599,12 +1681,18 @@ fn task_svg(
             fill
         );
     }
-    let mut label = crate::gantt::format_days(days);
+    let mut label = if group.is_some() {
+        // a folded group: how much is done says more than how long
+        String::new()
+    } else {
+        crate::gantt::format_days(days)
+    };
     if done >= 100.0 {
         label.push_str(" ✓");
     } else if done > 0.0 {
         label.push_str(&format!(" · {}%", done.round()));
     }
+    let label = label.trim_start_matches([' ', '·']).to_string();
     if r.w >= text::width(&label, 11.0) + 12.0 {
         let _ = write!(
             s,

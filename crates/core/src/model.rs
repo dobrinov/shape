@@ -383,6 +383,10 @@ pub struct Node {
     /// project's bar), instead of a row of its own.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub row: Option<String>,
+    /// Gantt task: the task it is part of (a phase of a sub-project), which
+    /// then spans its parts; written indented under it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub under: Option<String>,
     /// Gantt task: how much is done, in percent (0–100).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub done: Option<f64>,

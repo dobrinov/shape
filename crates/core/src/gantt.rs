@@ -227,6 +227,143 @@ pub fn ticks(scale: Scale, origin: Option<i64>, days: f64) -> Vec<(f64, String)>
     out
 }
 
+/// The tasks of chart `group` in the order they are written: each followed
+/// by its parts (`under` it), with how deep it is (node index, depth).
+pub fn tree_order(doc: &Document, group: &str) -> Vec<(usize, usize)> {
+    let idx: Vec<usize> = (0..doc.nodes.len())
+        .filter(|&i| doc.nodes[i].group.as_deref() == Some(group))
+        .collect();
+    let in_chart = |id: &str| idx.iter().any(|&i| doc.nodes[i].id == id);
+    let mut out = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    fn walk(
+        doc: &Document,
+        idx: &[usize],
+        at: usize,
+        depth: usize,
+        seen: &mut std::collections::HashSet<usize>,
+        out: &mut Vec<(usize, usize)>,
+    ) {
+        if !seen.insert(at) {
+            return;
+        }
+        out.push((at, depth));
+        let id = &doc.nodes[at].id;
+        for &c in idx {
+            if doc.nodes[c].under.as_deref() == Some(id.as_str()) {
+                walk(doc, idx, c, depth + 1, seen, out);
+            }
+        }
+    }
+    for &i in &idx {
+        let top = doc.nodes[i].under.as_deref().is_none_or(|u| !in_chart(u));
+        if top {
+            walk(doc, &idx, i, 0, &mut seen, &mut out);
+        }
+    }
+    // parts of a loop: at the top
+    for &i in &idx {
+        if !seen.contains(&i) {
+            walk(doc, &idx, i, 0, &mut seen, &mut out);
+        }
+    }
+    out
+}
+
+/// Whether task `id` of its chart has parts (a group of tasks, drawn as a
+/// bar across them).
+pub fn has_parts(doc: &Document, id: &str) -> bool {
+    let Some(g) = doc.node(id).and_then(|n| n.group.as_deref()) else {
+        return false;
+    };
+    doc.nodes
+        .iter()
+        .any(|n| n.under.as_deref() == Some(id) && n.group.as_deref() == Some(g))
+}
+
+/// The folded group task `n` is inside (the outermost one), if any: its
+/// row stands for it (a milestone shows on it; other tasks are hidden).
+pub fn folded_into(doc: &Document, n: &Node) -> Option<String> {
+    let mut out = None;
+    let mut cur = n.under.as_deref();
+    let mut steps = 0;
+    while let Some(u) = cur {
+        let Some(p) = doc.node(u).filter(|p| p.group == n.group) else {
+            break;
+        };
+        if p.collapsed {
+            out = Some(p.id.clone());
+        }
+        cur = p.under.as_deref();
+        steps += 1;
+        if steps > doc.nodes.len() {
+            break;
+        }
+    }
+    out
+}
+
+/// A task's name with the groups it is in: *Mobile app · Beta*.
+pub fn full_label(doc: &Document, n: &Node) -> String {
+    let mut out = vec![n.display().to_string()];
+    let mut cur = n.under.as_deref();
+    while let Some(p) = cur.and_then(|u| doc.node(u)).filter(|p| p.group == n.group) {
+        out.push(p.display().to_string());
+        cur = p.under.as_deref();
+        if out.len() > doc.nodes.len() {
+            break;
+        }
+    }
+    out.reverse();
+    out.join(" · ")
+}
+
+/// How deep task `n` is among its chart's groups (0: at the top).
+pub fn depth(doc: &Document, n: &Node) -> usize {
+    let mut d = 0;
+    let mut cur = n.under.as_deref();
+    while let Some(p) = cur.and_then(|u| doc.node(u)).filter(|p| p.group == n.group) {
+        d += 1;
+        cur = p.under.as_deref();
+        if d > doc.nodes.len() {
+            break;
+        }
+    }
+    d
+}
+
+/// How much of task `id` is done, in percent: its own `done`, or for a group,
+/// its parts' by how long each takes (None when nothing says).
+pub fn done_of(doc: &Document, id: &str) -> Option<f64> {
+    let n = doc.node(id)?;
+    if !has_parts(doc, id) {
+        return n.done;
+    }
+    let (mut all, mut done, mut said) = (0.0, 0.0, false);
+    let mut todo = vec![id.to_string()];
+    let mut seen = std::collections::HashSet::new();
+    while let Some(t) = todo.pop() {
+        if !seen.insert(t.clone()) {
+            continue;
+        }
+        for c in doc
+            .nodes
+            .iter()
+            .filter(|c| c.under.as_deref() == Some(t.as_str()) && c.group == n.group)
+        {
+            if has_parts(doc, &c.id) {
+                todo.push(c.id.clone());
+            } else if !c.milestone {
+                let d = c.days.unwrap_or(DEFAULT_DAYS);
+                all += d;
+                done += d * c.done.unwrap_or(0.0).clamp(0.0, 100.0) / 100.0;
+                said |= c.done.is_some();
+            }
+        }
+    }
+    (said && all > 0.0).then(|| (100.0 * done / all).round())
+}
+
 /// A task without a duration takes this long.
 pub const DEFAULT_DAYS: f64 = 1.0;
 
@@ -342,45 +479,101 @@ fn schedule_with(
             _ => days,
         }
     };
+    // a task's parts, in order (positions in `idx`); the tasks at the top
+    let order = tree_order(doc, group);
+    let pos = |i: usize| idx.iter().position(|&j| j == i).unwrap_or(0);
+    let mut kids: Vec<Vec<usize>> = vec![Vec::new(); idx.len()];
+    let mut tops = Vec::new();
+    for &(i, depth) in &order {
+        let under = doc.nodes[i].under.as_deref();
+        match under.and_then(|u| order.iter().find(|&&(j, _)| doc.nodes[j].id == u)) {
+            Some(&(p, _)) if depth > 0 => kids[pos(p)].push(pos(i)),
+            _ => tops.push(pos(i)),
+        }
+    }
     // `after` can point forward; settle a few rounds so order does not matter
     let mut starts: Vec<f64> = vec![0.0; idx.len()];
     let mut lengths: Vec<f64> = idx.iter().map(|&i| task_days(&doc.nodes[i])).collect();
-    for _ in 0..idx.len().clamp(1, 32) {
-        let mut end: std::collections::HashMap<&str, f64> = Default::default();
-        let mut prev_end = 0.0f64;
-        for (k, &i) in idx.iter().enumerate() {
-            let n = &doc.nodes[i];
-            let waits = |end: &std::collections::HashMap<&str, f64>| {
+    struct Round<'a> {
+        doc: &'a Document,
+        idx: &'a [usize],
+        kids: &'a [Vec<usize>],
+        ends: &'a HashMap<String, f64>,
+        origin: Option<i64>,
+        now: Option<f64>,
+        starts: Vec<f64>,
+        lengths: Vec<f64>,
+        end: HashMap<String, f64>,
+    }
+    impl Round<'_> {
+        /// Place task `k` (and its parts) where it starts by default
+        /// (`default`: after the one before it); returns when it ends.
+        fn place(&mut self, k: usize, default: f64, length: &dyn Fn(&Node, f64) -> f64) -> f64 {
+            let n = &self.doc.nodes[self.idx[k]];
+            let waits = |r: &Round| {
                 n.after
                     .iter()
                     .map(|a| {
-                        end.get(a.as_str()).copied().unwrap_or_else(|| {
+                        r.end.get(a.as_str()).copied().unwrap_or_else(|| {
                             // not placed yet this round: use the last round's
-                            idx.iter()
-                                .position(|&j| doc.nodes[j].id == *a)
-                                .map(|p| starts[p] + lengths[p])
+                            r.idx
+                                .iter()
+                                .position(|&j| r.doc.nodes[j].id == *a)
+                                .map(|p| r.starts[p] + r.lengths[p])
                                 // in another chart: when it ends there
-                                .or_else(|| Some(ends.get(a.as_str())? - origin? as f64))
+                                .or_else(|| Some(r.ends.get(a.as_str())? - r.origin? as f64))
                                 .unwrap_or(0.0)
                         })
                     })
                     .fold(0.0, f64::max)
             };
-            let start = match (n.start.as_deref().and_then(parse_date), origin) {
+            let start = match (n.start.as_deref().and_then(parse_date), self.origin) {
                 // a fixed date; in a forecast, later if what it waits for is late
-                (Some(d), Some(o)) if now.is_some() && !n.after.is_empty() => {
-                    ((d - o) as f64).max(waits(&end))
+                (Some(d), Some(o)) if self.now.is_some() && !n.after.is_empty() => {
+                    ((d - o) as f64).max(waits(self))
                 }
                 (Some(d), Some(o)) => (d - o) as f64,
-                _ if !n.after.is_empty() => waits(&end),
-                _ => prev_end,
+                _ if !n.after.is_empty() => waits(self),
+                _ => default,
             };
-            let days = length(n, start);
-            starts[k] = start;
-            lengths[k] = days;
-            end.insert(n.id.as_str(), start + days);
-            prev_end = start + days;
+            let parts = self.kids[k].clone();
+            let (from, to) = if parts.is_empty() {
+                (start, start + length(n, start))
+            } else {
+                // a group: from its first part to its last
+                let mut cursor = start;
+                let (mut lo, mut hi) = (f64::MAX, f64::MIN);
+                for c in parts {
+                    cursor = self.place(c, cursor, length);
+                    lo = lo.min(self.starts[c]);
+                    hi = hi.max(self.starts[c] + self.lengths[c]);
+                }
+                (lo, hi.max(lo))
+            };
+            self.starts[k] = from;
+            self.lengths[k] = to - from;
+            self.end.insert(n.id.clone(), to);
+            to
         }
+    }
+    for _ in 0..idx.len().clamp(1, 32) {
+        let mut r = Round {
+            doc,
+            idx: &idx,
+            kids: &kids,
+            ends,
+            origin,
+            now,
+            starts: starts.clone(),
+            lengths: lengths.clone(),
+            end: HashMap::new(),
+        };
+        let mut prev_end = 0.0f64;
+        for &k in &tops {
+            prev_end = r.place(k, prev_end, &length);
+        }
+        starts = r.starts;
+        lengths = r.lengths;
     }
     for (k, &i) in idx.iter().enumerate() {
         tasks.push((i, starts[k], lengths[k]));
@@ -437,7 +630,7 @@ pub fn track(doc: &Document, group: &str, today: i64) -> Vec<Track> {
         .map(|(&(i, s, d), &(_, fs, fd))| {
             let n = &doc.nodes[i];
             let (end, fend) = (last(o, s, d), last(fo, fs, fd));
-            let done = n.done.unwrap_or(0.0);
+            let done = done_of(doc, &n.id).unwrap_or(0.0);
             let begun = (today - (o + s.floor() as i64)) as f64;
             let status = if done >= 100.0 {
                 "done"
@@ -460,7 +653,7 @@ pub fn track(doc: &Document, group: &str, today: i64) -> Vec<Track> {
                 start: format_date(o + s.floor() as i64),
                 end: format_date(end),
                 days: d,
-                done: n.done,
+                done: done_of(doc, &n.id),
                 milestone: n.milestone,
                 forecast_start: format_date(fo + fs.floor() as i64),
                 forecast_end: format_date(fend),
@@ -635,6 +828,77 @@ mod tests {
         let ops = crate::ops::parse_ops(r#"{"op":"rename","id":"build","to":"make"}"#).unwrap();
         crate::ops::apply(&mut doc, &ops).unwrap();
         assert_eq!(doc.node("beta").unwrap().row.as_deref(), Some("make"));
+    }
+
+    #[test]
+    fn a_task_can_be_made_of_parts() {
+        // two sub-projects with the same phases, and an approval between them
+        let src = "gantt g: Shop [start: 2026-08-03] {\n  Web shop\n    Spike [2w, done]\n    Build [4w, done: 50%]\n    Beta [2026-10-28, milestone]\n  Mobile app [collapsed]\n    Spike [2026-08-17, 2w]\n    Store approval [9w, after: web-shop-build]\n    Beta [2026-12-16, 6w]\n}\n";
+        let mut doc = crate::dsl::parse(src).unwrap();
+        assert_eq!(crate::dsl::print(&doc), src);
+        fn n(d: &Document, id: &str) -> Node {
+            d.node(id).unwrap().clone()
+        }
+        assert_eq!(
+            n(&doc, "mobile-app-spike").under.as_deref(),
+            Some("mobile-app")
+        );
+        assert_eq!(n(&doc, "mobile-app-spike").label, "Spike");
+        assert!(n(&doc, "mobile-app").collapsed && n(&doc, "web-shop").under.is_none());
+        // a group spans its parts; its first part starts where it would
+        let t = track(&doc, "g", parse_date("2026-09-01").unwrap());
+        let at = |id: &str| t.iter().find(|x| x.id == id).unwrap().clone();
+        assert_eq!(at("web-shop").start, "2026-08-03");
+        assert_eq!(at("web-shop").end, "2026-10-27");
+        assert_eq!(at("web-shop-build").start, "2026-08-17");
+        // the next group starts after the one before; its parts are dated
+        assert_eq!(at("mobile-app").start, "2026-08-17");
+        assert_eq!(at("mobile-app").end, "2027-01-26");
+        // how much is done: by how long each part takes
+        assert_eq!(at("web-shop").done, Some(67.0));
+        assert_eq!(done_of(&doc, "mobile-app"), None);
+        // a milestone says whose it is, and is about the work in its group
+        let ms = crate::dashboard::milestones(&doc, parse_date("2026-09-01").unwrap());
+        assert_eq!(ms[0].label, "Web shop · Beta");
+        assert_eq!(ms[0].work, ["web-shop-spike", "web-shop-build"]);
+        // ops: a part moves up, a group goes with its parts or leaves them
+        let ops = |j: &str| crate::ops::parse_ops(j).unwrap();
+        crate::ops::apply(
+            &mut doc,
+            &ops(r#"{"op":"update_node","id":"mobile-app-beta","under":""}"#),
+        )
+        .unwrap();
+        assert!(n(&doc, "mobile-app-beta").under.is_none());
+        assert!(crate::ops::apply(
+            &mut doc,
+            &ops(r#"{"op":"update_node","id":"mobile-app","under":"mobile-app-spike"}"#)
+        )
+        .is_err());
+        crate::ops::apply(
+            &mut doc,
+            &ops(r#"{"op":"rename","id":"mobile-app","to":"app"}"#),
+        )
+        .unwrap();
+        assert_eq!(n(&doc, "mobile-app-spike").under.as_deref(), Some("app"));
+        crate::ops::apply(
+            &mut doc,
+            &ops(r#"{"op":"remove","id":"app","keep_members":true}"#),
+        )
+        .unwrap();
+        assert!(n(&doc, "mobile-app-spike").under.is_none());
+        crate::ops::apply(&mut doc, &ops(r#"{"op":"remove","id":"web-shop"}"#)).unwrap();
+        assert!(doc.node("web-shop-spike").is_none());
+        let back = crate::dsl::parse(&crate::dsl::print(&doc)).unwrap();
+        assert_eq!(crate::dsl::print(&back), crate::dsl::print(&doc));
+        // a chart removed takes its tasks with it
+        crate::ops::apply(&mut doc, &ops(r#"{"op":"remove","id":"g"}"#)).unwrap();
+        assert!(doc.nodes.is_empty());
+        // a mistake on a chart's first line is that line's only
+        let (d, errors) = crate::dsl::parse_lenient(
+            "gantt p: Plan [tags: delivery] {\n  Build [1w]\n  Beta [milestone]\n}\n",
+        );
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert_eq!(d.nodes.len(), 2);
     }
 
     #[test]

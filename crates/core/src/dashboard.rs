@@ -380,16 +380,32 @@ pub fn milestones(doc: &Document, today: i64) -> Vec<Milestone> {
                 marks.push(&end_row);
             }
             marks.sort_by_key(|m| day(&m.end));
-            let mut prev = today - 60;
+            // in a chart of groups (sub-projects), a milestone is about the
+            // work in its group: since the one before it there
+            let group_of = |id: &str| d.node(id).and_then(|n| n.under.clone());
+            let inside = |t: &str, g: &Option<String>| {
+                let Some(g) = g else { return true };
+                let mut cur = d.node(t).and_then(|n| n.under.as_deref());
+                while let Some(u) = cur {
+                    if u == g {
+                        return true;
+                    }
+                    cur = d.node(u).and_then(|n| n.under.as_deref());
+                }
+                false
+            };
+            let mut prevs: std::collections::HashMap<Option<String>, i64> = Default::default();
             for m in marks {
                 let due = day(&m.end);
-                let from = std::mem::replace(&mut prev, due);
+                let mine = group_of(&m.id);
+                let from = prevs.insert(mine.clone(), due).unwrap_or(today - 60);
+                let leaf = |t: &gantt::Track| !t.milestone && !gantt::has_parts(d, &t.id) && inside(&t.id, &mine);
                 if due < today || m.status == "done" {
                     continue;
                 }
                 let label = d
                     .node(&m.id)
-                    .map(|n| n.display().to_string())
+                    .map(|n| gantt::full_label(d, n))
                     .unwrap_or_else(|| format!("{} done", g.display()));
                 let mut light = Light::Green;
                 let mut why: Vec<(Light, String)> = Vec::new();
@@ -405,7 +421,7 @@ pub fn milestones(doc: &Document, today: i64) -> Vec<Milestone> {
                 }
                 let work: Vec<String> = tracks
                     .iter()
-                    .filter(|t| !t.milestone && day(&t.end) <= due && day(&t.end) > from)
+                    .filter(|t| leaf(t) && day(&t.end) <= due && day(&t.end) > from)
                     .map(|t| t.id.clone())
                     .collect();
                 let forecast = tracks
@@ -417,7 +433,7 @@ pub fn milestones(doc: &Document, today: i64) -> Vec<Milestone> {
                     .unwrap_or(due);
                 // the work planned to be done by then (since the milestone before)
                 for t in tracks.iter().filter(|t| {
-                    !t.milestone && t.status != "done" && day(&t.end) <= due && day(&t.end) > from
+                    leaf(t) && t.status != "done" && day(&t.end) <= due && day(&t.end) > from
                 }) {
                     let name = d
                         .node(&t.id)
@@ -1396,9 +1412,61 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                             .to_string(),
                     );
                     let bar_id = bar.id.clone();
+                    // its plans, folded into its row: unfolding it shows its
+                    // sub-projects, and theirs their phases (as planned)
+                    let mut inside = Vec::new();
+                    for (path, d) in docs(doc).into_iter().filter(|(p, _)| p.first() == Some(cid)) {
+                        for g in d.groups.iter().filter(|g| g.gantt) {
+                            let sc = gantt::schedule(d, &g.id);
+                            let Some(o) = sc.origin else { continue };
+                            let at = |id: &str| row_id("rm", &At { path: path.clone(), id: id.to_string() });
+                            for (i, _) in gantt::tree_order(d, &g.id) {
+                                let Some(&(_, st, len)) = sc.tasks.iter().find(|t| t.0 == i) else { continue };
+                                let t = &d.nodes[i];
+                                // the roadmap is about what is ahead: a milestone passed stays in its plan
+                                if t.milestone && o + (st as i64) < today {
+                                    continue;
+                                }
+                                let mut n = Node::new(&at(&t.id));
+                                n.label = t.display().to_string();
+                                n.color = t.color.clone();
+                                n.owner = t.owner.clone();
+                                n.under = Some(match t.under.as_deref() {
+                                    Some(u) if d.node(u).is_some_and(|p| p.group == t.group) => at(u),
+                                    _ => bar_id.clone(),
+                                });
+                                if gantt::has_parts(d, &t.id) {
+                                    n.collapsed = true;
+                                } else {
+                                    n.start = Some(gantt::format_date(o + st.floor() as i64));
+                                    n.milestone = t.milestone;
+                                    if !t.milestone {
+                                        n.days = Some(len.max(1.0));
+                                        n.done = t.done;
+                                    }
+                                }
+                                // a milestone ahead: its light, and when it is forecast
+                                if let Some(m) = mine.iter().find(|m| m.at.path == path && m.at.id == t.id) {
+                                    n.label = if m.forecast > m.due {
+                                        format!("{} → {}", m.label, gantt::short_date(m.forecast))
+                                    } else {
+                                        m.label.clone()
+                                    };
+                                    n.color = Some(m.light.color().to_string());
+                                }
+                                inside.push(n);
+                            }
+                        }
+                    }
+                    bar.collapsed = !inside.is_empty();
                     tasks.push(bar);
+                    // a milestone that is no task (a chart's end) sits on the row
                     for m in mine {
-                        let mut n = Node::new(&row_id("rm", &m.at));
+                        let id = row_id("rm", &m.at);
+                        if inside.iter().any(|n| n.id == id) {
+                            continue;
+                        }
+                        let mut n = Node::new(&id);
                         n.label = if m.forecast > m.due {
                             format!("{} → {}", m.label, gantt::short_date(m.forecast))
                         } else {
@@ -1410,6 +1478,7 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                         n.color = Some(m.light.color().to_string());
                         tasks.push(n);
                     }
+                    tasks.extend(inside);
                 }
                 out.groups.push(Group {
                     id: "roadmap".into(),
@@ -2288,6 +2357,9 @@ fn copy_block(out: &mut Document, d: &Document, path: &[String], gid: &str, id: 
         c.id = new_id(&n.id);
         c.group = Some(id.to_string());
         c.after = n.after.iter().map(|a| new_id(a)).collect();
+        // a gantt task's group and a milestone's row, under their new ids
+        c.under = n.under.as_deref().map(new_id);
+        c.row = n.row.as_deref().map(new_id);
         c.x = None;
         c.y = None;
         out.nodes.push(c);
@@ -2643,17 +2715,21 @@ mod tests {
             .collect();
         let rows: Vec<&str> = road
             .iter()
-            .filter(|n| n.row.is_none())
+            .filter(|n| n.row.is_none() && n.under.is_none())
             .map(|n| n.label.as_str())
             .collect();
         assert_eq!(rows, ["Web shop", "Mobile app", "Help centre"]);
+        // a project's plan is folded into its row: its milestones show there
         let on_web: Vec<&str> = road
             .iter()
-            .filter(|n| n.row.as_deref() == Some(road[0].id.as_str()))
+            .filter(|n| n.under.as_deref() == Some(road[0].id.as_str()))
             .map(|n| n.label.as_str())
             .collect();
-        assert!(on_web[0].starts_with("Web beta") && on_web[1] == "Web launch", "{on_web:?}");
-        assert_eq!(road.last().unwrap().owner.as_deref(), Some("no dates yet"));
+        assert_eq!(on_web[0], "Build");
+        assert!(on_web[1].starts_with("Web beta") && on_web[2] == "Web launch", "{on_web:?}");
+        assert!(road[0].collapsed);
+        let help = road.iter().find(|n| n.label == "Help centre").unwrap();
+        assert_eq!(help.owner.as_deref(), Some("no dates yet"));
         assert!(dash.group("roadmap").is_some_and(|g| g.gantt));
         // the projects' own plans, boards and risks are in their canvases, not here
         assert_eq!(dash.groups.iter().filter(|g| g.gantt).count(), 1);
@@ -2683,7 +2759,6 @@ mod tests {
         ));
         // from the start of its plan, with how much of it is done
         assert!(bar.is_some_and(|b| b.start.as_deref() == Some("2026-10-01") && b.done.is_some()));
-        let help = road.last().unwrap();
         assert_eq!(
             target(&help.id),
             Some((vec!["help".to_string()], "help".to_string()))

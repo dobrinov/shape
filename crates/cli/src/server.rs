@@ -549,7 +549,7 @@ fn listen(
                     let before = std::fs::read_to_string(&file).unwrap_or_default();
                     let changes = match (shape_core::parse(&before), shape_core::parse(&t)) {
                         (Ok(a), Ok(b)) => {
-                            shape_core::diff::markdown(&shape_core::diff::diff(&a, &b), &a, &b)
+                            shape_core::diff::summary(&a, &b)
                         }
                         _ => String::new(),
                     };

@@ -39,6 +39,9 @@ pub const GANTT_BAR: f64 = 22.0;
 pub const GANTT_HEAD: f64 = 30.0;
 /// Gantt charts: space between the task names and the timeline.
 pub const GANTT_GAP: f64 = 16.0;
+/// How far a part of a group is indented in the names, and room for a group's fold mark.
+pub const GANTT_INDENT: f64 = 14.0;
+pub const GANTT_FOLD: f64 = 14.0;
 
 /// Width a group needs for its title pill (bold 14px label + padding).
 pub fn group_label_w(label: &str) -> f64 {
@@ -550,6 +553,9 @@ pub fn layout_at(doc: &Document, today: Option<i64>) -> Layout {
                 h: rel.h,
             }
         } else {
+            if parent_of_node[i].is_some_and(|g| ctx.gantt[g].is_some()) && folded_away(doc, n) {
+                continue; // in a folded group
+            }
             let (ox, oy) = match parent_of_node[i] {
                 Some(g) => {
                     let r = abs_group[g].unwrap();
@@ -1188,7 +1194,8 @@ fn gantt_block(ctx: &mut Ctx, g: usize) -> (f64, f64) {
         .filter(|t| on_row(ctx.doc, &ctx.doc.nodes[t.0], &sched).is_none())
         .map(|t| {
             let n = &ctx.doc.nodes[t.0];
-            text::width(n.display(), 13.0)
+            name_indent(ctx.doc, n)
+                + text::width(n.display(), 13.0)
                 + n.owner
                     .as_deref()
                     .map_or(0.0, |o| text::width(o, 12.0) + 10.0)
@@ -1221,17 +1228,18 @@ fn gantt_block(ctx: &mut Ctx, g: usize) -> (f64, f64) {
     let x0 = names + GANTT_GAP;
     // a row per task; a milestone with `row:` (a task of this chart) sits
     // on that task's row
-    let rows: Vec<String> = sched
-        .tasks
+    // (in the order they are written: a group's parts under it)
+    let order = crate::gantt::tree_order(ctx.doc, &ctx.doc.groups[g].id);
+    let rows: Vec<String> = order
         .iter()
-        .map(|t| &ctx.doc.nodes[t.0])
+        .map(|&(i, _)| &ctx.doc.nodes[i])
         .filter(|n| on_row(ctx.doc, n, &sched).is_none())
         .map(|n| n.id.clone())
         .collect();
     for &(i, start, len) in &sched.tasks {
         let n = &ctx.doc.nodes[i];
-        let id = on_row(ctx.doc, n, &sched).unwrap_or(&n.id);
-        let k = rows.iter().position(|r| r == id).unwrap_or(0);
+        let id = on_row(ctx.doc, n, &sched).unwrap_or_else(|| n.id.clone());
+        let k = rows.iter().position(|r| *r == id).unwrap_or(0);
         let y = GANTT_HEAD + k as f64 * GANTT_ROW + (GANTT_ROW - GANTT_BAR) / 2.0;
         if n.milestone {
             // a diamond centred on its day
@@ -1256,24 +1264,52 @@ fn gantt_block(ctx: &mut Ctx, g: usize) -> (f64, f64) {
         left: 0.0,
         scale,
     });
+    // a milestone's name beside it on a bar may run past the last day
+    let labels = sched
+        .tasks
+        .iter()
+        .filter(|t| {
+            ctx.doc.nodes[t.0].milestone && on_row(ctx.doc, &ctx.doc.nodes[t.0], &sched).is_some()
+        })
+        .map(|t| {
+            ctx.node_pos[t.0].0 + GANTT_BAR + 6.0 + text::width(ctx.doc.nodes[t.0].display(), 10.5)
+        })
+        .fold(0.0, f64::max);
     (
-        x0 + days * day,
+        (x0 + days * day).max(labels),
         GANTT_HEAD + rows.len().max(1) as f64 * GANTT_ROW,
     )
 }
 
 /// The task whose row milestone `n` sits on: its `row`, a task of the same chart.
-pub fn on_row<'a>(
-    doc: &Document,
-    n: &'a Node,
-    sched: &crate::gantt::Schedule,
-) -> Option<&'a String> {
+/// In a folded group, its row: a milestone shows there, other tasks not at all.
+pub fn on_row(doc: &Document, n: &Node, sched: &crate::gantt::Schedule) -> Option<String> {
+    if let Some(g) = crate::gantt::folded_into(doc, n) {
+        return Some(g);
+    }
     let p = n.row.as_ref().filter(|_| n.milestone)?;
     sched
         .tasks
         .iter()
         .any(|t| doc.nodes[t.0].id == *p && !doc.nodes[t.0].milestone)
-        .then_some(p)
+        .then(|| p.clone())
+}
+
+/// A gantt task folded away in a group (a milestone there still shows, on
+/// the group's row).
+pub fn folded_away(doc: &Document, n: &Node) -> bool {
+    !n.milestone && crate::gantt::folded_into(doc, n).is_some()
+}
+
+/// How far a gantt task's name is indented, for its group and the
+/// fold mark of a group.
+pub fn name_indent(doc: &Document, n: &Node) -> f64 {
+    crate::gantt::depth(doc, n) as f64 * GANTT_INDENT
+        + if crate::gantt::has_parts(doc, &n.id) {
+            GANTT_FOLD
+        } else {
+            0.0
+        }
 }
 
 /// Cross-axis size of what band `b` holds.

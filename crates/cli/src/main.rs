@@ -1042,8 +1042,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 apply_json(&mut doc, &sync.ops)?;
             }
             if args.flag("--dry-run") {
-                let d = shape_core::diff::diff(&before, &doc);
-                print!("{}", shape_core::diff::markdown(&d, &before, &doc));
+                print!("{}", shape_core::diff::summary(&before, &doc));
             } else if before != doc {
                 save(file, &doc)?;
             }
@@ -1364,7 +1363,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             };
             print!(
                 "{}",
-                shape_core::diff::markdown(&shape_core::diff::diff(&before, &doc), &before, &doc)
+                shape_core::diff::summary(&before, &doc)
             );
             if args.flag("--dry-run") {
                 eprintln!("dry run: {} ops ok, {file} not changed", r.count);
@@ -1453,11 +1452,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                         if args.flag("--dry-run") {
                             print!(
                                 "{}",
-                                shape_core::diff::markdown(
-                                    &shape_core::diff::diff(&doc, &new),
-                                    &doc,
-                                    &new
-                                )
+                                shape_core::diff::summary(&doc, &new)
                             );
                         } else {
                             save(file, &new)?;
@@ -1470,8 +1465,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             };
             let before = doc.clone();
             let r = shape_core::ops::apply(&mut doc, &ops).map_err(|e| e.to_string())?;
-            let d = shape_core::diff::diff(&before, &doc);
-            print!("{}", shape_core::diff::markdown(&d, &before, &doc));
+            print!("{}", shape_core::diff::summary(&before, &doc));
             if args.flag("--dry-run") {
                 eprintln!("dry run: {} ops ok, {file} not changed", r.count);
             } else {
@@ -1542,7 +1536,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
             }
             print!(
                 "{}",
-                shape_core::diff::markdown(&shape_core::diff::diff(&before, &doc), &before, &doc)
+                shape_core::diff::summary(&before, &doc)
             );
             if args.flag("--dry-run") {
                 eprintln!("dry run: {file} not changed");
@@ -1563,7 +1557,7 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 shape_core::ops::apply(&mut doc, &[Op::Merge { dsl }]).map_err(|e| e.message)?;
             print!(
                 "{}",
-                shape_core::diff::markdown(&shape_core::diff::diff(&before, &doc), &before, &doc)
+                shape_core::diff::summary(&before, &doc)
             );
             if args.flag("--dry-run") {
                 eprintln!("dry run: {file} not changed");

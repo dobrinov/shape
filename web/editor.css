@@ -561,3 +561,4 @@
 .dge .dge-ai-card-note { margin: 0; overflow-wrap: anywhere; max-height: 30vh; overflow: auto; font-size: 13px; line-height: 1.45; color: var(--fg); }
 .dge-ai-card-actions { display: flex; align-items: center; gap: 8px; }
 .dge-ai-card-actions .dge-spacer { flex: 1; }
+.dge .dg-gfold { cursor: pointer; }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.76.0 — 2026-10-23
+
+- **Groups in gantt charts.** A task written indented under another is part of it: a sub-project with its own stages (spike, build, beta, general availability, or whatever your team calls them), or any work made of parts. The group's bar spans its parts and shows how much of them is done. Click the mark by its name to fold it into one row, with its milestones on it. Parts can share names across sub-projects (each sub-project can have its own *Beta*), and milestones say whose they are (*Mobile app · Beta*).
+- **The roadmap unfolds.** On a board of several projects, a project's row is folded. Click its mark to see its sub-projects, then click one to see its stages. Only milestones still ahead show on it.
+- **Drag a bar's start.** Dragging the left end of a bar changes when it starts and keeps its end; dragging a group moves all its parts. As before, drag a bar to move it, drag its right end to change when it ends, and draw an arrow from one bar to another to make it wait for that one.
+- Right-click a task → *Add a part*, *Part of “…”* (put it inside the task above), *Out of “…”*, *Ungroup*.
+- **Better plans from the AI.** *✦ Ask* and *✦ Rethink* name tasks by what they deliver and whose they are (*Mobile app beta*, not *Phase 2 beta*), and group a project's sub-projects with the stages your team uses. What a stage waits for (an outside approval, a spike, another team) gets a task of its own. The next Rethink after this upgrade offers to restructure plans this way.
+- *✦ Ask* on a board of boards now sees inside its canvases, so a request about a project's plan changes that plan instead of starting a new one.
+- Removing a block (a gantt chart, table, risk matrix…) without saying otherwise removes its items too, instead of leaving them behind as loose boxes. A plain section still keeps its boxes.
+- A mistake in a block's first line no longer flags every item inside it as an error too.
+- `shape ask` and `shape apply` list what changed inside canvases too, instead of saying *No changes*. So does the session log.
+
 ## 0.75.0 — 2026-10-22
 
 - **Each project has a summary of its own.** On a board of several projects, a project's row on the roadmap (or its badge) opens that project's summary instead of its canvas: its plans, its burndown, its kanban boards and its risks, in whichever perspective you are in. The crumbs take you back up to the roadmap, and *←* returns from the board to the summary you came from. Canvases inside a project, such as a task's risks or its test scenarios, are part of the project's summary.

@@ -498,7 +498,13 @@ impl Session {
                 .and_then(|s| parse(s).ok())
                 .and_then(|b| b.at(&path).cloned());
             let doc = whole.at(&path).unwrap_or(&whole);
-            let doc = dashboard::build(doc, p, today, before.as_ref());
+            let mut doc = dashboard::build(doc, p, today, before.as_ref());
+            // what the viewer unfolded (a project on the roadmap, its parts)
+            for id in o.open.iter().flatten() {
+                if let Some(n) = doc.node_mut(id) {
+                    n.collapsed = false;
+                }
+            }
             return render::render(&doc, &o);
         }
         // a perspective shows its part of the board (and of the base, to compare)

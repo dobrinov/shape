@@ -194,6 +194,8 @@ pub(crate) fn parse_lines(src: &str) -> (Document, Vec<Diagnostic>, Vec<LineInfo
         line: 0,
         map: None,
         gantt: None,
+        gantt_indent: Default::default(),
+        gantt_chain: Vec::new(),
         theme: None,
         theme_mode: None,
         theme_section: false,
@@ -236,7 +238,7 @@ pub(crate) fn parse_lines(src: &str) -> (Document, Vec<Diagnostic>, Vec<LineInfo
             let g = p.gantt.as_ref().unwrap().0.clone();
             p.todo_line(&g, raw)
         } else if p.gantt.is_some() {
-            p.task_line(t)
+            p.task_line(raw)
         } else {
             if t == "}" {
                 li.close = p.stack.last().map(|(g, _)| g.clone());
@@ -366,6 +368,10 @@ struct Parser {
     map: Option<MapBlock>,
     /// The gantt chart whose tasks are being read, and the line that opened it.
     gantt: Option<(String, usize)>,
+    /// In a gantt chart: how far tasks are indented, and the last task at
+    /// each depth (a task indented under another is part of it).
+    gantt_indent: crate::mindmap::Indent,
+    gantt_chain: Vec<String>,
     /// Nodes created only because an edge mentioned them; a mindmap topic
     /// with that id adopts them.
     implicit: std::collections::HashSet<String>,
@@ -771,50 +777,55 @@ impl Parser {
         if let Some(l) = label.or(qlabel) {
             g.label = l;
         }
-        for (k, v) in &attrs {
-            match (k.as_str(), v) {
-                ("scale" | "levels", Some(v)) if risks => {
-                    g.levels = Some(
-                        v.parse::<u8>()
-                            .ok()
-                            .filter(|n| (3..=5).contains(n))
-                            .ok_or_else(|| {
-                                format!("a risk matrix has 3, 4 or 5 levels, not `{v}`")
-                            })?,
-                    )
-                }
-                ("color" | "colour", Some(v)) if risks => g.color = Some(color(v)?),
-                ("x", Some(v)) if risks => g.x = Some(num("x", v)?),
-                ("y", Some(v)) if risks => g.y = Some(num("y", v)?),
-                (c, None) if risks && valid_color(c) => g.color = Some(c.to_string()),
-                (k, _) if risks => {
-                    return Err(format!(
-                        "unknown risk matrix attribute `{k}` (scale, color, x, y)"
-                    ))
-                }
-                ("start", Some(v)) => g.start = Some(date(v)?),
-                ("scale", Some(v)) => {
-                    g.scale = Some(Scale::parse(v).ok_or_else(|| {
-                        format!("unknown scale `{v}` (day, week, month, quarter)")
-                    })?)
-                }
-                ("color" | "colour", Some(v)) => g.color = Some(color(v)?),
-                ("x", Some(v)) => g.x = Some(num("x", v)?),
-                ("y", Some(v)) => g.y = Some(num("y", v)?),
-                (d, None) if crate::gantt::parse_date(d).is_some() => g.start = Some(d.to_string()),
-                (c, None) if valid_color(c) => g.color = Some(c.to_string()),
-                (k, _) => {
-                    return Err(format!(
-                        "unknown gantt attribute `{k}` (start, scale, color, x, y)"
-                    ))
+        // a mistake in the attributes is this line's: the items below are
+        // still read as the block's
+        let attrs_read = (|| -> Result<(), String> {
+            for (k, v) in &attrs {
+                match (k.as_str(), v) {
+                    ("scale" | "levels", Some(v)) if risks => {
+                        g.levels = Some(
+                            v.parse::<u8>()
+                                .ok()
+                                .filter(|n| (3..=5).contains(n))
+                                .ok_or_else(|| {
+                                    format!("a risk matrix has 3, 4 or 5 levels, not `{v}`")
+                                })?,
+                        )
+                    }
+                    ("color" | "colour", Some(v)) if risks => g.color = Some(color(v)?),
+                    ("x", Some(v)) if risks => g.x = Some(num("x", v)?),
+                    ("y", Some(v)) if risks => g.y = Some(num("y", v)?),
+                    (c, None) if risks && valid_color(c) => g.color = Some(c.to_string()),
+                    (k, _) if risks => {
+                        return Err(format!(
+                            "unknown risk matrix attribute `{k}` (scale, color, x, y)"
+                        ))
+                    }
+                    ("start", Some(v)) => g.start = Some(date(v)?),
+                    ("scale", Some(v)) => {
+                        g.scale = Some(Scale::parse(v).ok_or_else(|| {
+                            format!("unknown scale `{v}` (day, week, month, quarter)")
+                        })?)
+                    }
+                    ("color" | "colour", Some(v)) => g.color = Some(color(v)?),
+                    ("x", Some(v)) => g.x = Some(num("x", v)?),
+                    ("y", Some(v)) => g.y = Some(num("y", v)?),
+                    (d, None) if crate::gantt::parse_date(d).is_some() => g.start = Some(d.to_string()),
+                    (c, None) if valid_color(c) => g.color = Some(c.to_string()),
+                    (k, _) => {
+                        return Err(format!(
+                            "unknown gantt attribute `{k}` (start, scale, color, x, y)"
+                        ))
+                    }
                 }
             }
-        }
+            Ok(())
+        })();
         self.touched.push(Elem::Group(id.clone()));
         if !closes_inline {
             self.gantt = Some((id, self.line));
         }
-        Ok(())
+        attrs_read
     }
 
     /// `chart id: Title [bar, stacked, unit: %] {` … a header row and rows of
@@ -1853,9 +1864,13 @@ impl Parser {
     }
 
     /// One task of a gantt chart (or the closing `}`): `Label [5d, after: x]`.
-    fn task_line(&mut self, t: &str) -> Result<(), String> {
+    fn task_line(&mut self, raw: &str) -> Result<(), String> {
+        let (width, t) = crate::mindmap::indent_of(raw);
+        let t = t.trim_end();
         if t == "}" {
             self.gantt = None;
+            self.gantt_indent = Default::default();
+            self.gantt_chain.clear();
             return Ok(());
         }
         let block = self.gantt.as_ref().unwrap().0.clone();
@@ -1896,7 +1911,17 @@ impl Parser {
             _ => true,
         });
         let chart = self.gantt.as_ref().unwrap().0.clone();
-        let wanted = explicit.clone().unwrap_or_else(|| slug(&label));
+        // indented under a task: part of it (gantt charts only)
+        let under = if self.doc.group(&chart).is_some_and(|g| g.gantt) {
+            let depth = self.gantt_indent.depth(width);
+            self.gantt_chain.truncate(depth);
+            self.gantt_chain.last().cloned()
+        } else {
+            None
+        };
+        let wanted = explicit
+            .clone()
+            .unwrap_or_else(|| part_id(under.as_deref(), &label));
         let id = if !self.doc.id_taken(&wanted) {
             wanted
         } else if self.implicit.remove(&wanted) {
@@ -1911,7 +1936,11 @@ impl Parser {
         let mut n = Node::new(&id);
         n.label = if label == id { String::new() } else { label };
         n.group = Some(chart);
+        n.under = under;
         apply_node_attrs(&mut n, &attrs)?;
+        if self.doc.group(n.group.as_deref().unwrap_or("")).is_some_and(|g| g.gantt) {
+            self.gantt_chain.push(n.id.clone());
+        }
         self.touched.push(Elem::Node(n.id.clone()));
         self.doc.nodes.push(n);
         Ok(())
@@ -2890,21 +2919,34 @@ pub(crate) fn gantt_block(doc: &Document, g: &Group, pad: &str, out: &mut String
             _ => a.to_string(),
         }
     };
-    for n in &tasks {
+    // a task's parts go indented under it
+    for (i, depth) in crate::gantt::tree_order(doc, &g.id) {
+        let n = &doc.nodes[i];
         let label = n.display();
-        let mut m = (*n).clone();
+        let mut m = n.clone();
         m.after = m.after.iter().map(|a| named(a)).collect();
         let mut a = node_attrs(&m);
-        if slug(label) != n.id {
+        if part_id(n.under.as_deref(), label) != n.id {
             a.insert(0, format!("id: {}", attr_value(&n.id)));
         }
         out.push_str(&format!(
-            "{pad}  {}{}\n",
+            "{pad}  {}{}{}\n",
+            "  ".repeat(depth),
             crate::mindmap::outline_label(label),
             attrs_text(&a)
         ));
     }
     out.push_str(&format!("{pad}}}\n"));
+}
+
+/// The id a gantt task gets from its label: `mobile-app-beta` for *Beta*
+/// under `mobile-app` (so each sub-project's phases can share names).
+pub(crate) fn part_id(under: Option<&str>, label: &str) -> String {
+    let s = slug(label);
+    match under {
+        Some(u) if !s.starts_with(&format!("{u}-")) => format!("{u}-{s}"),
+        _ => s,
+    }
 }
 
 /// A database table: one column per line, types lined up.
