@@ -164,6 +164,8 @@ export interface Node {
   row?: string;
   /** Gantt task: the task of its chart it is part of (a phase of a sub-project; "" in ops puts it back at the top). */
   under?: string;
+  /** Gantt task: the platform it is for (`web`, `ios`, `android` or any word; "" in ops clears it). */
+  platform?: string;
   /** Gantt task: percent done, 0–100. */
   done?: number;
   /** Forecast launch: what it adds a month once ramped up. */
@@ -361,6 +363,8 @@ export interface AddNodeOp {
   row?: string;
   /** Gantt task: the task of its chart it is part of (a phase of a sub-project; "" in ops puts it back at the top). */
   under?: string;
+  /** Gantt task: the platform it is for (`web`, `ios`, `android` or any word; "" in ops clears it). */
+  platform?: string;
   /** Gantt task: percent done, 0–100. */
   done?: number;
   /** Forecast launch: what it adds a month once ramped up. */
@@ -426,6 +430,8 @@ export interface UpdateNodeOp {
   row?: string;
   /** Gantt task: the task of its chart it is part of (a phase of a sub-project; "" in ops puts it back at the top). */
   under?: string;
+  /** Gantt task: the platform it is for (`web`, `ios`, `android` or any word; "" in ops clears it). */
+  platform?: string;
   /** Gantt task: percent done, 0–100 (0 clears it). */
   done?: number;
   /** Forecast launch: what it adds a month once ramped up. */

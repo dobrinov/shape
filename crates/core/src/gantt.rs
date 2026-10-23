@@ -74,6 +74,30 @@ pub fn short_date(z: i64) -> String {
     format!("{} {d}", MONTHS[(m - 1) as usize])
 }
 
+/// A platform as written (`iOS`, `Android`, `web`) → its id (`ios`,
+/// `android`, `web`); None for "".
+pub fn platform_id(v: &str) -> Option<String> {
+    let v = v.trim().to_lowercase().replace([' ', '_'], "-");
+    (!v.is_empty()).then_some(v)
+}
+
+/// How a platform reads: `ios` → iOS, `android` → Android, `web` → Web, any
+/// other word with a capital.
+pub fn platform_name(id: &str) -> String {
+    match id {
+        "ios" => "iOS".into(),
+        "ipados" => "iPadOS".into(),
+        "macos" => "macOS".into(),
+        "api" => "API".into(),
+        _ => {
+            let mut c = id.chars();
+            c.next()
+                .map(|f| f.to_uppercase().chain(c).collect::<String>().replace('-', " "))
+                .unwrap_or_default()
+        }
+    }
+}
+
 /// "Wed 28 Oct 2026": a day as people read it.
 pub fn long_date(z: i64) -> String {
     const MONTHS: [&str; 12] = [
@@ -138,6 +162,9 @@ pub fn tooltip(doc: &Document, id: &str, today: Option<i64>) -> Option<String> {
         _ => {}
     }
     facts.dedup();
+    if let Some(p) = &n.platform {
+        facts.push(format!("platform: {}", platform_name(p)));
+    }
     if let Some(o) = &n.owner {
         facts.push(format!("owner: {o}"));
     }
@@ -446,6 +473,12 @@ pub fn done_of(doc: &Document, id: &str) -> Option<f64> {
     (said && all > 0.0).then(|| (100.0 * done / all).round())
 }
 
+/// Whether a task says how long it takes (a milestone takes no time; a
+/// group takes its parts').
+pub fn estimated(n: &Node) -> bool {
+    n.milestone || n.days.is_some() || n.done.is_some_and(|d| d >= 100.0)
+}
+
 /// A task without a duration takes this long.
 pub const DEFAULT_DAYS: f64 = 1.0;
 
@@ -550,6 +583,8 @@ fn schedule_with(
     let length = |n: &Node, start: f64| {
         let days = task_days(n);
         match now {
+            // no length given yet: nothing to forecast from
+            _ if !estimated(n) => days,
             Some(t) if !n.milestone && t > start => {
                 let left = days * (1.0 - n.done.unwrap_or(0.0).clamp(0.0, 100.0) / 100.0);
                 if left <= 0.0 {
@@ -716,6 +751,8 @@ pub fn track(doc: &Document, group: &str, today: i64) -> Vec<Track> {
             let begun = (today - (o + s.floor() as i64)) as f64;
             let status = if done >= 100.0 {
                 "done"
+            } else if !estimated(n) && !has_parts(doc, &n.id) {
+                "not estimated yet"
             } else if end < today {
                 "late"
             } else if begun >= 0.0 && !n.milestone && d > 0.0 {
@@ -992,6 +1029,24 @@ mod tests {
         );
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert_eq!(d.nodes.len(), 2);
+    }
+
+    #[test]
+    fn a_task_says_which_platform_it_is_for() {
+        let src = "gantt g: Shop [start: 2026-09-01] {\n  Mobile app\n    Implement [6w, platform: ios]\n    Implement [6w, platform: android]\n    Store review [9w, after: mobile-app-implement-ios, platform: ios]\n}\n";
+        let doc = crate::dsl::parse(src).unwrap();
+        assert_eq!(crate::dsl::print(&doc), src);
+        let ids: Vec<&str> = doc.nodes.iter().map(|n| n.id.as_str()).collect();
+        assert_eq!(ids, ["mobile-app", "mobile-app-implement-ios", "mobile-app-implement-android", "mobile-app-store-review-ios"]);
+        // written as people write it, kept as an id
+        let d = crate::dsl::parse("gantt g: G {\n  Build [platform: iOS]\n}\n").unwrap();
+        assert_eq!(d.nodes[0].platform.as_deref(), Some("ios"));
+        assert_eq!(platform_name("ios"), "iOS");
+        assert_eq!(platform_name("desktop"), "Desktop");
+        assert!(tooltip(&doc, "mobile-app-implement-android", None).unwrap().contains("platform: Android"));
+        // its chip by its name
+        let svg = crate::render::render(&doc, &Default::default()).svg;
+        assert!(svg.contains(r#"class="dg-platform""#) && svg.contains(">Android</text>"));
     }
 
     #[test]

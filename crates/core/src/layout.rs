@@ -1196,6 +1196,10 @@ fn gantt_block(ctx: &mut Ctx, g: usize) -> (f64, f64) {
             let n = &ctx.doc.nodes[t.0];
             name_indent(ctx.doc, n)
                 + text::width(n.display(), 13.0)
+                // its platform's chip
+                + n.platform.as_deref().map_or(0.0, |p| {
+                    text::width(&crate::gantt::platform_name(p), 10.5) + 16.0
+                })
                 + n.owner
                     .as_deref()
                     .map_or(0.0, |o| text::width(o, 12.0) + 10.0)

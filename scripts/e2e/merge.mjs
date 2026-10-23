@@ -5,7 +5,7 @@
 //   make e2e   (or: cd scripts/e2e && node merge.mjs)
 import { chromium } from "playwright";
 import { spawn, execSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, chmodSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, chmodSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,8 @@ import assert from "node:assert/strict";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
 const binDir = join(root, "target", "debug");
+// the old name still works: `diagram` is `shape` (as the releases ship it)
+if (!existsSync(join(binDir, "diagram"))) symlinkSync("shape", join(binDir, "diagram"));
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const env = { ...process.env, PATH: binDir + ":" + process.env.PATH, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };

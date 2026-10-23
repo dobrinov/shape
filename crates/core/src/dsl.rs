@@ -1919,9 +1919,14 @@ impl Parser {
         } else {
             None
         };
+        let platform = attrs
+            .iter()
+            .find(|(k, _)| k == "platform")
+            .and_then(|(_, v)| v.as_deref())
+            .and_then(crate::gantt::platform_id);
         let wanted = explicit
             .clone()
-            .unwrap_or_else(|| part_id(under.as_deref(), &label));
+            .unwrap_or_else(|| part_id(under.as_deref(), &label, platform.as_deref()));
         let id = if !self.doc.id_taken(&wanted) {
             wanted
         } else if self.implicit.remove(&wanted) {
@@ -2460,6 +2465,7 @@ const KEYS: &[&str] = &[
     "done",
     "progress",
     "owner",
+    "platform",
     "p",
     "probability",
     "likelihood",
@@ -2610,6 +2616,7 @@ pub fn apply_node_attrs(n: &mut Node, attrs: &Attrs) -> Result<(), String> {
                 n.done = Some(percent(v)?).filter(|d| *d > 0.0);
             }
             ("owner", Some(v)) => n.owner = Some(v.clone()).filter(|s| !s.is_empty()),
+            ("platform", Some(v)) => n.platform = crate::gantt::platform_id(v),
             ("p" | "probability" | "likelihood", Some(v)) => n.probability = Some(level(k, v)?),
             ("i" | "impact", Some(v)) => n.impact = Some(level(k, v)?),
             (k, None) if crate::gantt::parse_date(k).is_some() => n.start = Some(k.to_string()),
@@ -2620,7 +2627,7 @@ pub fn apply_node_attrs(n: &mut Node, attrs: &Attrs) -> Result<(), String> {
             (k, None) if valid_color(k) => n.color = Some(k.to_string()),
             (k, _) => {
                 return Err(format!(
-                    "unknown node attribute `{k}` (shape, color, detail, link, tags, x, y, w, h, collapsed, layout, parent, start, days, after, milestone, done, owner, p, i, date, important)"
+                    "unknown node attribute `{k}` (shape, color, detail, link, tags, x, y, w, h, collapsed, layout, parent, start, days, after, milestone, done, owner, platform, p, i, date, important)"
                 ))
             }
         }
@@ -2951,7 +2958,7 @@ pub(crate) fn gantt_block(doc: &Document, g: &Group, pad: &str, out: &mut String
         let mut m = n.clone();
         m.after = m.after.iter().map(|a| named(a)).collect();
         let mut a = node_attrs(&m);
-        if part_id(n.under.as_deref(), label) != n.id {
+        if part_id(n.under.as_deref(), label, n.platform.as_deref()) != n.id {
             a.insert(0, format!("id: {}", attr_value(&n.id)));
         }
         out.push_str(&format!(
@@ -2965,11 +2972,16 @@ pub(crate) fn gantt_block(doc: &Document, g: &Group, pad: &str, out: &mut String
 }
 
 /// The id a gantt task gets from its label: `mobile-app-beta` for *Beta*
-/// under `mobile-app` (so each sub-project's phases can share names).
-pub(crate) fn part_id(under: Option<&str>, label: &str) -> String {
+/// under `mobile-app` (so each sub-project's stages can share names), and
+/// `…-ios` for one on a platform (so each platform's can).
+pub(crate) fn part_id(under: Option<&str>, label: &str, platform: Option<&str>) -> String {
     let s = slug(label);
-    match under {
+    let s = match under {
         Some(u) if !s.starts_with(&format!("{u}-")) => format!("{u}-{s}"),
+        _ => s,
+    };
+    match platform {
+        Some(p) if !s.ends_with(&format!("-{p}")) => format!("{s}-{p}"),
         _ => s,
     }
 }
@@ -3796,6 +3808,9 @@ fn node_attrs(n: &Node) -> Vec<String> {
     }
     if let Some(o) = &n.owner {
         a.push(format!("owner: {}", attr_value(o)));
+    }
+    if let Some(p) = &n.platform {
+        a.push(format!("platform: {p}"));
     }
     if n.shape != Shape::default() {
         a.push(n.shape.as_str().to_string());

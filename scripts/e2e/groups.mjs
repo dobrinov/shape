@@ -113,6 +113,12 @@ try {
       await p.locator('.dg-node[data-id="polish"]').click({ button: "right" }); await sleep(200);
       await p.locator(".dge-menu").getByText("Part of “Checkout”").click();
       await until(/\n {6}Polish \[id: polish, 1w\]\n {2}\}/);
+      // which platform a task is for: a chip by its name
+      await p.locator('.dg-node[data-id="storefront-build"]').click({ button: "right" }); await sleep(200);
+      await p.locator(".dge-menu").getByText("Platform…").click(); await sleep(200);
+      await p.locator(".dge-menu").getByText("iOS", { exact: false }).first().click(); await sleep(400);
+      await until(/\n {6}Build \[[^\]]*platform: ios/);
+      assert.ok(await p.locator(".dg-platform", { hasText: "iOS" }).count() > 0, "its chip");
       if (process.env.SHOTS) await p.screenshot({ path: join(process.env.SHOTS, "groups-board.png") });
     }
     assert.deepEqual(errors, []);

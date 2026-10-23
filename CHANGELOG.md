@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.80.0 — 2026-10-23
+
+- **Platforms on gantt tasks.** `platform: ios` (or `web`, `android`, or any word) marks which platform a task is for, with a chip by its name in that platform's colour, the same on every chart. Names stay short: *Implement* with an iOS chip and *Implement* with an Android chip, instead of *Implement (iOS)*. Right-click a task → *Platform…*. Hovering a task says its platform too.
+- *✦ Ask* and *✦ Rethink* set platforms instead of writing them into names, and give each platform's work a task of its own. The next Rethink after this upgrade moves platforms out of names already on your board.
+- **A task with no length yet** is drawn as a dashed outline saying *no length yet*, instead of a one-day bar forecast weeks late. Its hover says *not estimated yet*.
+
 ## 0.79.0 — 2026-10-23
 
 - **Gantt bars and milestones say what they are on hover**, on the board and on summaries: the name with whose it is (*Web shop · Checkout · Beta*), the day (*Milestone · Wed 2 Dec 2026*) or a bar's first and last day and length, the forecast when it is later (*forecast Sun 1 Nov 2026 (+4d)*), how it stands (late, behind, pushed back, done), how much is done, who does it and what it waits for. Exported SVGs carry the same text.

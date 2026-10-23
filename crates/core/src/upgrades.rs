@@ -72,6 +72,12 @@ pub const NOTES: &[Note] = &[
         short: "sub-projects and their stages on the roadmap for Delivery",
         text: "A gantt task can be made of parts, written indented under it: a sub-project with its stages, which the roadmap unfolds from the project's row. When a project's plan holds several sub-projects (products, workstreams), group each one's tasks under it, with the stages the team uses, and fold the ones not being delivered now. Rename tasks and milestones named by a number (*Phase 2 beta*) after what they deliver and whose they are (*Mobile app beta*), and give what a stage waits for (an outside approval, a spike, another team) a task of its own with `after:`.",
     },
+    Note {
+        version: "0.80.0",
+        perspective: "delivery",
+        short: "platforms marked on gantt tasks for Delivery",
+        text: "A gantt task can say which platform it is for (`platform: web`, `ios`, `android` or any word), shown as a chip by its name. Where a task names its platform in its title (*Implement (iOS)*, *Spike · Android*), move it to `platform:` and keep the title short (*Implement*); where work is done for several platforms, give each platform a task of its own.",
+    },
 ];
 
 /// Whether version `a` is newer than `b` (`0.10.0` > `0.9.9`).

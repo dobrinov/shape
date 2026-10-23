@@ -97,6 +97,9 @@ pub enum Op {
         /// Gantt task: who does it ("" clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         owner: Option<String>,
+        /// Gantt task: the platform it is for (web, ios, android, any word; "" clears it).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        platform: Option<String>,
         /// Forecast launch: what it adds a month once ramped up.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         adds: Option<f64>,
@@ -197,6 +200,9 @@ pub enum Op {
         /// Gantt task: who does it ("" clears it).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         owner: Option<String>,
+        /// Gantt task: the platform it is for (web, ios, android, any word; "" clears it).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        platform: Option<String>,
         /// Forecast launch: what it adds a month once ramped up.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         adds: Option<f64>,
@@ -1053,6 +1059,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             milestone,
             row,
             under,
+            platform,
             date,
             important,
             widget,
@@ -1105,6 +1112,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             if let Some(u) = opt(under) {
                 n.under = u;
+            }
+            if let Some(p) = platform {
+                n.platform = crate::gantt::platform_id(p);
             }
             launch(&mut n, adds, ramp);
             event(&mut n, date, important)?;
@@ -1174,6 +1184,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             milestone,
             row,
             under,
+            platform,
             date,
             important,
             widget,
@@ -1257,6 +1268,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             if let Some(u) = opt(under) {
                 n.under = u;
+            }
+            if let Some(p) = platform {
+                n.platform = crate::gantt::platform_id(p);
             }
             launch(n, adds, ramp);
             event(n, date, important)?;

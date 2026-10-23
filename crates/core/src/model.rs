@@ -399,6 +399,9 @@ pub struct Node {
     /// Gantt task: who does it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
+    /// Gantt task: the platform it is for (`web`, `ios`, `android`, or any word).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub platform: Option<String>,
     /// Risk: how likely it is (1 to the matrix's levels).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub probability: Option<u8>,

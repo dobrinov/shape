@@ -432,7 +432,7 @@ fn draw(doc: &Document, opts: &RenderOptions, def: Option<crate::model::ThemeDef
         );
         if let Some(gb_t) = &gb.gantt {
             let today = opts.today.as_deref().and_then(crate::gantt::parse_date);
-            gantt_svg(&mut s, doc, gb, gb_t, &lay, p, today);
+            gantt_svg(&mut s, doc, gb, gb_t, &lay, p, t, today);
         }
         if let Some(m) = &gb.matrix {
             matrix_svg(&mut s, doc, gb, m, p, t);
@@ -917,6 +917,7 @@ fn gantt_svg(
     g: &layout::GanttBox,
     lay: &Layout,
     p: &Palette,
+    t: Theme,
     today: Option<i64>,
 ) {
     let (ox, oy) = (
@@ -1041,12 +1042,17 @@ fn gantt_svg(
     // task names, and who does each
     for (k, id) in g.rows.iter().enumerate() {
         let Some(node) = doc.node(id) else { continue };
+        // (after the platform's chip, when it has one)
+        let chip_w = node.platform.as_deref().map_or(0.0, |pf| {
+            text::width(&crate::gantt::platform_name(pf), 10.5) + 16.0
+        });
         let owner = node
             .owner
             .as_deref()
             .map(|o| {
                 format!(
-                    r#"<tspan dx="8" font-size="12" fill="{}">{}</tspan>"#,
+                    r#"<tspan dx="{}" font-size="12" fill="{}">{}</tspan>"#,
+                    n(8.0 + chip_w),
                     p.muted,
                     esc(o)
                 )
@@ -1073,15 +1079,36 @@ fn gantt_svg(
                 p.muted
             );
         }
+        let x = ox + indent + if group { layout::GANTT_FOLD } else { 0.0 };
+        // the platform it is for: a chip by its name, the same colour on every chart
+        let chip = node.platform.as_deref().map(|pf| {
+            let name = crate::gantt::platform_name(pf);
+            let k = theme::tint(platform_color(pf), t);
+            let (bg, fg) = k.map_or((p.node_stroke.to_string(), p.fg.to_string()), |k| (k.soft, k.accent));
+            let at = x + text::width(node.display(), 13.0) + 6.0;
+            let w = chip_w - 6.0;
+            format!(
+                r#"<g class="dg-platform"><rect x="{}" y="{}" width="{}" height="16" rx="8" fill="{bg}"/><text x="{}" y="{}" font-size="10.5" font-weight="600" fill="{fg}">{}</text></g>"#,
+                n(at),
+                n(cy - 8.0),
+                n(w),
+                n(at + 5.0),
+                n(cy + 3.8),
+                esc(&name)
+            )
+        });
         let _ = write!(
             s,
             r#"<text x="{}" y="{}" font-size="13" fill="{}"{}>{}{owner}</text>"#,
-            n(ox + indent + if group { layout::GANTT_FOLD } else { 0.0 }),
+            n(x),
             n(cy + 4.5),
             p.fg,
             if group { r#" font-weight="600""# } else { "" },
             esc(node.display())
         );
+        if let Some(c) = chip {
+            s.push_str(&c);
+        }
         // a task that opens a canvas: a badge at the end of its name that opens
         // it, with how many risks it holds (in the worst one's colour)
         if let Some(c) = node.canvas.as_deref().and_then(|c| doc.canvas(c)) {
@@ -1529,6 +1556,20 @@ fn risk_svg(
 }
 
 /// A gantt task: a bar, with its duration inside when it fits.
+/// A platform's colour, the same on every chart: web blue, iOS gray,
+/// Android green, others from the rest of the palette.
+fn platform_color(id: &str) -> &'static str {
+    match id {
+        "web" => "blue",
+        "ios" | "ipados" | "macos" => "gray",
+        "android" => "green",
+        _ => {
+            const REST: [&str; 5] = ["purple", "teal", "orange", "pink", "yellow"];
+            REST[id.bytes().map(usize::from).sum::<usize>() % REST.len()]
+        }
+    }
+}
+
 fn task_svg(
     s: &mut String,
     node: &Node,
@@ -1657,6 +1698,24 @@ fn task_svg(
             n(r.y),
             n(r.w),
             n(r.h)
+        );
+        return;
+    }
+    if group.is_none() && !crate::gantt::estimated(node) {
+        // no length given yet: an outline, and saying so
+        let _ = write!(
+            s,
+            r#"<g class="dg-node dg-task dg-unestimated" data-id="{}">{title}<rect class="dg-shape" x="{}" y="{}" width="{}" height="{}" rx="5" fill="{}" fill-opacity="0.15" stroke="{}" stroke-width="1.5" stroke-dasharray="4 3"/><text x="{}" y="{}" font-size="11" font-style="italic" fill="{}">no length yet</text></g>"#,
+            esc(&node.id),
+            n(r.x),
+            n(r.y),
+            n(r.w.max(14.0)),
+            n(r.h),
+            fill,
+            stroke,
+            n(r.x + r.w.max(14.0) + 6.0),
+            n(r.cy() + 4.0),
+            p.muted
         );
         return;
     }

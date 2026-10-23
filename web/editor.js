@@ -2452,6 +2452,7 @@
           ["Starts after…", function () { afterMenu(t.id); }, "Or draw an arrow from the task it waits for (in any chart)"],
           tk.milestone ? null : ["Progress…", function () { askProgress(t.id); }, "How much is done, like 60%"],
           ["Owner…", function () { askOwner(t.id); }, "Who does it"],
+          ["Platform…", function () { platformMenu(t.id); }, tk.platform ? "Now " + platformName(tk.platform) : "Web, iOS, Android or another: a chip by its name"],
           [tk.milestone ? "Make it a task" : "Make it a milestone", function () { applyOps([{ op: "update_node", id: t.id, milestone: !tk.milestone }]); }, tk.milestone ? "A bar again" : "A point in time, drawn as a diamond"],
           ["Colour…", function () { colourMenu(t.id, "update_node", tk.color); }, "The colour of its bar"],
           tk.start ? ["Follow the task before", function () { applyOps([{ op: "update_node", id: t.id, start: "" }]); }, "Drop its fixed date"] : null,
@@ -4583,6 +4584,20 @@
         var m = /^(\d+(?:\.\d+)?)\s*%?$/.exec(v);
         if (!m || +m[1] > 100) { flash("Write a percentage from 0 to 100, like 60%", true); return; }
         applyOps([{ op: "update_node", id: id, done: +m[1] }]);
+      });
+    }
+    /* Which platform a task is for: shown as a chip by its name. */
+    function platformName(p) { return { ios: "iOS", android: "Android", web: "Web", macos: "macOS", ipados: "iPadOS", api: "API" }[p] || p.charAt(0).toUpperCase() + p.slice(1).replace(/-/g, " "); }
+    function platformMenu(id) {
+      var cur = node(id).platform || "";
+      var set = function (v) { applyOps([{ op: "update_node", id: id, platform: v }]); };
+      setTimeout(function () {
+        openMenu(st.menuAt, ["web", "ios", "android"].map(function (p) {
+          return [(p === cur ? "✓ " : "\u2003") + platformName(p), function () { set(p); }];
+        }).concat([
+          [(cur && ["web", "ios", "android"].indexOf(cur) < 0 ? "✓ " + platformName(cur) + "… " : "\u2003Another…"), function () { askAt(st.menuAt, cur, "Platform (desktop, API…)", function (v) { set(v.trim()); }); }],
+          cur ? ["\u2003None", function () { set(""); }] : null
+        ]).filter(Boolean));
       });
     }
     function askOwner(id) {
