@@ -607,7 +607,10 @@ fn draw(doc: &Document, opts: &RenderOptions, def: Option<crate::model::ThemeDef
                 });
                 let group = crate::gantt::has_parts(doc, &node.id)
                     .then(|| (node.collapsed, crate::gantt::done_of(doc, &node.id)));
-                task_svg(&mut s, node, nb, p, t, change, room, group)
+                // its hover text: when, how it stands, whose it is
+                let today = opts.today.as_deref().and_then(crate::gantt::parse_date);
+                let tip = crate::gantt::tooltip(doc, &node.id, today);
+                task_svg(&mut s, node, nb, p, t, change, room, group, tip)
             }
             _ if nb.risk => risk_svg(&mut s, doc, node, nb, p, t, change),
             _ if nb.datum => datum_svg(&mut s, doc, node, nb, p, change),
@@ -1536,8 +1539,12 @@ fn task_svg(
     room: Option<f64>,
     // a group of tasks: whether it is folded, and how much of it is done
     group: Option<(bool, Option<f64>)>,
+    tip: Option<String>,
 ) {
     let r = nb.rect;
+    let title = tip
+        .map(|t| format!("<title>{}</title>", esc(&t)))
+        .unwrap_or_default();
     let k = theme::tint(node.color.as_deref().unwrap_or("blue"), t);
     let (mut fill, mut stroke) = match &k {
         Some(k) => (k.accent.clone(), k.accent.clone()),
@@ -1556,7 +1563,7 @@ fn task_svg(
     if node.milestone {
         let _ = write!(
             s,
-            r#"<g class="dg-node dg-task dg-milestone" data-id="{}"><path class="dg-shape" d="M{},{} L{},{} L{},{} L{},{} Z" fill="{}" stroke="{}" stroke-width="{}"/></g>"#,
+            r#"<g class="dg-node dg-task dg-milestone" data-id="{}">{title}<path class="dg-shape" d="M{},{} L{},{} L{},{} L{},{} Z" fill="{}" stroke="{}" stroke-width="{}"/></g>"#,
             esc(&node.id),
             n(r.cx()),
             n(r.y),
@@ -1612,7 +1619,7 @@ fn task_svg(
         let (y, h) = (r.y + 2.0, 7.0);
         let _ = write!(
             s,
-            r#"<g class="dg-node dg-task dg-task-group" data-id="{}"><path class="dg-shape" d="M{},{} H{} V{} L{},{} L{},{} H{} L{},{} L{},{} Z" fill="{}" fill-opacity="{}" stroke="{}" stroke-width="1"/>"#,
+            r#"<g class="dg-node dg-task dg-task-group" data-id="{}">{title}<path class="dg-shape" d="M{},{} H{} V{} L{},{} L{},{} H{} L{},{} L{},{} Z" fill="{}" fill-opacity="{}" stroke="{}" stroke-width="1"/>"#,
             esc(&node.id),
             n(r.x),
             n(y),
@@ -1655,7 +1662,7 @@ fn task_svg(
     }
     let _ = write!(
         s,
-        r#"<g class="dg-node dg-task" data-id="{}"><rect class="dg-shape" x="{}" y="{}" width="{}" height="{}" rx="5" fill="{}" stroke="{}" stroke-width="1"{}/>"#,
+        r#"<g class="dg-node dg-task" data-id="{}">{title}<rect class="dg-shape" x="{}" y="{}" width="{}" height="{}" rx="5" fill="{}" stroke="{}" stroke-width="1"{}/>"#,
         esc(&node.id),
         n(r.x),
         n(r.y),

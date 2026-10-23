@@ -72,6 +72,9 @@ try {
     assert.ok(await p.locator('.dg-node[data-id="@dash/rm/web:storefront-build"]').count() > 0, "its phases");
     // the folded Checkout shows its beta on its row
     assert.ok(await p.locator('.dg-node[data-id="@dash/rm/web:checkout-beta"]').count() > 0);
+    // a milestone says what it is and when, on hover
+    await p.locator('.dg-node[data-id="@dash/rm/web:checkout-beta"]').hover(); await sleep(700);
+    assert.match(await p.locator(".dge-tip").textContent(), new RegExp("Checkout · Beta.*Milestone · \\w{3} \\d+ \\w{3} 20\\d\\d"));
     if (process.env.SHOTS) await p.screenshot({ path: join(process.env.SHOTS, "groups-roadmap-" + scheme + ".png") });
 
     if (scheme === "light") {
@@ -80,6 +83,10 @@ try {
       await p.locator('button[title="Fit (F)"]').click(); await sleep(300);
       await p.locator('.dg-node[data-id="web_link"]').dblclick(); await sleep(700);
       assert.equal(await p.locator(".dge-crumbs").textContent(), "Shop/Web shop");
+      // on the board too
+      await p.locator('.dg-node[data-id="storefront-beta"]').hover(); await sleep(700);
+      assert.match(await p.locator(".dge-tip").textContent(), /Storefront · Beta.*Milestone · /);
+      await p.mouse.move(5, 400); await sleep(200);
       // Checkout unfolds from its mark
       assert.equal(await p.locator('.dg-node[data-id="checkout-store-approval"]').count(), 0);
       await p.locator('.dg-gfold[data-node="checkout"]').click(); await sleep(500);

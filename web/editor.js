@@ -6040,11 +6040,17 @@
       var g = e.target.closest && e.target.closest(".dg-node");
       if (!g || g === tipFor || st.drag || e.target.closest(".dg-pin, .dg-link, .dg-open, .dge-ctl")) return;
       var n = node(g.getAttribute("data-id"));
-      if (!n) return;
       // the drawing's own hover text (a table row's cells…) goes in the card instead
       var t = g.querySelector(":scope > title");
       if (t) { g.setAttribute("data-summary", t.textContent); t.remove(); }
-      var f = nodeFacts(n, g.getAttribute("data-summary"));
+      var summary = g.getAttribute("data-summary"), f;
+      if (g.classList.contains("dg-task") && summary) {
+        // a gantt task or milestone (on the board or a summary): its name, then when it is and how it stands
+        var lines = summary.split("\n");
+        f = n ? nodeFacts(n, null) : { body: "", meta: [] };
+        f = { title: lines[0], body: f.body, meta: lines.slice(1).concat(f.meta.filter(function (m) { return /open comment/.test(m); })) };
+      } else if (n) f = nodeFacts(n, summary);
+      else return;
       if (!f.body && !f.meta.length) return;
       hideTip();
       tipFor = g;

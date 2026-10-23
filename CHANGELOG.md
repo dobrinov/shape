@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.79.0 — 2026-10-23
+
+- **Gantt bars and milestones say what they are on hover**, on the board and on summaries: the name with whose it is (*Web shop · Checkout · Beta*), the day (*Milestone · Wed 2 Dec 2026*) or a bar's first and last day and length, the forecast when it is later (*forecast Sun 1 Nov 2026 (+4d)*), how it stands (late, behind, pushed back, done), how much is done, who does it and what it waits for. Exported SVGs carry the same text.
+
 ## 0.78.0 — 2026-10-23
 
 - **A new board opens straight away.** Opening Shape without a board (the app, or `shape` with no file) no longer asks where to save it first: you start drawing at once. Your work is kept as a draft from the first change, and the draft opens again if Shape is closed before it is saved.

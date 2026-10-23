@@ -74,6 +74,84 @@ pub fn short_date(z: i64) -> String {
     format!("{} {d}", MONTHS[(m - 1) as usize])
 }
 
+/// "Wed 28 Oct 2026": a day as people read it.
+pub fn long_date(z: i64) -> String {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    const DAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    let (y, m, d) = civil(z);
+    format!("{} {d} {} {y}", DAYS[weekday(z) as usize], MONTHS[(m - 1) as usize])
+}
+
+/// A task's hover text: its name (with the groups it is in), then when it
+/// is (a milestone's day; a bar's first and last), its forecast when that
+/// is later, how it stands, how much is done, who does it and what it waits
+/// for. As of `today` (days since 1970) when given.
+pub fn tooltip(doc: &Document, id: &str, today: Option<i64>) -> Option<String> {
+    let n = doc.node(id)?;
+    let chart = n.group.as_deref()?;
+    let mut facts = Vec::new();
+    let sched = schedule(doc, chart);
+    let &(_, start, len) = sched.tasks.iter().find(|t| doc.nodes[t.0].id == id)?;
+    let track = today
+        .map(|t| track(doc, chart, t))
+        .unwrap_or_default()
+        .into_iter()
+        .find(|t| t.id == id);
+    match sched.origin {
+        Some(o) => {
+            let from = o + start.floor() as i64;
+            let to = from + (len.ceil() as i64 - 1).max(0);
+            facts.push(if n.milestone {
+                format!("Milestone · {}", long_date(from))
+            } else if to > from {
+                format!("{} – {} · {}", long_date(from), long_date(to), format_days(len))
+            } else {
+                format!("{} · {}", long_date(from), format_days(len))
+            });
+        }
+        None if n.milestone => facts.push("Milestone".into()),
+        None => facts.push(format_days(len)),
+    }
+    if let Some(t) = &track {
+        if t.slip > 0 {
+            let day = parse_date(&t.forecast_end).unwrap_or(0);
+            facts.push(format!("forecast {} (+{}d)", long_date(day), t.slip));
+        }
+        if t.status != "upcoming" {
+            facts.push(t.status.to_string());
+        }
+    }
+    let parts = doc
+        .nodes
+        .iter()
+        .filter(|c| c.under.as_deref() == Some(id) && c.group == n.group)
+        .count();
+    if parts > 0 {
+        facts.push(format!("{parts} {}", if parts == 1 { "part" } else { "parts" }));
+    }
+    match done_of(doc, id) {
+        Some(d) if d >= 100.0 && !facts.iter().any(|f| f == "done") => facts.push("done".into()),
+        Some(d) if d >= 100.0 => {}
+        Some(d) if !n.milestone => facts.push(format!("{d}% done")),
+        _ => {}
+    }
+    facts.dedup();
+    if let Some(o) = &n.owner {
+        facts.push(format!("owner: {o}"));
+    }
+    if !n.after.is_empty() {
+        let names: Vec<&str> = n
+            .after
+            .iter()
+            .map(|a| doc.node(a).map(|t| t.display()).unwrap_or(a))
+            .collect();
+        facts.push(format!("after {}", names.join(", ")));
+    }
+    Some(format!("{}\n{}", full_label(doc, n), facts.join(" · ")))
+}
+
 /// 0 = Monday.
 pub fn weekday(z: i64) -> i64 {
     (z + 3).rem_euclid(7)
@@ -305,17 +383,21 @@ pub fn folded_into(doc: &Document, n: &Node) -> Option<String> {
 
 /// A task's name with the groups it is in: *Mobile app · Beta*.
 pub fn full_label(doc: &Document, n: &Node) -> String {
-    let mut out = vec![n.display().to_string()];
+    let mut out = n.display().to_string();
     let mut cur = n.under.as_deref();
+    let mut steps = 0;
     while let Some(p) = cur.and_then(|u| doc.node(u)).filter(|p| p.group == n.group) {
-        out.push(p.display().to_string());
+        // (a name that says whose it is already: once)
+        if !out.starts_with(&format!("{} · ", p.display())) {
+            out = format!("{} · {out}", p.display());
+        }
         cur = p.under.as_deref();
-        if out.len() > doc.nodes.len() {
+        steps += 1;
+        if steps > doc.nodes.len() {
             break;
         }
     }
-    out.reverse();
-    out.join(" · ")
+    out
 }
 
 /// How deep task `n` is among its chart's groups (0: at the top).
@@ -893,6 +975,17 @@ mod tests {
         // a chart removed takes its tasks with it
         crate::ops::apply(&mut doc, &ops(r#"{"op":"remove","id":"g"}"#)).unwrap();
         assert!(doc.nodes.is_empty());
+        // hover text: whose it is, when, how it stands
+        let d = crate::dsl::parse("gantt g: Shop [start: 2026-10-05] {\n  Mobile app\n    Build [2w, done: 50%, owner: ana]\n    Beta [2026-10-28, milestone, after: mobile-app-build]\n}\n").unwrap();
+        let today = parse_date("2026-10-25");
+        assert_eq!(
+            tooltip(&d, "mobile-app-beta", today).unwrap(),
+            "Mobile app · Beta\nMilestone · Wed 28 Oct 2026 · forecast Sun 1 Nov 2026 (+4d) · pushed back · after Build"
+        );
+        assert_eq!(
+            tooltip(&d, "mobile-app-build", today).unwrap(),
+            "Mobile app · Build\nMon 5 Oct 2026 – Sun 18 Oct 2026 · 2w · forecast Sat 31 Oct 2026 (+13d) · late · 50% done · owner: ana"
+        );
         // a mistake on a chart's first line is that line's only
         let (d, errors) = crate::dsl::parse_lenient(
             "gantt p: Plan [tags: delivery] {\n  Build [1w]\n  Beta [milestone]\n}\n",

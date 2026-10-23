@@ -14,7 +14,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
 const bin = join(root, "target", "debug", "shape");
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const port = 6590 + Math.floor(Math.random() * 100);
+const port = 6700 + Math.floor(Math.random() * 90); // (not 6665–6669: Chrome blocks them)
 const dir = mkdtempSync(join(tmpdir(), "diagram-e2e-"));
 const file = join(dir, "board.shape");
 writeFileSync(file, "title: Launch\ntype: project\n\napi: Orders API [tags: tech, detail: Rust]\nbeta: Open beta [tags: delivery, detail: 28 Oct]\nnote: A loose note\napi -> beta\n\nrisks r: Risks {\n  Fraud [p: 3, i: 4]\n}\n");
