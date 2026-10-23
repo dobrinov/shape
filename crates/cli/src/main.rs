@@ -5,6 +5,7 @@ mod export;
 mod history;
 mod log;
 mod png;
+mod prefs;
 mod server;
 mod skills;
 mod update;
@@ -25,7 +26,8 @@ pub const HELP: &str = r#"Shape — one board for the whole project, as text, wi
 
 USAGE
   shape [FILE]                       open FILE in the editor, in its own window (created if
-                                     missing; no FILE asks where to save a new board)
+                                     missing; no FILE: a new board, saved where you say
+                                     once there is something on it)
   shape new FILE [--template flow|architecture|board|product|project]   start a board from a template
                                      (product and project boards come with perspectives)
   --canvas ID[/ID…]                  with any command: work on that canvas inside the board
@@ -857,23 +859,19 @@ fn run(args: Args) -> Result<ExitCode, String> {
             let file = match args.pos.first() {
                 Some(f) => PathBuf::from(f),
                 None => {
-                    // from a terminal or a double-click on the app: ask where
-                    // the new board goes (not from scripts and tests)
+                    // from a terminal or a double-click on the app: a draft,
+                    // and the editor asks where it goes once there is
+                    // something on it (scripts and tests: untitled.shape here)
                     let terminal = std::io::stdin().is_terminal();
-                    let asked = native
-                        .as_ref()
-                        .filter(|_| terminal || args.flag("--idle-exit"));
-                    match asked {
-                        Some(n) => match n.ask_new_board(&window::start_dir(terminal)) {
-                            Some(f) => f,
-                            None => return ok, // cancelled
-                        },
-                        None => PathBuf::from(untitled()),
+                    if !matches!(open, Open::Nowhere) && (terminal || args.flag("--idle-exit")) {
+                        prefs::draft()?
+                    } else {
+                        PathBuf::from(untitled())
                     }
                 }
             };
             if !file.exists() {
-                std::fs::write(&file, "idea: Start here\nidea -> next: then\n")
+                std::fs::write(&file, prefs::STARTER)
                     .map_err(|e| format!("{}: {e}", file.display()))?;
                 let at = std::fs::canonicalize(&file).unwrap_or_else(|_| file.clone());
                 eprintln!("created {}", at.display());

@@ -5926,6 +5926,11 @@
         return button;
       },
       flash: flash,
+      // for the app around the editor: a dialog like the editor's, a toast with an action
+      dialog: function (title, content, actions) { showModal(title, content, actions); },
+      closeDialog: function () { closeModal(); },
+      offer: function (msg, label, act) { flashAction(msg, label, act); },
+      h: h,
       on: function (name, fn) { (listeners[name] = listeners[name] || []).push(fn); return api; },
       destroy: function () {
         document.removeEventListener("keydown", onKey);

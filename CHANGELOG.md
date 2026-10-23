@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.78.0 — 2026-10-23
+
+- **A new board opens straight away.** Opening Shape without a board (the app, or `shape` with no file) no longer asks where to save it first: you start drawing at once. Your work is kept as a draft from the first change, and the draft opens again if Shape is closed before it is saved.
+- **Shape asks once there is something on it.** After a few changes, a small bar offers *Save…* (ignore it to keep playing). ⌘S asks too, and so does closing the window: *Save…*, *Discard* or *Cancel*. Saving asks for the board's name and its folder (*Change…* opens the folder picker).
+- **Always save new boards there?** After your first save, Shape asks whether to keep that folder for new boards. If yes, later new boards only ask for a name. Choosing another folder asks again.
+
 ## 0.77.0 — 2026-10-23
 
 - **A comment about several elements.** With the comment tool (C), ⇧-click the elements a comment is about, then click one of them. Or select them and right-click → *Comment on these…*. The comment names them all (*Comment on Database and Orders API*), and opening its thread highlights each one. In the file it is `comment on api, db: …`. Delete one of them and the comment stays on the others.

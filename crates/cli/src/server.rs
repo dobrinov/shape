@@ -252,16 +252,16 @@ pub fn serve(
     }));
     crate::update::start();
     match show {
-        Show::None => listen(server, file, display, ai, idle_exit),
+        Show::None => listen(server, file, display, ai, idle_exit, false),
         Show::Browser => {
             open_browser(&url);
-            listen(server, file, display, ai, idle_exit)
+            listen(server, file, display, ai, idle_exit, false)
         }
         Show::Window(window) => {
             let name = crate::window::board_name(&file);
             // the window's own lifetime ends the process: no idle timer
             let listener = std::thread::spawn(move || {
-                if let Err(e) = listen(server, file, display, ai, false) {
+                if let Err(e) = listen(server, file, display, ai, false, true) {
                     eprintln!("shape: {e}");
                     std::process::exit(1);
                 }
@@ -279,12 +279,59 @@ pub fn serve(
 }
 
 /// Answer the editor's requests until the process ends.
+/// For a new board not saved anywhere yet (a draft): where it would go
+/// (the folder chosen for new boards, else Documents), and whether there
+/// is a folder picker. None for a board with a file of its own.
+fn new_board(file: &Path, picker: bool) -> Option<serde_json::Value> {
+    if !crate::prefs::is_draft(file) {
+        return None;
+    }
+    let always = crate::prefs::new_board_dir();
+    let dir = always
+        .clone()
+        .unwrap_or_else(|| crate::window::start_dir(false));
+    Some(json!({
+        "dir": dir.display().to_string(),
+        "always": always.is_some(),
+        "picker": picker,
+    }))
+}
+
+/// Save the draft `file` as `{name}.shape` in `{dir}`, and drop the draft.
+fn save_as(file: &Path, v: &serde_json::Value) -> Result<PathBuf, (u16, String)> {
+    if !crate::prefs::is_draft(file) {
+        return Err((409, "this board is saved already".into()));
+    }
+    let name = v["name"]
+        .as_str()
+        .and_then(crate::prefs::board_file_name)
+        .ok_or((400, "give the board a name".to_string()))?;
+    let dir = v["dir"]
+        .as_str()
+        .map(PathBuf::from)
+        .filter(|d| d.is_dir())
+        .ok_or((400, "that folder does not exist".to_string()))?;
+    let to = dir.join(&name);
+    if to.exists() {
+        return Err((
+            409,
+            format!("{name} is there already: give it another name"),
+        ));
+    }
+    let text = std::fs::read_to_string(file).map_err(|e| (500, e.to_string()))?;
+    std::fs::write(&to, text).map_err(|e| (500, format!("{}: {e}", to.display())))?;
+    let _ = std::fs::remove_file(file);
+    Ok(std::fs::canonicalize(&to).unwrap_or(to))
+}
+
 fn listen(
     server: Server,
     file: PathBuf,
     display: String,
     ai: Option<String>,
     idle_exit: bool,
+    // in a window: a native folder picker for new boards
+    picker: bool,
 ) -> Result<(), String> {
     // started from a double-click (`shape install-app`): no terminal to stop
     // it, so it stops once the editor tabs are gone (they check in every 30s)
@@ -312,8 +359,9 @@ fn listen(
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         // git's name only: without one, the editor asks who you are
         .filter(|s| !s.is_empty());
-    let root = board_root(&file);
-    let start = (file.clone(), display.clone());
+    // (a new board's draft, once saved, is the board from then on)
+    let mut root = board_root(&file);
+    let mut start = (file.clone(), display.clone());
     for mut req in server.incoming_requests() {
         if let Ok(mut t) = heard.lock() {
             *t = std::time::Instant::now();
@@ -423,8 +471,76 @@ fn listen(
                 respond_json(
                     req,
                     200,
-                    json!({ "path": display, "rel": rel_to(&root, &file), "name": name, "source": source, "themes": themes, "mtime": mtime(&file).to_string(), "author": author, "format": crate::format_for(&display), "version": env!("CARGO_PKG_VERSION") }),
+                    json!({ "path": display, "rel": rel_to(&root, &file), "name": name, "source": source, "themes": themes, "mtime": mtime(&file).to_string(), "author": author, "format": crate::format_for(&display), "version": env!("CARGO_PKG_VERSION"), "new": new_board(&file, picker) }),
                 );
+            }
+            // a new board's draft gets a name and a folder: it is that file from now on
+            (Method::Post, "/api/save-as") => {
+                let mut body = String::new();
+                let _ = req.as_reader().read_to_string(&mut body);
+                let v: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
+                match save_as(&file, &v) {
+                    Ok(to) => {
+                        let shown = to.display().to_string();
+                        crate::log::event("save-as", json!({ "file": shown }));
+                        root = board_root(&to);
+                        start = (to.clone(), shown.clone());
+                        respond_json(
+                            req,
+                            200,
+                            json!({ "ok": true, "path": shown, "rel": rel_to(&root, &to), "name": to.file_name().map(|n| n.to_string_lossy().into_owned()), "mtime": mtime(&to).to_string() }),
+                        );
+                    }
+                    Err((code, e)) => respond_json(req, code, json!({ "ok": false, "error": e })),
+                }
+            }
+            // closing a draft without saving it
+            (Method::Post, "/api/discard") => {
+                if crate::prefs::is_draft(&file) {
+                    let _ = std::fs::remove_file(&file);
+                    crate::log::event("discard", json!({}));
+                    respond_json(req, 200, json!({ "ok": true }));
+                } else {
+                    respond_json(
+                        req,
+                        409,
+                        json!({ "ok": false, "error": "only a new board's draft is discarded" }),
+                    );
+                }
+            }
+            // the folder new boards are saved in from now on (null: ask each time)
+            (Method::Post, "/api/new-board-folder") => {
+                let mut body = String::new();
+                let _ = req.as_reader().read_to_string(&mut body);
+                let v: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
+                let dir = v["dir"].as_str().map(PathBuf::from);
+                match crate::prefs::set_new_board_dir(dir.as_deref()) {
+                    Ok(()) => respond_json(req, 200, json!({ "ok": true })),
+                    Err(e) => respond_json(req, 500, json!({ "ok": false, "error": e })),
+                }
+            }
+            (Method::Post, "/api/pick-folder") => {
+                let mut body = String::new();
+                let _ = req.as_reader().read_to_string(&mut body);
+                let v: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
+                let from = v["dir"]
+                    .as_str()
+                    .map(PathBuf::from)
+                    .filter(|d| d.is_dir())
+                    .unwrap_or_else(|| crate::window::start_dir(false));
+                match crate::window::pick_folder(&from) {
+                    Some(Some(d)) => respond_json(
+                        req,
+                        200,
+                        json!({ "ok": true, "dir": d.display().to_string() }),
+                    ),
+                    Some(None) => respond_json(req, 200, json!({ "ok": false, "cancelled": true })),
+                    None => respond_json(
+                        req,
+                        501,
+                        json!({ "ok": false, "error": "no folder picker here" }),
+                    ),
+                }
             }
             (Method::Get, "/api/ai") => respond_json(
                 req,
@@ -548,9 +664,7 @@ fn listen(
                     // the session log: what this save changed
                     let before = std::fs::read_to_string(&file).unwrap_or_default();
                     let changes = match (shape_core::parse(&before), shape_core::parse(&t)) {
-                        (Ok(a), Ok(b)) => {
-                            shape_core::diff::summary(&a, &b)
-                        }
+                        (Ok(a), Ok(b)) => shape_core::diff::summary(&a, &b),
                         _ => String::new(),
                     };
                     if before != t {

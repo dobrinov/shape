@@ -148,7 +148,7 @@ make install        # builds web/pkg (WASM), then `cargo install --path crates/c
 
 A plain `cargo install --path crates/cli` also works. Its `build.rs` runs wasm-pack whenever the WASM bundle is missing or out of date. The editor's native window uses the system webview (WebKit on macOS, WebView2 on Windows 10/11, WebKitGTK on Linux: `sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev` to build there); `--no-default-features` builds without it, and boards then open in the browser. The Linux release binaries are built that way, so they run without WebKitGTK; build from source for the window on Linux.
 
-**The editor:** `shape FILE` opens the board in its own window; closing the window saves and stops. `shape` with no file asks where to save a new board. `--browser` opens a browser tab instead (as before), `--no-open` just runs the server. Where no window can be made (no display), the browser opens.
+**The editor:** `shape FILE` opens the board in its own window; closing the window saves and stops. `shape` with no file opens a new board straight away (kept as a draft, so nothing is lost); after a few changes, or on ⌘S or closing, it asks for a name and a folder, and whether to always save new boards there. `--browser` opens a browser tab instead (as before), `--no-open` just runs the server. Where no window can be made (no display), the browser opens.
 
 **Open boards from Finder (or Files, or Explorer):**
 
@@ -164,7 +164,8 @@ After this, `.shape` files get their own document icon, and double-clicking one 
 
 ```
 shape [FILE]                       open FILE in the editor, in its own window (created if
-                                   missing; no FILE asks where to save a new board)
+                                   missing; no FILE: a new board, saved where you say
+                                   once there is something on it)
                                    --browser: in a browser tab · --no-open: the server only
 shape new FILE [--template flow|architecture|board]
 

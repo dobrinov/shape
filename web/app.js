@@ -63,6 +63,10 @@
   function serverMode(wasm) {
     var mtime = null, saving = false, pending = null, timer = null, lastSaved = null, rel = "";
     var saved = Promise.resolve();
+    // a new board (`shape` with no file): a draft until it gets a name and a
+    // folder; after a few changes Shape offers to save it, ⌘S and closing ask
+    var fresh = null, changes = 0, offered = 0;
+    function savedStatus() { status(fresh ? "Draft · not saved yet" : "Saved"); }
     function save(text) {
       if (saving) { pending = text; return; }
       saving = true;
@@ -74,16 +78,94 @@
         if (!res.ok) throw new Error(res.error);
         mtime = res.mtime;
         lastSaved = text;
-        status("Saved");
+        savedStatus();
         if (pending != null) { var p = pending; pending = null; save(p); }
       }).catch(function (e) { saving = false; status("Not saved: " + e.message, "error"); });
     }
     /* The native window calls this before it closes: save what is pending, resolve once saved. */
-    window.diagramFlush = function () {
+    function flush() {
       clearTimeout(timer); timer = null;
       if (editor && editor.getSource() !== lastSaved) save(editor.getSource());
       return (function wait() { return saved.then(function () { return saving || pending != null ? wait() : null; }); })();
+    }
+    window.diagramFlush = function () {
+      // a draft with work on it: ask before the window closes (it waits for us)
+      if (fresh && changes && window.ipc) {
+        window.ipc.postMessage("wait");
+        askOnClose();
+        return new Promise(function () {});
+      }
+      return flush();
     };
+    function closeWindow() { flush().then(function () { window.ipc.postMessage("close"); }); }
+    function askOnClose() {
+      var h = editor.h;
+      editor.dialog("Save this board?", h("p", { class: "dge-muted" }, ["It is not saved anywhere yet. Discard it, or give it a name and a folder."]), [
+        h("button", { class: "danger", onclick: function () {
+          fetch("api/discard", { method: "POST" }).catch(function () {}).then(function () { window.ipc.postMessage("close"); });
+        } }, ["Discard"]),
+        h("button", { onclick: function () { editor.closeDialog(); window.ipc.postMessage("resume"); } }, ["Cancel"]),
+        h("button", { class: "primary", onclick: function () { saveAs(closeWindow); } }, ["Save…"])
+      ]);
+    }
+    /* `/Users/ana/Documents/Boards` → `~/Documents/Boards`, for reading. */
+    function shortPath(p) { return p.replace(/^\/Users\/[^/]+|^\/home\/[^/]+|^[A-Za-z]:\\Users\\[^\\]+/, "~"); }
+    /* Name the draft and choose its folder; `then` runs once it is saved. */
+    function saveAs(then) {
+      var h = editor.h, doc = editor.getDocument(), dir = fresh.dir;
+      var name = h("input", { class: "dge-input", value: doc.title || "Untitled", placeholder: "Name of the board" });
+      var where = h("code", { class: "dge-save-dir", title: dir }, [shortPath(dir)]);
+      var typed = fresh.picker ? null : h("input", { class: "dge-input", value: dir });
+      var err = h("p", { class: "dge-error", hidden: true });
+      var change = fresh.picker ? h("button", { onclick: function () {
+        fetch("api/pick-folder", { method: "POST", body: JSON.stringify({ dir: dir }) }).then(function (r) { return r.json(); }).then(function (v) {
+          if (v.ok) { dir = v.dir; where.textContent = shortPath(dir); where.title = dir; }
+        });
+      } }, ["Change…"]) : null;
+      var go = function () {
+        var d = typed ? typed.value.trim() : dir;
+        flush().then(function () {
+          return fetch("api/save-as", { method: "POST", body: JSON.stringify({ name: name.value, dir: d }) }).then(function (r) { return r.json(); });
+        }).then(function (res) {
+          if (!res.ok) { err.textContent = res.error.charAt(0).toUpperCase() + res.error.slice(1); err.hidden = false; return; }
+          // a folder not kept for new boards yet: ask whether to keep it
+          var ask = !fresh.always || d !== fresh.dir;
+          fresh = null;
+          rel = res.rel || res.name;
+          mtime = res.mtime;
+          fileEl.textContent = res.path;
+          fileEl.title = res.path;
+          document.title = res.name + " — Shape";
+          savedStatus();
+          editor.closeDialog();
+          if (ask) askAlways(d, then); else if (then) then();
+        }).catch(function (e) { err.textContent = e.message; err.hidden = false; });
+      };
+      name.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+      editor.dialog("Save this board", h("div", { class: "dge-persp-form" }, [
+        h("label", {}, [h("span", {}, ["Name"]), name]),
+        h("label", {}, [h("span", {}, ["Folder"]), typed || h("div", { class: "dge-save-where" }, [where, change])]),
+        err
+      ]), [
+        h("button", { onclick: function () { editor.closeDialog(); if (then === closeWindow) window.ipc.postMessage("resume"); } }, ["Cancel"]),
+        h("button", { class: "primary", onclick: go }, ["Save"])
+      ]);
+      setTimeout(function () { name.focus(); name.select(); }, 0);
+    }
+    function askAlways(dir, then) {
+      var h = editor.h;
+      var keep = function (d) {
+        fetch("api/new-board-folder", { method: "POST", body: JSON.stringify({ dir: d }) }).catch(function () {}).then(function () {
+          editor.closeDialog();
+          if (d) editor.flash("New boards go in " + shortPath(d) + " from now on");
+          if (then) then();
+        });
+      };
+      editor.dialog("Save new boards here?", h("p", { class: "dge-muted" }, ["Always save new boards in " + shortPath(dir) + ", and only ask for their name?"]), [
+        h("button", { onclick: function () { keep(null); } }, ["Ask each time"]),
+        h("button", { class: "primary", onclick: function () { keep(dir); } }, ["Always here"])
+      ]);
+    }
     /* Follow a link to another board: save what is pending, then open it here. */
     function openBoard(path, id) {
       var to = joinPath(rel, path);
@@ -119,9 +201,12 @@
       rel = f.rel || f.name;
       mtime = f.mtime;
       lastSaved = f.source;
-      fileEl.textContent = f.path;
-      fileEl.title = f.path;
-      document.title = f.name + " — Shape";
+      fresh = f.new || null;
+      fileEl.textContent = fresh ? "Untitled · not saved yet" : f.path;
+      fileEl.title = fresh ? "A draft: Save (⌘S) gives it a name and a folder" : f.path;
+      document.title = (fresh ? "Untitled" : f.name) + " — Shape";
+      // (a tab, not the window: the browser asks before leaving a draft)
+      window.addEventListener("beforeunload", function (e) { if (fresh && changes && !window.ipc) { e.preventDefault(); e.returnValue = ""; } });
       // the session log (`shape logs`): what the editor saw go wrong, and the AI's work
       var log = function (kind, data) {
         try { fetch("api/log", { method: "POST", body: JSON.stringify(Object.assign({ kind: kind }, data || {})) }).catch(function () {}); } catch (e) { /* no server: nothing to log */ }
@@ -133,7 +218,7 @@
         themeFiles: f.themes || {},
         author: f.author || undefined,
         file: f.path,
-        name: f.name.replace(/\..*$/, ""),
+        name: fresh ? "Untitled" : f.name.replace(/\..*$/, ""),
         // ✦ actions go to the harness the server was started with (--ai CMD)
         ai: harness.available ? function (prompt, images) {
           // images go along as data URIs; the server hands them to the AI tool
@@ -183,13 +268,21 @@
           });
         },
         onChange: function (text) {
+          // a draft: after a few changes, offer to save it (again after many more)
+          if (fresh) {
+            changes++;
+            if (changes - offered >= (offered ? 40 : 5)) {
+              offered = changes;
+              editor.offer("This board is not saved anywhere yet.", "Save…", function () { saveAs(); });
+            }
+          }
           // back to what is on disk (e.g. an undo within the debounce): drop the pending save
-          if (text === lastSaved) { clearTimeout(timer); status("Saved"); return; }
+          if (text === lastSaved) { clearTimeout(timer); savedStatus(); return; }
           status("Unsaved", "dirty");
           clearTimeout(timer);
           timer = setTimeout(function () { save(text); }, 400);
         },
-        onSave: function (text) { clearTimeout(timer); save(text); },
+        onSave: function (text) { clearTimeout(timer); save(text); if (fresh) saveAs(); },
         openBoard: openBoard,
         boards: function () {
           return fetch("api/boards").then(function (r) { return r.json(); }).then(function (b) {
@@ -197,7 +290,7 @@
           });
         }
       });
-      status("Saved");
+      savedStatus();
       checkUpdate(0);
       // a merge that clashed: settle it first
       fetch(api("api/conflict")).then(function (r) { return r.json(); }).then(function (c) {

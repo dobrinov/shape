@@ -27,21 +27,6 @@ pub fn choose(no_open: bool, browser: bool, window_built: bool) -> Open {
     }
 }
 
-/// A name typed in the save dialog, with `.shape` added unless it names a
-/// board format already (`plan` → `plan.shape`, `v1.2` → `v1.2.shape`).
-#[cfg_attr(not(feature = "window"), allow(dead_code))]
-pub fn with_extension(p: PathBuf) -> PathBuf {
-    let ext = p
-        .extension()
-        .map(|e| e.to_string_lossy().to_ascii_lowercase());
-    if matches!(ext.as_deref(), Some("shape" | "diagram" | "json" | "mmd")) {
-        return p;
-    }
-    let mut s = p.into_os_string();
-    s.push(".shape");
-    PathBuf::from(s)
-}
-
 /// The board's file name, for the window title.
 pub fn board_name(file: &Path) -> String {
     file.file_name()
@@ -107,10 +92,10 @@ pub fn open_external(url: &str) {
 }
 
 #[cfg(feature = "window")]
-pub use native::Native;
+pub use native::{pick_folder, Native};
 
 #[cfg(not(feature = "window"))]
-pub use none::Native;
+pub use none::{pick_folder, Native};
 
 #[cfg(not(feature = "window"))]
 mod none {
@@ -119,12 +104,14 @@ mod none {
     /// Built without the `window` feature: there is never a window.
     pub enum Native {}
 
+    /// No window: no folder picker (None).
+    pub fn pick_folder(_dir: &Path) -> Option<Option<PathBuf>> {
+        None
+    }
+
     impl Native {
         pub fn init() -> Option<Native> {
             None
-        }
-        pub fn ask_new_board(&self, _dir: &Path) -> Option<PathBuf> {
-            match *self {}
         }
         pub fn run(self, _url: &str, _name: &str) -> Result<(), String> {
             match self {}
@@ -148,6 +135,15 @@ mod native {
         CloseRequested,
         /// saved (or given up waiting): go
         Close,
+        /// no answer from the page in time: go, unless it is asking something
+        CloseTimeout,
+        /// the page is asking the person something before it closes (where
+        /// to save a new board): wait for it
+        Wait,
+        /// they chose to keep working: do not close
+        Resume,
+        /// the native folder picker, from `dir`; the answer goes back
+        Pick(PathBuf, std::sync::mpsc::Sender<Option<PathBuf>>),
         Title(String),
         /// what Check for Updates… found: the newer version, or why it could not tell
         #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -166,6 +162,23 @@ mod native {
         event_loop: EventLoop<Ev>,
     }
 
+    /// The window's events, for the server's requests (a folder picker).
+    static PROXY: std::sync::OnceLock<std::sync::Mutex<EventLoopProxy<Ev>>> =
+        std::sync::OnceLock::new();
+
+    /// The native folder picker, opened over the window from `dir`: Some(None)
+    /// when cancelled, None when there is no window to open it from.
+    pub fn pick_folder(dir: &Path) -> Option<Option<PathBuf>> {
+        let (tx, rx) = std::sync::mpsc::channel();
+        PROXY
+            .get()?
+            .lock()
+            .ok()?
+            .send_event(Ev::Pick(dir.to_path_buf(), tx))
+            .ok()?;
+        rx.recv().ok()
+    }
+
     impl Native {
         /// None where no window can be made (no display on Linux).
         pub fn init() -> Option<Native> {
@@ -182,22 +195,12 @@ mod native {
             made.ok().map(|event_loop| Native { event_loop })
         }
 
-        /// The native save dialog for a new board; None on cancel.
-        pub fn ask_new_board(&self, dir: &Path) -> Option<PathBuf> {
-            rfd::FileDialog::new()
-                .set_title("New board")
-                .set_file_name("Untitled.shape")
-                .add_filter("Shape board", &["shape", "diagram"])
-                .set_directory(dir)
-                .save_file()
-                .map(super::with_extension)
-        }
-
         /// Show the editor at `url` until the window closes, then end the
         /// process. Returns only when the window could not be made.
         pub fn run(self, url: &str, name: &str) -> Result<(), String> {
             let event_loop = self.event_loop;
             let proxy = event_loop.create_proxy();
+            let _ = PROXY.set(std::sync::Mutex::new(event_loop.create_proxy()));
 
             // 1400×900, smaller on a small screen, centred
             let (mut size, mut at) = (LogicalSize::<f64>::new(1400.0, 900.0), None);
@@ -250,9 +253,13 @@ mod native {
                     true
                 })
                 .with_ipc_handler(move |req| {
-                    if req.body() == "close" {
-                        let _ = p_ipc.send_event(Ev::Close);
-                    }
+                    let ev = match req.body().as_str() {
+                        "close" => Ev::Close,
+                        "wait" => Ev::Wait,
+                        "resume" => Ev::Resume,
+                        _ => return,
+                    };
+                    let _ = p_ipc.send_event(ev);
                 })
                 .with_document_title_changed_handler(move |t| {
                     let _ = p_title.send_event(Ev::Title(t));
@@ -274,7 +281,7 @@ mod native {
             mac::name();
             #[cfg(target_os = "macos")]
             let menu = mac::menu(proxy.clone());
-            let mut closing = false;
+            let (mut closing, mut waiting) = (false, false);
             event_loop.run(move |event, _, flow| {
                 *flow = ControlFlow::Wait;
                 match event {
@@ -300,11 +307,24 @@ mod native {
                             let p = proxy.clone();
                             std::thread::spawn(move || {
                                 std::thread::sleep(Duration::from_secs(3));
-                                let _ = p.send_event(Ev::Close);
+                                let _ = p.send_event(Ev::CloseTimeout);
                             });
                         }
                     }
                     Event::UserEvent(Ev::Close) => *flow = ControlFlow::Exit,
+                    Event::UserEvent(Ev::CloseTimeout) if !waiting => *flow = ControlFlow::Exit,
+                    Event::UserEvent(Ev::Wait) => waiting = true,
+                    Event::UserEvent(Ev::Resume) => {
+                        (closing, waiting) = (false, false);
+                    }
+                    Event::UserEvent(Ev::Pick(dir, reply)) => {
+                        let picked = rfd::FileDialog::new()
+                            .set_title("Where new boards go")
+                            .set_directory(&dir)
+                            .set_parent(&window)
+                            .pick_folder();
+                        let _ = reply.send(picked);
+                    }
                     Event::UserEvent(Ev::Title(t)) => window.set_title(&super::title(&t)),
                     Event::UserEvent(Ev::Updates(found)) => tell_updates(found),
                     _ => {}
@@ -548,16 +568,6 @@ mod tests {
         assert_eq!(choose(false, true, true), Open::Browser);
         assert_eq!(choose(true, false, true), Open::Nowhere);
         assert_eq!(choose(true, true, false), Open::Nowhere);
-    }
-
-    #[test]
-    fn new_boards_get_the_extension() {
-        let p = |s: &str| with_extension(PathBuf::from(s));
-        assert_eq!(p("/a/plan"), PathBuf::from("/a/plan.shape"));
-        assert_eq!(p("/a/plan.shape"), PathBuf::from("/a/plan.shape"));
-        assert_eq!(p("/a/plan.diagram"), PathBuf::from("/a/plan.diagram"));
-        assert_eq!(p("/a/plan.json"), PathBuf::from("/a/plan.json"));
-        assert_eq!(p("/a/v1.2"), PathBuf::from("/a/v1.2.shape"));
     }
 
     #[test]

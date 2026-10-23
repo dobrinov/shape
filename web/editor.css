@@ -562,3 +562,8 @@
 .dge-ai-card-actions { display: flex; align-items: center; gap: 8px; }
 .dge-ai-card-actions .dge-spacer { flex: 1; }
 .dge .dg-gfold { cursor: pointer; }
+/* saving a new board: its folder, and what went wrong */
+.dge-save-where { display: flex; align-items: center; gap: 8px; font-weight: 400; }
+.dge-save-dir { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 12px; }
+.dge-persp-form p.dge-error { margin: 0; color: var(--danger); font-size: 12px; font-weight: 400; }
+.dge-persp-form p.dge-error[hidden] { display: none; }
