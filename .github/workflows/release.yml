@@ -64,6 +64,11 @@ jobs:
           - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, name: linux-arm64 }
           - { os: windows-latest,   target: x86_64-pc-windows-msvc,    name: windows-x86_64 }
     runs-on: ${{ matrix.os }}
+    # signing runs once its secrets are set (see CODE_SIGNING.md); until then
+    # the binaries are built unsigned, as before
+    env:
+      MACOS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' && 'yes' || '' }}
+      WINDOWS_SIGNING: ${{ secrets.SIGNPATH_API_TOKEN != '' && 'yes' || '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -92,6 +97,71 @@ jobs:
           else
             cargo build --release --locked -p shape --target ${{ matrix.target }}
           fi
+
+      # macOS: signed with the Developer ID certificate (hardened runtime, a
+      # timestamp) and notarized by Apple, so it opens without a warning
+      - name: Sign and notarize (macOS)
+        if: ${{ startsWith(matrix.os, 'macos') && env.MACOS_SIGNING == 'yes' }}
+        shell: bash
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          bin="target/${{ matrix.target }}/release/shape"
+          # the certificate, in a keychain of its own for this run
+          kc="$RUNNER_TEMP/sign.keychain-db"
+          kpw=$(openssl rand -hex 16)
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$kpw" "$kc"
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p "$kpw" "$kc"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kpw" "$kc" >/dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          line=$(security find-identity -v -p codesigning "$kc" | grep -m1 'Developer ID Application')
+          [ -n "$line" ] || { echo "MACOS_CERT_P12 holds no Developer ID Application certificate"; exit 1; }
+          id=$(echo "$line" | awk '{print $2}')
+          team=$(echo "$line" | sed -E 's/.*\(([A-Z0-9]+)\)"$/\1/')
+          codesign --force --options runtime --timestamp --sign "$id" "$bin"
+          codesign --verify --strict --verbose=2 "$bin"
+          # notarized: Apple checks it, and Gatekeeper finds its ticket online
+          # (a bare binary cannot carry the ticket stapled)
+          ditto -c -k --keepParent "$bin" "$RUNNER_TEMP/shape.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/shape.zip" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$team" --wait --timeout 30m --output-format json | tee "$RUNNER_TEMP/notary.json"
+          grep -q '"status":"Accepted"' "$RUNNER_TEMP/notary.json" || { echo "not notarized"; exit 1; }
+          security delete-keychain "$kc"
+
+      # Windows: signed by SignPath (free for open source; certificate by
+      # SignPath Foundation), so SmartScreen and antivirus trust it
+      - name: shape.exe to sign (Windows)
+        id: unsigned
+        if: ${{ startsWith(matrix.os, 'windows') && env.WINDOWS_SIGNING == 'yes' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-${{ matrix.name }}
+          path: target/${{ matrix.target }}/release/shape.exe
+          if-no-files-found: error
+      - name: Sign (Windows, SignPath)
+        if: ${{ startsWith(matrix.os, 'windows') && env.WINDOWS_SIGNING == 'yes' }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'shape' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+      - name: Use the signed shape.exe (Windows)
+        if: ${{ startsWith(matrix.os, 'windows') && env.WINDOWS_SIGNING == 'yes' }}
+        shell: pwsh
+        run: |
+          Copy-Item signed/shape.exe target/${{ matrix.target }}/release/shape.exe -Force
+          $sig = Get-AuthenticodeSignature target/${{ matrix.target }}/release/shape.exe
+          "signed by: $($sig.SignerCertificate.Subject) ($($sig.Status))"
+          if ($sig.Status -ne 'Valid') { throw "shape.exe is not validly signed" }
 
       - name: Package
         id: pkg

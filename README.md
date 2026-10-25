@@ -160,6 +160,8 @@ After this, `.shape` files get their own document icon, and double-clicking one 
 
 **New versions:** once a day, the editor asks GitHub whether a newer release exists. If one does, the terminal says so (with `brew upgrade shape` when Homebrew installed it), and a *New* badge in the top bar links to the release notes. Set `SHAPE_NO_UPDATE_CHECK=1` to turn this off; it is also off when `CI` is set.
 
+**Signing:** release binaries are being set up to be signed: macOS with a Developer ID and notarized by Apple, Windows through SignPath Foundation. See [CODE_SIGNING.md](CODE_SIGNING.md) for the policy and what Shape sends over the network.
+
 ## Usage
 
 ```
