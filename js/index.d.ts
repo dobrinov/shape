@@ -87,6 +87,8 @@ export interface Perspective {
   label: string;
   tags?: string[];
   show?: string[];
+  /** Tags it leaves out, with what is inside them (Product hides `tech`). */
+  hide?: string[];
   details?: boolean;
 }
 
@@ -225,6 +227,8 @@ export interface Edge {
 /** A section; also swimlanes (`lanes`) and gantt charts (`gantt`). */
 export interface Group {
   id: string;
+  /** The perspectives it belongs to, as a box's tags (`tech` for a technical section). */
+  tags?: string[];
   label?: string;
   color?: Color;
   /** Enclosing group, for nested groups (and lanes). */
@@ -594,6 +598,8 @@ export interface AddGroupOp {
   id?: string;
   label?: string;
   color?: Color | string;
+  /** The perspectives it belongs to. */
+  tags?: string[];
   parent?: string;
   /** Nodes (or groups) to move into the new group. */
   members?: string[];
@@ -657,6 +663,8 @@ export interface UpdateGroupOp {
   id: string;
   label?: string;
   color?: Color | "";
+  /** Replaces its tags ([] clears them). */
+  tags?: string[];
   parent?: string;
   lanes?: boolean;
   kanban?: boolean;

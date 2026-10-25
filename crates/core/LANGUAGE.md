@@ -48,7 +48,7 @@ Edits keep the file as it is written. Ops, the editor and `shape apply` rewrite 
 | `a -> b` · `a -> b: label [attrs]` | an edge |
 | `a -> b -> c` | a chain of edges (the label applies to each) |
 | `a -> b, c` | fan-out: one edge to each node in the list |
-| `group id: Label [attrs] {` … `}` | a group (a *section* in the editor): a titled frame around what is declared or listed inside. Groups nest. |
+| `group id: Label [attrs] {` … `}` | a group (a *section* in the editor): a titled frame around what is declared or listed inside. Groups nest. Sections and blocks take `tags` like boxes (`group arch: Architecture [tags: tech]`, `adr embed: Use an iframe [proposed, tags: tech]`): the perspectives they belong to. |
 | `lanes id: Title {` … `lane id: Title {` … `}` … `}` | swimlanes: each `lane` is a band (a row when the flow runs right or left, a column when it runs down or up) with its title at the side; the flow runs across lanes |
 | `gantt id: Title [start: YYYY-MM-DD] {` … `}` | a gantt chart: one task per line, `Label [5d, after: other-task]` (see *Gantt charts*) |
 | `entity id: Name {` … `}` | a database table: one column per line, `email: text [unique]` (see *Database tables*) |
@@ -377,7 +377,8 @@ perspective legal: Legal [tags: legal, show: adr]
 fraud: Fraud reporting API [tags: tech exec]
 ```
 
-- A perspective is a way of looking at the board: it shows the elements tagged for it (`tags`), the blocks of the kinds it names whole (`show`: mindmap, timeline, adr, risks, kanban, gantt, table, chart, entity, sequence, lanes, sticky), the sections around them and the arrows and comments between them. `details: off` shows titles only. It changes what you see, never the board.
+- A perspective is a way of looking at the board: it shows the elements tagged for it (`tags`), the blocks of the kinds it names whole (`show`: mindmap, timeline, adr, risks, kanban, gantt, table, chart, entity, sequence, lanes, sticky), the sections around them and the arrows and comments between them. `details: off` shows titles only. `hide: tech` leaves out what is tagged so (and none of its own tags), with everything inside it: a section, a block, a mindmap branch. Product, Users, Design, Marketing, Business, Investors and Client hide `tech`, so their view and summary read without implementation details; tag technical things `tech` (Rethink does). It changes what you see, never the board.
+- Every set of perspectives has Delivery. On a board with no plan yet (no gantt chart), its summary says *No delivery plan yet*, and **✦ Plan the delivery** (in the ✦ menu, and offered there) asks what it needs to know in a form: the team, the start, fixed dates, milestones, platforms, what it waits for. Answer what you can; it then drafts the plan in a section *Delivery plan*: a gantt chart with the stages and milestones, the delivery risks, and *Open questions for the plan* for what you left empty. The summary's traffic lights and burndown follow from it.
 - The board's set (`perspectives: project`; *Board → Perspectives* in the editor, which also asks once when a board with plans on it has none) brings built-in ones:
   - `project`, a project team: Delivery (`delivery`, also `team`), Product (`product`), Technical (`tech`), QA (`qa`, also `test` and `testing`), Legal (`legal`), Business (`business`, also `finance` and `commercial`), Marketing (`marketing`), Design (`design`);
   - `product`, a product team: Product, Technical, Users (`user`), QA, Legal, Business, Marketing, Design;

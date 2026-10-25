@@ -1025,7 +1025,7 @@ mod tests {
         );
         // a mistake on a chart's first line is that line's only
         let (d, errors) = crate::dsl::parse_lenient(
-            "gantt p: Plan [tags: delivery] {\n  Build [1w]\n  Beta [milestone]\n}\n",
+            "gantt p: Plan [owner: delivery] {\n  Build [1w]\n  Beta [milestone]\n}\n",
         );
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert_eq!(d.nodes.len(), 2);

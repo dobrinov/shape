@@ -18,7 +18,18 @@ fn p(id: &str, label: &str, tags: &[&str], show: &[&str], details: bool) -> Pers
         label: label.into(),
         tags: tags.iter().map(|t| t.to_string()).collect(),
         show: show.iter().map(|t| t.to_string()).collect(),
+        hide: default_hide(id),
         details,
+    }
+}
+
+/// What a built-in perspective leaves out: the audiences that are not
+/// technical do not see what is only technical (tagged `tech`).
+pub fn default_hide(id: &str) -> Vec<String> {
+    match id {
+        "product" | "user" | "users" | "design" | "marketing" | "business" | "investors"
+        | "client" => vec!["tech".to_string()],
+        _ => Vec::new(),
     }
 }
 
@@ -129,7 +140,7 @@ pub fn builtins(kind: BoardKind) -> Vec<Perspective> {
             v
         }
         BoardKind::Product => {
-            let mut v = vec![product, tech, user, qa];
+            let mut v = vec![product, delivery, tech, user, qa];
             v.extend(around());
             v
         }
@@ -185,12 +196,81 @@ pub fn all(doc: &Document) -> Vec<Perspective> {
     };
     let mut out = builtins(kind);
     for own in &doc.perspectives {
+        let mut own = own.clone();
+        // one written with a built-in id leaves out what that one does
+        if own.hide.is_empty() {
+            own.hide = default_hide(&own.id);
+        }
         match out.iter_mut().find(|x| x.id == own.id) {
-            Some(x) => *x = own.clone(),
-            None => out.push(own.clone()),
+            Some(x) => *x = own,
+            None => out.push(own),
         }
     }
     out
+}
+
+/// The board without what `p` leaves out (its `hide` tags, on elements,
+/// sections and blocks with none of its own tags): those, what is inside
+/// them, the branches under such a mindmap topic, and the arrows and
+/// comments that go with them; in every canvas too.
+pub fn strip(doc: &Document, p: &Perspective) -> Document {
+    let mut out = doc.clone();
+    if p.hide.is_empty() {
+        return out;
+    }
+    strip_in(&mut out, p);
+    out
+}
+
+fn strip_in(doc: &mut Document, p: &Perspective) {
+    let off = |tags: &[String]| {
+        tags.iter().any(|t| p.hide.contains(t)) && !tags.iter().any(|t| p.tags.contains(t))
+    };
+    // groups left out, with the ones inside them
+    let mut gone_groups: Vec<String> = Vec::new();
+    loop {
+        let more: Vec<String> = doc
+            .groups
+            .iter()
+            .filter(|g| !gone_groups.contains(&g.id))
+            .filter(|g| off(&g.tags) || g.parent.as_ref().is_some_and(|pa| gone_groups.contains(pa)))
+            .map(|g| g.id.clone())
+            .collect();
+        if more.is_empty() {
+            break;
+        }
+        gone_groups.extend(more);
+    }
+    // nodes left out: tagged so, in a group left out, or under a topic left out
+    let mut gone: Vec<String> = Vec::new();
+    loop {
+        let more: Vec<String> = doc
+            .nodes
+            .iter()
+            .filter(|n| !gone.contains(&n.id))
+            .filter(|n| {
+                off(&n.tags)
+                    || n.group.as_ref().is_some_and(|g| gone_groups.contains(g))
+                    || n.parent.as_ref().is_some_and(|pa| gone.contains(pa))
+            })
+            .map(|n| n.id.clone())
+            .collect();
+        if more.is_empty() {
+            break;
+        }
+        gone.extend(more);
+    }
+    doc.nodes.retain(|n| !gone.contains(&n.id));
+    doc.groups.retain(|g| !gone_groups.contains(&g.id));
+    let lost = |id: &str| gone.iter().any(|g| g == id) || gone_groups.iter().any(|g| g == id);
+    doc.edges.retain(|e| !lost(&e.from) && !lost(&e.to));
+    let left = doc.clone();
+    doc.comments.retain(|c| {
+        c.on.is_none() || c.targets().any(|t| !lost(t) && left.element(t).is_some())
+    });
+    for c in &mut doc.canvases {
+        strip_in(&mut c.doc, p);
+    }
 }
 
 fn kind_of(g: &Group) -> &'static str {
@@ -229,9 +309,13 @@ fn kind_of(g: &Group) -> &'static str {
 /// says so. Sections stay around what they still hold; arrows and comments
 /// stay with what they join or are about.
 pub fn view(doc: &Document, p: &Perspective) -> Document {
+    // (without what it leaves out)
+    let stripped = strip(doc, p);
+    let doc = &stripped;
     let tagged = |tags: &[String]| tags.iter().any(|t| p.tags.contains(t));
-    // a block shows whole when it is of a kind the perspective shows
-    let whole = |g: &Group| p.show.iter().any(|k| k == kind_of(g));
+    // a block shows whole when it is of a kind the perspective shows, or
+    // tagged for it (a section too)
+    let whole = |g: &Group| p.show.iter().any(|k| k == kind_of(g)) || tagged(&g.tags);
     let group_shown_whole = |id: &str| -> bool {
         let mut cur = doc.group(id);
         let mut hops = 0;
@@ -608,6 +692,7 @@ mod tests {
             ids,
             [
                 "product",
+                "delivery",
                 "tech",
                 "user",
                 "qa",
@@ -615,8 +700,7 @@ mod tests {
                 "business",
                 "marketing",
                 "design",
-                "exec",
-                "delivery"
+                "exec"
             ]
         );
         assert!(s.apply(r#"{"op":"perspective","id":"x","show":["nope"]}"#)["ok"] == false);
@@ -721,5 +805,38 @@ mod tests {
             purpose("business"),
             Some("Money, pricing, deals and the numbers")
         );
+    }
+
+    #[test]
+    fn product_leaves_out_what_is_only_technical() {
+        let src = "type: product\n\nmindmap scope: Chat widget [tags: product] {\n  Answers from the help pages\n  Hosting [tags: tech]\n    Iframe from its own domain\n  Languages\n}\n\ngroup arch: Architecture [tags: tech] {\n  api: Answers API\n  adr embed: Embed as an iframe [proposed] {\n    context: c\n  }\n}\n\nadr history: Users can continue past chats [proposed, tags: product tech] {\n  context: c\n}\n\nadr cache: Cache answers for a day [proposed, tags: tech] {\n  context: c\n}\n";
+        let doc = crate::dsl::parse(src).unwrap();
+        assert_eq!(crate::dsl::parse(&crate::dsl::print(&doc)).unwrap(), doc, "tags on sections and blocks round-trip");
+        assert_eq!(doc.group("arch").unwrap().tags, ["tech"]);
+        let all = all(&doc);
+        let product = all.iter().find(|p| p.id == "product").unwrap();
+        assert!(all.iter().any(|p| p.id == "delivery"), "every set has Delivery");
+        let v = view(&doc, product);
+        let labels: Vec<&str> = v.nodes.iter().map(|n| n.display()).collect();
+        assert!(labels.contains(&"Answers from the help pages") && labels.contains(&"Languages"));
+        assert!(!labels.contains(&"Hosting") && !labels.contains(&"Iframe from its own domain"), "a technical branch goes");
+        assert!(v.group("arch").is_none() && v.group("embed").is_none() && v.group("cache").is_none());
+        assert!(v.group("history").is_some(), "tagged for both: shown");
+        // the technical perspective still sees all of it
+        let tech = all.iter().find(|p| p.id == "tech").unwrap();
+        let t = view(&doc, tech);
+        assert!(t.group("cache").is_some() && t.group("arch").is_some());
+        // and Product's summary asks no technical decisions
+        let dash = crate::dashboard::build(&doc, product, 0, None);
+        let rows: Vec<&str> = dash.nodes.iter().map(|n| n.display()).collect();
+        assert!(rows.iter().any(|r| r.contains("continue past chats")), "{rows:?}");
+        assert!(!rows.iter().any(|r| r.contains("iframe") || r.contains("Cache")), "{rows:?}");
+        // a board's own line with a built-in id leaves out the same
+        let own = crate::dsl::parse("perspective product: Product [tags: product]\n").unwrap();
+        assert_eq!(all_of(&own, "product").hide, ["tech"]);
+    }
+
+    fn all_of(doc: &Document, id: &str) -> Perspective {
+        all(doc).into_iter().find(|p| p.id == id).unwrap()
     }
 }

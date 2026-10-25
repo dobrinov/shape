@@ -113,7 +113,7 @@ try {
   // a new type: warned that the AI will rethink the board
   await p.locator('[data-act="board"]').click();
   await p.locator(".dge-board-menu select").first().selectOption("product"); await sleep(300);
-  assert.match(await p.locator(".dge-modal").innerText(), /Use the Product team perspectives\?[\s\S]*Product, Technical, Users[\s\S]*rethink/);
+  assert.match(await p.locator(".dge-modal").innerText(), /Use the Product team perspectives\?[\s\S]*Product, Delivery, Technical, Users[\s\S]*rethink/);
   if (process.env.SHOTS) await p.screenshot({ path: process.env.SHOTS + "/type-change.png" });
   await p.getByRole("button", { name: "Cancel" }).click(); await sleep(200);
   assert.match(saved(), /\ntype: project\n/);

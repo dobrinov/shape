@@ -57,7 +57,7 @@ try {
   const kept = saved();
   // the AI button in the corner opens its menu; Add what you know
   await p.locator(".dge-ai-fab").click();
-  assert.equal(await p.locator(".dge-ai-menu .dge-ai-item").count(), 4);
+  assert.equal(await p.locator(".dge-ai-menu .dge-ai-item").count(), 5); // Ask, Rethink, Add what you know, Plan the delivery, Draft test scenarios
   await p.locator(".dge-ai-item", { hasText: "Add what you know" }).click();
   await p.locator(".dge-dialog textarea").fill("Make the database red, twice");
   await p.locator(".dge-dialog button.primary").click();

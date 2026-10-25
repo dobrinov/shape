@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.82.0 — 2026-10-25
+
+- **Product shows the product, not how it is built.** Product, Users, Design, Marketing, Business, Investors and Client leave out anything that is only technical (tagged `tech`): architecture sections, implementation decisions, a mindmap's technical branches, on the board and in their summaries. Something tagged both still shows. ✦ Rethink and *Sort into perspectives* tag technical things `tech`, and the next Rethink after this upgrade tags what is already on your board.
+- **Sections and blocks take tags**, like boxes: `group arch: Architecture [tags: tech]`, `adr embed: Use an iframe [proposed, tags: tech]`. A section tagged for a perspective shows whole in it.
+- **Every board has a Delivery perspective**, product boards too. Without a plan, its summary says *No delivery plan yet* and offers **✦ Plan the delivery**. The AI asks what it needs to know in a short form (the team, the start, fixed dates, milestones, platforms, outside dependencies). Answer what you can, and it drafts the plan: a gantt chart with stages and milestones, the delivery risks, and open questions for what you skipped. The traffic lights and burndown follow from it, and you see the plan before keeping it. Also in the ✦ menu.
+- **Comments asking for another form are followed.** A comment like *these wireframes should be desktop* now replaces the mobile screens instead of adding desktop ones next to them.
+- **Wireframes for the right device.** The AI draws screens for where the product runs (`web` for a web app or a widget in one), and asks when the board does not say.
+
 ## 0.81.0 — 2026-10-25
 
 - **✦ Ask answers in the chat.** A question about the board gets an answer in words, in the Ask panel, and each fact links to the block it comes from (a decision, a gantt task, a risk, a section or a comment). Click a link to go there; a comment's link opens its thread. It still draws, on a temporary canvas, when a picture says it better (things that depend on each other, a sequence over time, options side by side): the answer then has *Open the drawing*.

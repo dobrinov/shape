@@ -22,6 +22,7 @@ pub mod adr;
 pub mod charts;
 pub mod cycle;
 pub mod dashboard;
+pub mod delivery;
 pub mod diff;
 pub mod dsl;
 pub mod entities;

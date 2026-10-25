@@ -51,6 +51,11 @@ pub struct Perspective {
     pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub show: Vec<String>,
+    /// What it leaves out: elements, sections and blocks with one of these
+    /// tags (and none of its own), with what is inside them (Product hides
+    /// `tech`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hide: Vec<String>,
     pub details: bool,
 }
 
@@ -61,6 +66,7 @@ impl Default for Perspective {
             label: String::new(),
             tags: Vec::new(),
             show: Vec::new(),
+            hide: Vec::new(),
             details: true,
         }
     }
@@ -496,6 +502,10 @@ pub struct Edge {
 #[serde(default)]
 pub struct Group {
     pub id: String,
+    /// The perspectives it belongs to (as a box's `tags`): a section or
+    /// block tagged `tech` is technical, and so on.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub label: String,
     #[serde(skip_serializing_if = "Option::is_none")]

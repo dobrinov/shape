@@ -670,6 +670,9 @@ fn table(id: &str, label: &str, columns: &[&str]) -> Group {
 /// The dashboard of perspective `p` for the whole board `doc`, as of day
 /// `today`; `before` is an earlier version, for what changed since.
 pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Document>) -> Document {
+    // without what the perspective leaves out (Product: what is only technical)
+    let stripped = crate::perspectives::strip(doc, p);
+    let doc = &stripped;
     let mut out = Document {
         title: Some(p.label.clone()),
         ..Default::default()
@@ -940,6 +943,12 @@ pub fn build(doc: &Document, p: &Perspective, today: i64, before: Option<&Docume
                 },
             )
         }
+        // no plan yet: the AI asks what it needs to know, then drafts one
+        ("delivery", None) if !crate::delivery::has_plan(doc) => (
+            "No delivery plan yet".to_string(),
+            "gray",
+            "✦ Plan the delivery asks what it needs to know (the team, the dates, the milestones), then drafts the plan: a gantt chart, its risks and the questions still open".to_string(),
+        ),
         ("product", _) => (
             format!(
                 "What we are building: {}",

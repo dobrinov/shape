@@ -313,6 +313,25 @@ impl Diagram {
         shape_core::qa::draft_prompt(&self.inner.doc)
     }
 
+    /// Whether the board (any canvas) has a delivery plan (a gantt chart).
+    pub fn has_delivery_plan(&self) -> bool {
+        shape_core::delivery::has_plan(&self.inner.whole())
+    }
+
+    /// A prompt asking what the AI needs to know to plan the delivery, as
+    /// of `today` (`YYYY-MM-DD`); its reply goes to [`delivery_questions`].
+    pub fn delivery_questions_prompt(&self, today: &str) -> String {
+        shape_core::delivery::questions_prompt(&self.inner.whole(), shape_core::gantt::parse_date(today))
+    }
+
+    /// A prompt asking for the delivery plan from the answers
+    /// (`[[question, answer], …]`, JSON); the reply is a note and ops for
+    /// the top board.
+    pub fn delivery_plan_prompt(&self, answers: &str, today: &str) -> String {
+        let answers: Vec<(String, String)> = serde_json::from_str(answers).unwrap_or_default();
+        shape_core::delivery::plan_prompt(&self.inner.whole(), &answers, shape_core::gantt::parse_date(today))
+    }
+
     /// The ops that put a [`tests_prompt`](Self::tests_prompt) reply on the
     /// open canvas: `{ops}` (to `apply`) or `{error}`.
     pub fn tests_ops(&self, reply: &str) -> String {
@@ -620,6 +639,16 @@ pub fn count_changes(old: &str, new: &str) -> i32 {
     match (old, shape_core::parse(new)) {
         (Ok(o), Ok(n)) => shape_core::change_count(&o, &n) as i32,
         _ => -1,
+    }
+}
+
+/// The questions in a reply to `delivery_questions_prompt`:
+/// `{ok, questions: [{id, question, hint}]}` or `{ok: false, error}`.
+#[wasm_bindgen]
+pub fn delivery_questions(reply: &str) -> String {
+    match shape_core::delivery::questions(reply) {
+        Ok(q) => json!({"ok": true, "questions": q}).to_string(),
+        Err(e) => json!({"ok": false, "error": e}).to_string(),
     }
 }
 

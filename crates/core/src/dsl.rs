@@ -782,6 +782,7 @@ impl Parser {
         let attrs_read = (|| -> Result<(), String> {
             for (k, v) in &attrs {
                 match (k.as_str(), v) {
+                    ("tags" | "tag", Some(v)) => g.tags = v.split_whitespace().map(String::from).collect(),
                     ("scale" | "levels", Some(v)) if risks => {
                         g.levels = Some(
                             v.parse::<u8>()
@@ -861,6 +862,7 @@ impl Parser {
         }
         for (k, v) in &attrs {
             match (k.as_str(), v) {
+                ("tags" | "tag", Some(v)) => g.tags = v.split_whitespace().map(String::from).collect(),
                 (k, None) if ChartKind::parse(k).is_some() => g.chart = ChartKind::parse(k),
                 ("type" | "kind", Some(v)) => {
                     g.chart = Some(ChartKind::parse(v).ok_or_else(|| {
@@ -911,6 +913,7 @@ impl Parser {
         for (k, v) in &attrs {
             match (k.as_str(), v) {
                 ("tags" | "tag", Some(v)) => p.tags = words(v),
+                ("hide", Some(v)) => p.hide = words(v),
                 ("show", Some(v)) => {
                     p.show = words(v);
                     if let Some(bad) = p
@@ -933,7 +936,7 @@ impl Parser {
                 }
                 (k, _) => {
                     return Err(format!(
-                        "unknown perspective attribute `{k}` (tags, show, details)"
+                        "unknown perspective attribute `{k}` (tags, show, hide, details)"
                     ))
                 }
             }
@@ -1155,6 +1158,7 @@ impl Parser {
         }
         for (k, v) in &attrs {
             match (k.as_str(), v) {
+                ("tags" | "tag", Some(v)) => g.tags = v.split_whitespace().map(String::from).collect(),
                 ("color" | "colour", Some(v)) => g.color = Some(color(v)?),
                 (c, None) if valid_color(c) => g.color = Some(c.to_string()),
                 ("x", Some(v)) => g.x = Some(num("x", v)?),
@@ -1249,6 +1253,7 @@ impl Parser {
         }
         for (k, v) in &attrs {
             match (k.as_str(), v) {
+                ("tags" | "tag", Some(v)) => g.tags = v.split_whitespace().map(String::from).collect(),
                 ("color" | "colour", Some(v)) => g.color = Some(color(v)?),
                 (c, None) if valid_color(c) => g.color = Some(c.to_string()),
                 ("x", Some(v)) => g.x = Some(num("x", v)?),
@@ -1305,6 +1310,7 @@ impl Parser {
         }
         for (k, v) in &attrs {
             match (k.as_str(), v) {
+                ("tags" | "tag", Some(v)) => g.tags = v.split_whitespace().map(String::from).collect(),
                 ("color" | "colour", Some(v)) => g.color = Some(color(v)?),
                 (c, None) if valid_color(c) => g.color = Some(c.to_string()),
                 ("x", Some(v)) => g.x = Some(num("x", v)?),
@@ -1354,6 +1360,7 @@ impl Parser {
         }
         for (k, v) in &attrs {
             match (k.as_str(), v) {
+                ("tags" | "tag", Some(v)) => g.tags = v.split_whitespace().map(String::from).collect(),
                 ("unit", Some(v)) => g.unit = Some(v.clone()),
                 ("color" | "colour", Some(v)) => g.color = Some(color(v)?),
                 (c, None) if valid_color(c) => g.color = Some(c.to_string()),
@@ -1496,6 +1503,7 @@ impl Parser {
         }
         for (k, v) in &attrs {
             match (k.as_str(), v) {
+                ("tags" | "tag", Some(v)) => g.tags = v.split_whitespace().map(String::from).collect(),
                 (d, None) if Device::parse(d).is_some() => g.screen = Device::parse(d),
                 ("device", Some(v)) => {
                     g.screen =
@@ -1695,6 +1703,7 @@ impl Parser {
         }
         for (k, v) in &attrs {
             match (k.as_str(), v) {
+                ("tags" | "tag", Some(v)) => g.tags = v.split_whitespace().map(String::from).collect(),
                 ("status", Some(v)) if crate::adr::valid_status(v) => g.adr = Some(v.clone()),
                 (v, None) if crate::adr::valid_status(v) => g.adr = Some(v.to_string()),
                 ("status", Some(v)) => return Err(crate::adr::status_error(v)),
@@ -2127,6 +2136,7 @@ impl Parser {
         }
         for (k, v) in &attrs {
             match (k.as_str(), v) {
+                ("tags" | "tag", Some(v)) => g.tags = v.split_whitespace().map(String::from).collect(),
                 ("color" | "colour", Some(v)) => g.color = Some(color(v)?),
                 ("label", Some(v)) => g.label = v.clone(),
                 // a section (or swimlanes) placed by hand: its top-left
@@ -2899,9 +2909,14 @@ pub(crate) fn node_line(n: &Node) -> String {
 /// `mindmap id: Topic [attrs] {` + the indented outline + `}`.
 /// `x: …, y: …` of a pinned swimlanes or gantt chart.
 fn group_pos(g: &Group) -> Vec<String> {
-    [("x", g.x), ("y", g.y)]
-        .into_iter()
-        .filter_map(|(k, v)| v.map(|v| format!("{k}: {}", fmt_num(v))))
+    // (its tags first: which perspectives it belongs to)
+    let tags = (!g.tags.is_empty()).then(|| format!("tags: {}", attr_value(&g.tags.join(" "))));
+    tags.into_iter()
+        .chain(
+            [("x", g.x), ("y", g.y)]
+                .into_iter()
+                .filter_map(|(k, v)| v.map(|v| format!("{k}: {}", fmt_num(v)))),
+        )
         .collect()
 }
 
@@ -3176,6 +3191,9 @@ pub(crate) fn perspective_line(p: &Perspective) -> String {
     }
     if !p.show.is_empty() {
         a.push(format!("show: {}", p.show.join(" ")));
+    }
+    if !p.hide.is_empty() {
+        a.push(format!("hide: {}", p.hide.join(" ")));
     }
     if !p.details {
         a.push("details: off".to_string());

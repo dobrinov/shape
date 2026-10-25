@@ -372,6 +372,9 @@ pub enum Op {
         label: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         color: Option<String>,
+        /// The perspectives it belongs to (`tech` for a technical section).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tags: Option<Vec<String>>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         parent: Option<String>,
         /// Nodes (or groups) to move into the new group.
@@ -465,6 +468,9 @@ pub enum Op {
         label: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         color: Option<String>,
+        /// Replaces its tags ([] clears them).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tags: Option<Vec<String>>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         parent: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2001,6 +2007,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             id,
             label,
             color: c,
+            tags,
             parent,
             members,
             lanes,
@@ -2075,6 +2082,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             if let Some(c) = c.as_deref().filter(|c| !c.is_empty()) {
                 g.color = Some(color(c)?);
             }
+            g.tags = tags.clone().unwrap_or_default();
             doc.groups.push(g);
             for m in members {
                 if let Some(n) = doc.node_mut(m) {
@@ -2091,6 +2099,7 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             id,
             label,
             color: c,
+            tags,
             parent,
             lanes,
             kanban,
@@ -2133,6 +2142,9 @@ fn apply_op(doc: &mut Document, op: &Op, created: &mut Vec<String>) -> Result<()
             }
             if let Some(c) = opt(c) {
                 g.color = c.map(|c| color(&c)).transpose()?;
+            }
+            if let Some(t) = tags {
+                g.tags = t.clone();
             }
             if let Some(p) = opt(parent) {
                 g.parent = p;

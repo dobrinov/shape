@@ -279,6 +279,9 @@
       aiItem("add", "Add what you know", "Details, facts or notes: the AI puts them in place",
         "Add what you know (" + MOD + "K): write down details or information you have, about the selection or the whole canvas; the AI adds them where they belong, or makes the change you ask for. You see the changes before keeping them.",
         MOD + "K", function () { askAI(); }),
+      aiItem("gantt", "Plan the delivery", "It asks what it needs to know, then drafts the plan",
+        "Plan the delivery: the AI reads the board and asks you what it needs to know to plan how the work gets delivered (the team, the start, fixed dates, milestones, platforms, what it waits for). Answer what you can. It then drafts the plan: a gantt chart with the stages and milestones, the delivery risks, and the questions still open. The Delivery summary's traffic lights and burndown follow from it. You see the changes before keeping them.",
+        "", function () { planDelivery(); }),
       aiItem("tests", "Draft test scenarios", "What to test, from how the board says it works",
         "Draft test scenarios: the AI reads how this canvas works (its flows, screens, rules, data and risks) and writes the scenarios a tester would run, each with steps, the expected result and what it covers, in a table on a canvas of test scenarios. Run again for more: it adds new ones only. Right-click a scenario to mark it passed or failed. You see the changes before keeping them.",
         "", function () { draftTests(); }),
@@ -525,6 +528,10 @@
       fillPerspectives();
       render();
       fit();
+      // Delivery with nothing to show: the AI can ask for what it needs
+      if (id === "delivery" && !view && !st.session.has_delivery_plan()) {
+        setTimeout(function () { if (st.perspective && st.perspective.id === "delivery") flashAction("No delivery plan yet.", "✦ Plan the delivery", planDelivery); }, 400);
+      }
     }
     function restorePerspective() {
       var id = null;
@@ -711,7 +718,7 @@
       var list = st.perspectives || [];
       if (!list.length) return null;
       var lines = list.map(function (p) { return "- " + p.label + ": tag `" + (p.tags[0] || p.id) + "`" + (p.show.length ? " (it already shows " + p.show.join(", ") + " blocks whole)" : ""); }).join("\n");
-      return ("Sort the board into its perspectives, the audiences that look at it:\n\n" + lines + "\n\nAdd to each box's `tags` the tags of every perspective it matters to (`update_node` with the box's existing tags plus the new ones; a box can belong to several, and inside canvases too). Tag mindmap centres, not their topics. Change nothing else: no labels, sections or arrows. In the note, say how many elements each perspective now shows.");
+      return ("Sort the board into its perspectives, the audiences that look at it:\n\n" + lines + "\n\nAdd to each box's `tags` the tags of every perspective it matters to (`update_node` with the box's existing tags plus the new ones; a box can belong to several, and inside canvases too). Sections and blocks take tags too (`update_group` with `tags`). Tag mindmap centres; tag a topic only to mark it technical. Tag what is technical `tech` (architecture, hosting, APIs, data stores, implementation choices and their decision records, a section of them as a whole): Product and the other non-technical audiences leave it out. Change nothing else: no labels, sections or arrows. In the note, say how many elements each perspective now shows.");
     }
     /* AI prompts…: the prompts the AI buttons send, built for this board as
        it is now, to read (and give feedback on). Nothing is sent. */
@@ -1670,6 +1677,51 @@
       };
       round(prompt, 0);
     }
+    /* Plan the delivery: the AI asks what it needs to know (a form to
+       answer what you can), then drafts the plan as changes to keep. */
+    function planDelivery() {
+      if (st.preview) return flash("Keep or discard the AI's changes first", true);
+      closeAiMenu();
+      if (dashOn()) leaveDash([]);
+      var prompt = st.session.delivery_questions_prompt(isoDay(today()));
+      var job = opts.ai ? busyStart("plan", "Working out what to ask you") : null;
+      var round = function (p, n) {
+        return ask(p, "✦ Plan the delivery: what to ask").then(function (text) {
+          if (job && job.stopped) return;
+          var r = JSON.parse(wasm.delivery_questions(String(text || "")));
+          if (!r.ok) {
+            if (opts.ai && n < 2) { busyStep(job, "The reply did not fit; asking again (" + (n + 2) + " of 3)"); return round(wasm.ask_again(prompt, String(text || ""), r.error), n + 1); }
+            busyEnd(job);
+            return flash("The AI's questions did not read: " + r.error, true);
+          }
+          busyEnd(job);
+          askDeliveryQuestions(r.questions);
+        }, function (e) {
+          if (job && job.stopped) return;
+          busyEnd(job);
+          if (e && e.shown) flash("");
+          else if (String(e && e.message) !== "cancelled") flash("AI: " + (e && e.message || e), true);
+        });
+      };
+      round(prompt, 0);
+    }
+    function askDeliveryQuestions(qs) {
+      var fields = qs.map(function (q) { return { q: q, ta: h("textarea", { class: "dge-input", rows: 2, placeholder: q.hint || "Leave it empty if nobody knows yet" }) }; });
+      var go = function () {
+        var answers = fields.map(function (f) { return [f.q.question, f.ta.value.trim()]; });
+        closeModal();
+        log("ai-action", { action: "plan", answered: answers.filter(function (a) { return a[1]; }).length, of: answers.length });
+        var job = opts.ai ? busyStart("plan", "Drafting the delivery plan") : null;
+        askRound(st.session.delivery_plan_prompt(JSON.stringify(answers), isoDay(today())), 0, "Plan the delivery", null, [], [], job);
+      };
+      showModal("Plan the delivery", h("div", { class: "dge-persp-form dge-plan-form" }, [
+        h("p", { class: "dge-muted" }, ["Answer what you can. What you leave empty becomes an open question on the plan, to settle later."])
+      ].concat(fields.map(function (f) { return h("label", {}, [h("span", {}, [f.q.question]), f.ta]); }))), [
+        h("button", { onclick: closeModal }, ["Cancel"]),
+        h("button", { class: "primary", onclick: go }, ["Draft the plan"])
+      ]);
+      setTimeout(function () { if (fields[0]) fields[0].ta.focus(); }, 0);
+    }
     /* A table of test scenarios has an "expected" column; its status column
        says how each went. */
     function testsTable(g) {
@@ -1999,7 +2051,8 @@
     var BUSY_STEPS = {
       rethink: ["Reading the board, every canvas and comment", "Working out what changed and where it belongs", "Choosing the right block for each thing", "Writing the changes"],
       add: ["Reading what you added", "Finding where each thing belongs", "Writing the changes"],
-      tests: ["Reading how it works: the flows, screens and rules", "Working out what could go wrong", "Writing the scenarios"]
+      tests: ["Reading how it works: the flows, screens and rules", "Working out what could go wrong", "Writing the scenarios"],
+      plan: ["Reading the board: the scope, screens and decisions", "Working out the work and its stages", "Placing it on a timeline", "Writing the plan"]
     };
     function busyStart(kind, title, what) {
       busyEnd(st.busy);

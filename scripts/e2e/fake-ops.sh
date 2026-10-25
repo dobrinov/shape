@@ -6,6 +6,8 @@
 # rethink told what a newer Shape can do says so.
 p=$(cat)
 case "$p" in
+  *"# Questions to plan the delivery of"*) printf '```json\n{"questions": [{"id": "start", "question": "When does the work start?", "hint": "a date"}, {"id": "team", "question": "Who is on the team?", "hint": "e.g. 2 web developers"}, {"id": "ga", "question": "Is there a fixed launch date?"}]}\n```\n' ;;
+  *"# Plan the delivery of"*"2 Nov 2026"*) printf '```json\n{"note": "A plan from 2 Nov: build, beta and launch.", "ops": [{"op": "add_group", "id": "delivery", "label": "Delivery plan", "tags": ["delivery"]}, {"op": "merge", "dsl": "group delivery {\\n  gantt plan: Plan [start: 2026-11-02] {\\n    Widget\\n      Build [4w, platform: web]\\n      Beta [2w]\\n      Launch [milestone]\\n  }\\n  todo open: Open questions for the plan {\\n    [ ] Who is on the team?\\n  }\\n}"}]}\n```\n' ;;
   *"# A question about the board"*"Who owns the API"*) printf 'The **platform team** owns it ([[api]]); nothing on the board says who owns the database.\n' ;;
   *"# A question about the board"*) printf 'The API writes to Postgres.\n\n```shape\ntitle: Writes\nwriter: Orders API [link: #/api]\nstore: Postgres [link: #/db]\nwriter -> store: writes\n```\n' ;;
   *"# Draft test scenarios"*"Scenarios already written"*) printf '```shape\ntable t: Tests {\n  scenario | steps | expected | covers | status\n  Pay twice | 1. Pay\\n2. Pay again | Charged once | Checkout | to run\n}\n```\n' ;;

@@ -78,6 +78,18 @@ pub const NOTES: &[Note] = &[
         short: "platforms marked on gantt tasks for Delivery",
         text: "A gantt task can say which platform it is for (`platform: web`, `ios`, `android` or any word), shown as a chip by its name. Where a task names its platform in its title (*Implement (iOS)*, *Spike · Android*), move it to `platform:` and keep the title short (*Implement*); where work is done for several platforms, give each platform a task of its own.",
     },
+    Note {
+        version: "0.82.0",
+        perspective: "product",
+        short: "product scope without technical detail for Product",
+        text: "Product (and Users, Design, Marketing, Business, Client) leave out what is only technical: tag it `tech` (architecture, hosting, APIs, data stores, implementation choices and their decision records; sections and blocks take tags too, with `update_group`). Go through each mindmap and tag `tech` every topic whose branch is about how it is built (how it is embedded or hosted, APIs, code, data stores), so its product branches read alone. Keep `product` on what the product people need, also when it has a technical side.",
+    },
+    Note {
+        version: "0.82.0",
+        perspective: "delivery",
+        short: "what a delivery plan needs, for Delivery",
+        text: "Every board has a Delivery perspective. When the board has no delivery plan (no gantt chart), add a to-do list \"Delivery: what we need to know\" with the questions a plan needs answered (who is on the team, when the work starts, the fixed dates, the milestones, the platforms, what it waits for outside the team), so they can be answered and the plan drafted with ✦ Plan the delivery.",
+    },
 ];
 
 /// Whether version `a` is newer than `b` (`0.10.0` > `0.9.9`).
