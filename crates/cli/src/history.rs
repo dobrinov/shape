@@ -3,7 +3,6 @@
 //! `.shape-history/<file name>/` (one at most every few minutes of
 //! saving, signed by whoever saved), so it can go back too.
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The least time between two snapshots of a file.
@@ -24,7 +23,7 @@ pub struct Version {
 }
 
 fn git_in(dir: &Path, args: &[&str]) -> Option<String> {
-    let out = Command::new("git")
+    let out = crate::command("git")
         .arg("-C")
         .arg(dir)
         .args(args)

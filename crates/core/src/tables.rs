@@ -21,7 +21,10 @@ const LINE: f64 = 18.0;
 const PAD_X: f64 = 10.0;
 const PAD_Y: f64 = 8.0;
 /// How much wider bold text is than regular.
-const BOLD: f64 = 1.08;
+const BOLD: f64 = 1.1;
+/// How much wider text may draw than it measures (fonts differ between
+/// systems): room so it never runs into the next column.
+const SLACK: f64 = 1.08;
 /// The widest a column gets before its text wraps.
 const MAX_COL: f64 = 260.0;
 
@@ -89,7 +92,7 @@ pub fn plot(doc: &Document, g: &Group) -> Plot {
                 .enumerate()
                 .filter_map(|(i, r)| r.get(k).map(|c| (i, c)))
                 .flat_map(|(i, c)| c.split('\n').map(move |l| (i, l)))
-                .map(|(i, l)| text::width(l, SIZE) * bold(i, k))
+                .map(|(i, l)| text::width(l, SIZE) * bold(i, k) * SLACK)
                 .fold(40.0, f64::max)
                 .min(MAX_COL)
                 + 2.0 * PAD_X
@@ -109,7 +112,7 @@ pub fn plot(doc: &Document, g: &Group) -> Plot {
             .map(|k| {
                 let c = row.get(k).map(|s| s.as_str()).unwrap_or("");
                 // (a hair over, so a word that just fits is not broken)
-                text::wrap(c, SIZE, (widths[k] - 2.0 * PAD_X) / bold(i, k) + 1.0)
+                text::wrap(c, SIZE, (widths[k] - 2.0 * PAD_X) / (bold(i, k) * SLACK) + 1.0)
             })
             .collect();
         let h = lines.iter().map(|l| l.len()).max().unwrap_or(1).max(1) as f64 * LINE + 2.0 * PAD_Y;

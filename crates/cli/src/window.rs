@@ -75,14 +75,14 @@ pub fn open_external(url: &str) {
         return;
     }
     let mut cmd = if cfg!(target_os = "macos") {
-        std::process::Command::new("open")
+        crate::command("open")
     } else if cfg!(windows) {
         // not `cmd /C start`: cmd would read the & of a query string
-        let mut c = std::process::Command::new("rundll32");
+        let mut c = crate::command("rundll32");
         c.arg("url.dll,FileProtocolHandler");
         c
     } else {
-        std::process::Command::new("xdg-open")
+        crate::command("xdg-open")
     };
     let _ = cmd
         .arg(url)
@@ -384,7 +384,7 @@ mod native {
                     .show();
                 if matches!(pick, MessageDialogResult::Custom(ref b) if b == "See what's new") {
                     let opener = if cfg!(target_os = "macos") { "open" } else if cfg!(windows) { "explorer" } else { "xdg-open" };
-                    let _ = std::process::Command::new(opener).arg(&u.url).spawn();
+                    let _ = crate::command(opener).arg(&u.url).spawn();
                 }
             }
             Ok(None) => {

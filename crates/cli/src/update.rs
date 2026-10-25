@@ -4,7 +4,6 @@
 //! believed), and a failure (offline, rate limit) is quiet.
 //! `SHAPE_NO_UPDATE_CHECK=1` turns it off; so does `CI`.
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -135,7 +134,7 @@ fn fresh(cache: &str, now: u64, current: &str) -> Option<String> {
 }
 
 fn fetch() -> Option<String> {
-    let out = Command::new("curl")
+    let out = crate::command("curl")
         .args([
             "-fsSL",
             "--max-time",

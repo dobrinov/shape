@@ -259,7 +259,7 @@ mod tests {
         std::fs::write(&file, &old).unwrap();
         assert!(refresh_in(&dir).is_empty());
         // from before the markers, as an earlier Shape shipped it: updated
-        let shipped = std::process::Command::new("git")
+        let shipped = crate::command("git")
             .args(["show", &format!("v0.60.0:skills/{name}/SKILL.md")])
             .output()
             .unwrap()

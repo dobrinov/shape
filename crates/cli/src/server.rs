@@ -70,7 +70,7 @@ fn url_decode(s: &str) -> String {
 fn board_root(file: &Path) -> PathBuf {
     let abs = std::fs::canonicalize(file).unwrap_or_else(|_| file.to_path_buf());
     let dir = abs.parent().unwrap_or(Path::new(".")).to_path_buf();
-    std::process::Command::new("git")
+    crate::command("git")
         .arg("-C")
         .arg(&dir)
         .args(["rev-parse", "--show-toplevel"])
@@ -169,7 +169,7 @@ fn unmerged(file: &Path) -> Option<(String, String, String)> {
         .unwrap_or(Path::new("."));
     let name = format!("./{}", file.file_name()?.to_string_lossy());
     let git = |args: &[&str]| {
-        std::process::Command::new("git")
+        crate::command("git")
             .arg("-C")
             .arg(dir)
             .args(args)
@@ -203,7 +203,7 @@ pub fn open_browser(url: &str) {
     } else {
         ("xdg-open", vec![url])
     };
-    let _ = std::process::Command::new(cmd.0)
+    let _ = crate::command(cmd.0)
         .args(cmd.1)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -351,7 +351,7 @@ fn listen(
             }
         });
     }
-    let author = std::process::Command::new("git")
+    let author = crate::command("git")
         .args(["config", "user.name"])
         .output()
         .ok()
@@ -413,7 +413,7 @@ fn listen(
                     continue;
                 }
                 let staged = was
-                    && std::process::Command::new("git")
+                    && crate::command("git")
                         .arg("-C")
                         .arg(
                             file.parent()

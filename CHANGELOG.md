@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.80.1 — 2026-10-25
+
+- **Windows: no more flashing terminal windows.** Since 0.73, Shape on Windows starts without a console window, so every program it runs in the background (git, on each save and while it checks for changes, and your AI's CLI) opened a console window of its own. With Shape switching between those windows and the editor, it could not be used. They now run without a window.
+- **Table text stays in its cells.** On some systems text draws wider than Shape measures it, so a long first-column entry ran into the next column and the last column ran past the table's edge. Columns now leave room for that, and text wraps a little earlier.
+
+## 0.80.1 — 2026-10-25
+
+- **Windows: no more flashing terminal windows.** Since 0.73, Shape on Windows starts without a console window, so every program it runs in the background (git, on each save and while it checks for changes, and your AI's CLI) opened a console window of its own. With Shape switching between those windows and the editor, it could not be used. They now run without a window.
+- **Table text stays in its cells.** On some systems text draws wider than Shape measures it, so a long first-column entry ran into the next column and the last column ran past the table's edge. Columns now leave room for that, and text wraps a little earlier.
+
 ## 0.80.0 — 2026-10-23
 
 - **Platforms on gantt tasks.** `platform: ios` (or `web`, `android`, or any word) marks which platform a task is for, with a chip by its name in that platform's colour, the same on every chart. Names stay short: *Implement* with an iOS chip and *Implement* with an Android chip, instead of *Implement (iOS)*. Right-click a task → *Platform…*. Hovering a task says its platform too.

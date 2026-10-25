@@ -62,7 +62,7 @@ pub fn search_path() -> String {
 }
 
 fn sh(cmd: &str) -> Command {
-    let mut c = Command::new("sh");
+    let mut c = crate::command("sh");
     c.args(["-c", cmd]).env("PATH", search_path());
     c
 }

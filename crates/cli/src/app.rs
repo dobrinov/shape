@@ -113,7 +113,7 @@ fn macos(remove: bool) -> Result<(), String> {
         .flat_map(|d| [d.join("Shape.app"), d.join("Diagram.app")])
     {
         if old.exists() {
-            let _ = Command::new(LSREGISTER).arg("-u").arg(&old).output();
+            let _ = crate::command(LSREGISTER).arg("-u").arg(&old).output();
             std::fs::remove_dir_all(&old).map_err(|e| format!("{}: {e}", old.display()))?;
             if remove {
                 eprintln!("removed {}", old.display());
@@ -148,7 +148,7 @@ end run
     let tmp = std::env::temp_dir().join(format!("shape-app-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);
     write(&tmp.join("open.applescript"), script)?;
-    run(Command::new("osacompile")
+    run(crate::command("osacompile")
         .arg("-o")
         .arg(&app)
         .arg(tmp.join("open.applescript")))?;
@@ -167,7 +167,7 @@ end run
                 png(svg, size * 2)?,
             )?;
         }
-        run(Command::new("iconutil")
+        run(crate::command("iconutil")
             .args(["-c", "icns", "-o"])
             .arg(res.join(format!("{name}.icns")))
             .arg(&set))?;
@@ -178,11 +178,11 @@ end run
     // the board type: declared here, opened here, with its icon
     let plist = app.join("Contents").join("Info.plist");
     let set = |key: &str, json: String| {
-        let _ = Command::new("plutil")
+        let _ = crate::command("plutil")
             .args(["-remove", key])
             .arg(&plist)
             .output();
-        run(Command::new("plutil")
+        run(crate::command("plutil")
             .args(["-insert", key, "-json", &json])
             .arg(&plist))
     };
@@ -207,9 +207,9 @@ end run
             r#"[{{"CFBundleTypeName":"Shape board","CFBundleTypeRole":"Editor","LSHandlerRank":"Owner","LSItemContentTypes":["{UTI}"],"CFBundleTypeIconFile":"document.icns"}}]"#
         ),
     )?;
-    run(Command::new(LSREGISTER).arg("-f").arg(&app))?;
+    run(crate::command(LSREGISTER).arg("-f").arg(&app))?;
     // Finder caches icons: a touch makes it look again
-    let _ = Command::new("touch").arg(&app).output();
+    let _ = crate::command("touch").arg(&app).output();
     eprintln!("installed {}", app.display());
     eprintln!(
         ".shape and .diagram files now have their own icon and open in Shape on a double-click."
@@ -267,18 +267,18 @@ fn linux(remove: bool) -> Result<(), String> {
         )?;
     }
     // refresh the caches when the tools are there
-    let _ = Command::new("update-mime-database")
+    let _ = crate::command("update-mime-database")
         .arg(share.join("mime"))
         .output();
-    let _ = Command::new("update-desktop-database")
+    let _ = crate::command("update-desktop-database")
         .arg(share.join("applications"))
         .output();
-    let _ = Command::new("gtk-update-icon-cache")
+    let _ = crate::command("gtk-update-icon-cache")
         .args(["-f", "-t"])
         .arg(share.join("icons/hicolor"))
         .output();
     if !remove {
-        let _ = Command::new("xdg-mime")
+        let _ = crate::command("xdg-mime")
             .args(["default", "shape.desktop", "application/x-shape"])
             .output();
     }
@@ -316,7 +316,7 @@ fn ico(svg: &str) -> Result<Vec<u8>, String> {
 
 fn windows(remove: bool) -> Result<(), String> {
     let classes = r"HKCU\Software\Classes";
-    let reg = |args: &[&str]| run(Command::new("reg").args(args));
+    let reg = |args: &[&str]| run(crate::command("reg").args(args));
     // the association from before the rename to Shape goes either way
     let _ = reg(&["delete", &format!(r"{classes}\diagram.board"), "/f"]);
     if remove {
@@ -377,7 +377,7 @@ fn windows(remove: bool) -> Result<(), String> {
             bin = q(&bin),
             home = q(&home()?),
         );
-        run(Command::new("powershell").args([
+        run(crate::command("powershell").args([
             "-NoProfile",
             "-NonInteractive",
             "-Command",

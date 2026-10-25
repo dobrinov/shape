@@ -227,6 +227,21 @@ impl Args {
 }
 
 /// The first free `untitled.shape`, `untitled-2.shape`, … in the current directory.
+/// A program Shape runs (git, the AI's CLI, an opener). On Windows it gets
+/// no console window of its own: shape.exe has none, so each one would
+/// flash a new one up over the editor.
+pub fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    #[allow(unused_mut)]
+    let mut c = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        c.creation_flags(CREATE_NO_WINDOW);
+    }
+    c
+}
+
 fn untitled() -> String {
     (1..)
         .map(|n| match n {
@@ -280,7 +295,7 @@ fn main() -> ExitCode {
 }
 
 pub fn repo_root() -> Option<PathBuf> {
-    let out = Command::new("git")
+    let out = crate::command("git")
         .args(["rev-parse", "--show-toplevel"])
         .output()
         .ok()?;
@@ -304,7 +319,7 @@ fn read_text(path: &str) -> Result<String, String> {
 fn git_show(reference: &str, file: &str) -> Result<String, String> {
     let abs = std::fs::canonicalize(file).map_err(|e| format!("{file}: {e}"))?;
     let dir = abs.parent().unwrap_or(Path::new("."));
-    let out = Command::new("git")
+    let out = crate::command("git")
         .arg("-C")
         .arg(dir)
         .args(["ls-files", "--full-name"])
@@ -315,7 +330,7 @@ fn git_show(reference: &str, file: &str) -> Result<String, String> {
     if rel.is_empty() {
         return Err(format!("{file} is not tracked by git"));
     }
-    let out = Command::new("git")
+    let out = crate::command("git")
         .arg("-C")
         .arg(dir)
         .args(["show", &format!("{reference}:{rel}")])
@@ -422,7 +437,7 @@ pub fn git_since_on(file: &str) -> Option<(String, String, String, String)> {
     let abs = std::fs::canonicalize(file).ok()?;
     let dir = abs.parent().unwrap_or(Path::new("."));
     let git = |args: &[&str]| -> Option<String> {
-        let out = Command::new("git")
+        let out = crate::command("git")
             .arg("-C")
             .arg(dir)
             .args(args)
@@ -485,7 +500,7 @@ fn parse_doc(src: &str, what: &str) -> Result<Document, String> {
 fn merge_cmd(args: &Args) -> Result<ExitCode, String> {
     if args.flag("--install") {
         let git = |a: &[&str]| {
-            Command::new("git")
+            crate::command("git")
                 .args(a)
                 .status()
                 .map_err(|e| format!("git: {e}"))
@@ -505,7 +520,7 @@ fn merge_cmd(args: &Args) -> Result<ExitCode, String> {
             "merge.shape.driver",
             "shape merge %O %A %B --driver",
         ])?;
-        let top = Command::new("git")
+        let top = crate::command("git")
             .args(["rev-parse", "--show-toplevel"])
             .output()
             .map_err(|e| format!("git: {e}"))?;
@@ -548,7 +563,7 @@ fn merge_cmd(args: &Args) -> Result<ExitCode, String> {
     let (Some(b), Some(o), Some(t)) = (&docs[0], &docs[1], &docs[2]) else {
         // not all three read as boards: git's own line-by-line merge
         if driver {
-            let st = Command::new("git")
+            let st = crate::command("git")
                 .args(["merge-file", &ours, &base, &theirs])
                 .status()
                 .map_err(|e| format!("git merge-file: {e}"))?;
@@ -678,7 +693,7 @@ fn author(args: &Args) -> Option<String> {
     if let Some(b) = args.val("--by") {
         return Some(b.to_string());
     }
-    let git = Command::new("git")
+    let git = crate::command("git")
         .args(["config", "user.name"])
         .output()
         .ok()

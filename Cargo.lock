@@ -2237,7 +2237,7 @@ dependencies = [
 
 [[package]]
 name = "shape"
-version = "0.80.0"
+version = "0.80.1"
 dependencies = [
  "muda",
  "objc2",
@@ -2255,7 +2255,7 @@ dependencies = [
 
 [[package]]
 name = "shape-core"
-version = "0.80.0"
+version = "0.80.1"
 dependencies = [
  "schema-core",
  "serde",
@@ -2264,7 +2264,7 @@ dependencies = [
 
 [[package]]
 name = "shape-wasm"
-version = "0.80.0"
+version = "0.80.1"
 dependencies = [
  "serde",
  "serde_json",
