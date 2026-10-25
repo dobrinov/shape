@@ -631,10 +631,15 @@ mod tests {
             "{p}"
         );
         let (summary, source) = prompt::answer_parts("SSO waits on the IdP.\n\n```shape\ntitle: SSO\nsso: SSO login [link: #/plan/sso]\nidp: Pick an IdP [sticky]\nidp -> sso\n```\nThat is all.").unwrap();
-        assert_eq!(summary, "SSO waits on the IdP. That is all.");
+        assert_eq!(summary, "SSO waits on the IdP.\nThat is all.");
         let d = dsl::parse(&source).unwrap();
         assert_eq!(d.node("sso").unwrap().link.as_deref(), Some("#/plan/sso"));
-        assert!(prompt::answer_parts("no diagram here").is_err());
+        // most answers are words only: no drawing
+        assert_eq!(
+            prompt::answer_parts("It waits on [[plan/sso]].\n- one\n").unwrap(),
+            ("It waits on [[plan/sso]].\n- one".to_string(), String::new())
+        );
+        assert!(prompt::answer_parts("  ").is_err());
         assert!(prompt::answer_parts("```shape\na -> -> [\n```").is_err());
         // the fence's name from before the rename still works
         assert!(prompt::answer_parts("Here.\n\n```diagram\na: A\n```").is_ok());
@@ -679,6 +684,16 @@ mod tests {
                 (p(&[]), Some("nope"), None),
             ]
         );
+        // written loosely: the element with that id, wherever it is
+        let loose = s.answer_refs("[[sso]] and [[deep/okta]]");
+        assert_eq!((loose[0].path.clone(), loose[0].label.as_deref()), (p(&["plan"]), Some("SSO login")));
+        assert_eq!((loose[1].path.clone(), loose[1].label.as_deref()), (p(&["plan", "deep"]), Some("Use Okta")));
+        // a comment: its thread
+        let mut c = Session::new();
+        c.set_source("a: A\n\ncanvas plan: Plan {\n  b: B\n  comment on b: Which date is right for the launch, 26 Nov or 3 Dec?\n}\n");
+        let r = &c.answer_refs("as [[c1]] asks")[0];
+        assert!(r.comment && r.path == p(&["plan"]));
+        assert_eq!(r.label.as_deref(), Some("comment: Which date is right for the…"));
     }
 
     #[test]

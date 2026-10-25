@@ -267,8 +267,8 @@
       ].filter(Boolean));
     };
     var aiMenu = h("div", { class: "dge-ai-menu", role: "menu", hidden: true }, [
-      aiItem("ask", "Ask", "Questions answered with a diagram drawn for them",
-        "Ask: a question about this board (all of it, canvases included), such as what blocks the launch or who owns what. The AI draws the answer on a temporary canvas, each piece linked to its place on the board. Save it as a canvas, comment on it, or rethink the board from it. Nothing changes until you do.",
+      aiItem("ask", "Ask", "Questions about the board, answered with links to where it says so",
+        "Ask: a question about this board (all of it, canvases included), such as what blocks the launch or who owns what. The AI answers in the chat, each fact a link to the block it comes from. When a picture says it better, it also draws one on a temporary canvas: save it as a canvas, comment on it, or rethink the board from it. Nothing changes until you do.",
         "", function () { openAsk(); }),
       aiItem("rethink", "Rethink", "Act on the comments and bring the board up to date",
         "Rethink: the AI reads the whole board, every canvas included. It acts on the open comments first (changing the board everywhere a comment affects it, then resolving the comment), then organises: related items in sections, duplicates merged, stale items updated. In git, what changed on this branch counts as new information too. Nothing is lost, and you see the changes before keeping them.",
@@ -1769,7 +1769,7 @@
       var pending = askAtt.take();
       askAtt.clear();
       askInput.value = "";
-      var a = h("div", { class: "dge-ask-a dge-muted" }, [opts.ai ? "✦ Drawing an answer…" : "✦ Waiting for the reply you paste…"]);
+      var a = h("div", { class: "dge-ask-a dge-muted" }, [opts.ai ? "✦ Thinking…" : "✦ Waiting for the reply you paste…"]);
       askThread.appendChild(h("div", { class: "dge-ask-q" }, [q]));
       askThread.appendChild(a);
       askThread.scrollTop = askThread.scrollHeight;
@@ -1789,10 +1789,14 @@
       };
       pending.then(function (got) { images = got.images; return round(prompt, 0); }).then(function (r) {
         st.askHistory = history.concat([[q, r.summary]]);
+        // the answer in words, each fact a link to the block it comes from
         a.className = "dge-ask-a";
-        a.textContent = r.summary || "Answered on its own canvas.";
-        closeAsk(true);
-        openAnswer(q, r.summary, r.source);
+        a.textContent = "";
+        renderAnswer(a, r.summary || "Answered with a drawing.");
+        // a drawing, when the AI found that one says it better
+        if (r.source) {
+          a.appendChild(h("button", { class: "dge-ask-draw", onclick: function () { closeAsk(true); openAnswer(q, r.summary, r.source); } }, ["Open the drawing"]));
+        }
       }, function (e) {
         a.className = "dge-ask-a dge-ask-err";
         a.textContent = e && e.message === "cancelled" ? "Cancelled." : "No answer: " + (e && e.message || e);
@@ -1821,6 +1825,10 @@
       refreshDoc();
       render();
       var said = h("span", { class: "dge-answer-summary" });
+      // its links read as the names of what they point at
+      var named = {};
+      JSON.parse(main.session.answer_refs(summary || "")).forEach(function (r) { named[r.ref] = r.label || r.ref; });
+      summary = (summary || "").replace(/\[\[([^\]]+)\]\]/g, function (m, ref) { return named[ref.trim()] || ref; }).replace(/\n+/g, " ");
       (summary || "").split(/(\*\*[^*]+\*\*)/).forEach(function (part) {
         var b = /^\*\*([^*]+)\*\*$/.exec(part);
         said.appendChild(b ? h("b", {}, [b[1]]) : document.createTextNode(part));
@@ -1879,7 +1887,8 @@
     /* An answer: paragraphs and bullets, **bold**, and [[canvas/id]] as links to that place. */
     function renderAnswer(into, text) {
       var refs = {};
-      JSON.parse(st.session.answer_refs(text)).forEach(function (r) { refs[r.ref] = r; });
+      // (the places are on the board, also while a drawn answer is open)
+      JSON.parse((st.answer ? st.answer.main.session : st.session).answer_refs(text)).forEach(function (r) { refs[r.ref] = r; });
       var inline = function (line, parent) {
         line.split(/(\[\[[^\]]+\]\]|\*\*[^*]+\*\*)/).forEach(function (part) {
           var m = /^\[\[([^\]]+)\]\]$/.exec(part);
@@ -1914,6 +1923,16 @@
     function goToRef(r) {
       var here = JSON.stringify(st.canvasPath) === JSON.stringify(r.path);
       if (!here && !openCanvas(r.path)) return;
+      if (r.comment) {
+        // a comment: its thread, by what it is on
+        var c = comment(r.id);
+        if (!c) return;
+        var g = c.on ? geom(c.on) : null, box = canvas.getBoundingClientRect();
+        var at = g ? toScreen(g.x + g.w, g.y) : c.x != null ? toScreen(c.x, c.y) : { x: 200, y: 200 };
+        if (c.on) select(commentTargets(c));
+        setTimeout(function () { openThread(r.id, box.left + at.x, box.top + at.y); }, 60);
+        return;
+      }
       if (r.id) followLink("#" + r.id);
     }
     /* Rethink: the model organises what was collected on the open canvas.

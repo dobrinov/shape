@@ -6,6 +6,7 @@
 # rethink told what a newer Shape can do says so.
 p=$(cat)
 case "$p" in
+  *"# A question about the board"*"Who owns the API"*) printf 'The **platform team** owns it ([[api]]); nothing on the board says who owns the database.\n' ;;
   *"# A question about the board"*) printf 'The API writes to Postgres.\n\n```shape\ntitle: Writes\nwriter: Orders API [link: #/api]\nstore: Postgres [link: #/db]\nwriter -> store: writes\n```\n' ;;
   *"# Draft test scenarios"*"Scenarios already written"*) printf '```shape\ntable t: Tests {\n  scenario | steps | expected | covers | status\n  Pay twice | 1. Pay\\n2. Pay again | Charged once | Checkout | to run\n}\n```\n' ;;
   *"# Draft test scenarios"*) printf '```shape\ntable t: Tests {\n  scenario | steps | expected | covers | status\n  Pay with a saved card | 1. Open the cart\\n2. Pay | Paid, receipt sent | Checkout | to run\n  Wrong password | 1. Sign in with a wrong password | Says it is wrong | Sign in | to run\n}\n```\n' ;;

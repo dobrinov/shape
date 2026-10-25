@@ -70,6 +70,8 @@ try {
   if (process.env.SHOTS) await p.screenshot({ path: join(process.env.SHOTS, "images-ai-ask.png") });
   await p.locator(".dge-ask-panel textarea").fill("What is on this?");
   await p.keyboard.press("Enter");
+  await p.waitForSelector(".dge-ask-a .dge-ask-draw", { timeout: 10000 });
+  await p.locator(".dge-ask-a .dge-ask-draw").last().click();
   await p.waitForSelector('.dg-node:has-text("1 images, listed yes")', { timeout: 10000 });
   assert.equal(await p.locator(".dge-ask-panel .dge-att-item").count(), 0, "sent, the thumbnail goes");
   assert.deepEqual(errors, []);

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.81.0 — 2026-10-25
+
+- **✦ Ask answers in the chat.** A question about the board gets an answer in words, in the Ask panel, and each fact links to the block it comes from (a decision, a gantt task, a risk, a section or a comment). Click a link to go there; a comment's link opens its thread. It still draws, on a temporary canvas, when a picture says it better (things that depend on each other, a sequence over time, options side by side): the answer then has *Open the drawing*.
+- Links in answers find their element wherever it is, also when the AI writes them loosely (a chart's id as if it were a canvas).
+
 ## 0.80.1 — 2026-10-25
 
 - **Windows: no more flashing terminal windows.** Since 0.73, Shape on Windows starts without a console window, so every program it runs in the background (git, on each save and while it checks for changes, and your AI's CLI) opened a console window of its own. With Shape switching between those windows and the editor, it could not be used. They now run without a window.

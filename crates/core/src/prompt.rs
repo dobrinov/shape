@@ -522,10 +522,11 @@ pub fn question(
 }
 
 /// A prompt asking a model to answer `question` about the whole board
-/// (`root`, canvases included) with a small diagram of its own: a summary
-/// in a sentence or two, then a board in the `shape` language whose
-/// elements link back to where they come from (`#/id` on the top board,
-/// `#/plan/id` inside a canvas). See [`answer_parts`].
+/// (`root`, canvases included): in a few sentences for the chat, each fact
+/// linked to the block it comes from (`[[id]]`, `[[plan/id]]` inside a
+/// canvas), and only when a picture says it better, a small board of its
+/// own whose elements link back too (`#/id`, `#/plan/id`). See
+/// [`answer_parts`].
 pub fn answer_board(
     root: &Document,
     history: &[(String, String)],
@@ -534,7 +535,7 @@ pub fn answer_board(
     recipes: &[crate::recipes::Recipe],
 ) -> String {
     let title = root.title.as_deref().unwrap_or("Untitled diagram");
-    let mut s = format!("# A question about the board \"{title}\"\n\nAnswer the question at the end by drawing a small board of your own: a diagram made for this question from what is on the board below (the top board, then each canvas inside it, in the `shape` language with every id).\n\n");
+    let mut s = format!("# A question about the board \"{title}\"\n\nAnswer the question at the end from what is on the board below (the top board, then each canvas inside it, in the `shape` language with every id).\n\n");
     s.push_str(&board_by_canvas(root, today));
     if !history.is_empty() {
         s.push_str("## Earlier in this conversation\n\n");
@@ -545,18 +546,24 @@ pub fn answer_board(
     s.push_str(&format!("## The question\n\n{}\n\n", question.trim()));
     s.push_str(&crate::recipes::prompt_section(recipes));
     s.push('\n');
-    s.push_str("## How to answer\n\nFirst one or two short plain sentences that answer the question (40 words at most; the diagram carries the detail). Then one ```shape code block: a small board that shows the answer.\n\n- Pick the form that fits the question: boxes and arrows for what depends on what, sections to group, a `timeline` for when things happened, a `table` to compare, a `mindmap` to break something down, stickies for open questions.\n- Keep it small: about 4 to 15 elements, short labels, details (`detail:`) for the rest.\n- Link every element that comes from the board to its place there: `[link: #/id]` for the top board, `[link: #/plan/id]` for an element inside canvas `plan` (the canvas path, then the id). Only ids that are on the board.\n- Start it with `title:` (a short name for the answer). Do not copy the whole board; show only what answers the question.\n- When the board does not answer it, say so in the sentences and draw what is known and what is missing (a sticky per missing piece).\n\nExample:\n\nFraud reporting is the long pole: it must ship before the open beta.\n\n```shape\ntitle: What blocks the launch\nfraud: Fraud reporting API [red, link: #/blockers/b-fraud, detail: owner rado]\nbeta: Open beta, 28 Oct [link: #/status/beta]\nfraud -> beta: must ship first\n```\n");
+    s.push_str("## How to answer\n\nAnswer in the chat: a few plain sentences or a short list, without a preamble. **bold** and `- ` bullets at most; no headings, tables or code blocks in the text.\n\n- Link what the answer comes from, so the reader can check it: `[[id]]` for an element of the top board, `[[canvas/id]]` for one inside a canvas (the canvas path, then the id; e.g. `[[plan/sso]]`), `[[canvas]]` for a whole canvas, `[[c1]]` for a comment. Link the block each fact comes from (the decision record, the gantt task, the risk, the section); use only ids that are on the board.\n- When the board does not answer the question, say so, and say what is missing; do not make things up.\n- Draw only when a picture says it better than words: many things that depend on each other, a sequence over time, several options side by side. Then, after the text, add one ```shape code block: a small board that shows it (about 4 to 15 elements, short labels, details (`detail:`) for the rest, `title:` first), each element that comes from the board linked to its place there (`[link: #/id]`, `[link: #/plan/id]` inside canvas `plan`). Pick the form that fits: boxes and arrows for what depends on what, a `timeline` for when, a `table` to compare, a `mindmap` to break down, stickies for what is missing. Most questions need no drawing.\n\nExample, in words:\n\nThe open beta waits on **checkout**: the card form is not built yet ([[plan/card-form]]) and its risk is the highest on the board ([[risks/card-fraud]]).\n\nExample, with a drawing:\n\nThree things must ship before the launch, and the store review is the long pole ([[plan/store-review]]).\n\n```shape\ntitle: What blocks the launch\nreview: Store review, 9 weeks [red, link: #/plan/store-review]\nform: Card form [link: #/plan/card-form]\nlaunch: Launch, 1 Feb [link: #/plan/launch]\nreview -> launch\nform -> launch\n```\n");
     s
 }
 
-/// A model's reply to [`answer_board`]: its sentences and its board (the
-/// `shape` block; `diagram`, the name before, works too), or why it cannot
-/// be used.
+/// A model's reply to [`answer_board`]: its text and its board (the
+/// `shape` block, "" when it answered in words only; `diagram`, the name
+/// before, works too), or why it cannot be used.
 pub fn answer_parts(reply: &str) -> Result<(String, String), String> {
-    let (start, fence) = ["```shape", "```diagram"]
+    let Some((start, fence)) = ["```shape", "```diagram"]
         .iter()
         .find_map(|f| reply.find(f).map(|i| (i, *f)))
-        .ok_or("the reply has no ```shape block")?;
+    else {
+        let text = reply.trim();
+        if text.is_empty() {
+            return Err("the reply is empty".into());
+        }
+        return Ok((text.to_string(), String::new()));
+    };
     let body = &reply[start + fence.len()..];
     let end = body.find("```").ok_or("the ```shape block is not closed")?;
     let source = body[..end].trim_matches('\n').to_string() + "\n";
@@ -566,10 +573,10 @@ pub fn answer_parts(reply: &str) -> Result<(String, String), String> {
             .collect::<Vec<_>>()
             .join("; ")
     })?;
-    let summary = format!("{} {}", &reply[..start], &body[end + 3..])
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
+    // the text around the drawing, its lines kept (bullets)
+    let summary = format!("{}\n{}", reply[..start].trim(), body[end + 3..].trim())
+        .trim()
+        .to_string();
     Ok((summary, source))
 }
 
@@ -584,6 +591,9 @@ pub struct AnswerRef {
     pub id: Option<String>,
     /// What to call it; none when nothing on the board has that id.
     pub label: Option<String>,
+    /// It is a comment (`id` is its id): its thread opens.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub comment: bool,
 }
 
 /// The places an answer to [`question`] points at, in order (each once).
@@ -601,17 +611,19 @@ pub fn answer_refs(root: &Document, answer: &str) -> Vec<AnswerRef> {
         let parts: Vec<String> = r.split('/').map(|p| p.trim().to_string()).collect();
         let (canvas, id) = parts.split_at(parts.len() - 1);
         let id = &id[0];
+        let name = |doc: &Document, id: &str| {
+            doc.element(id).map(|e| match e {
+                Element::Node(n) if !n.label.is_empty() => n.label.replace('\n', " "),
+                Element::Node(_) => id.to_string(),
+                Element::Group(g) => g.display().to_string(),
+                Element::Edge(e) => e
+                    .label
+                    .clone()
+                    .unwrap_or_else(|| format!("{} → {}", e.from, e.to)),
+            })
+        };
         let found = root.at(canvas).and_then(|doc| {
-            if let Some(e) = doc.element(id) {
-                let label = match e {
-                    Element::Node(n) if !n.label.is_empty() => n.label.replace('\n', " "),
-                    Element::Node(_) => id.clone(),
-                    Element::Group(g) => g.display().to_string(),
-                    Element::Edge(e) => e
-                        .label
-                        .clone()
-                        .unwrap_or_else(|| format!("{} → {}", e.from, e.to)),
-                };
+            if let Some(label) = name(doc, id) {
                 Some((canvas.to_vec(), Some(id.clone()), label))
             } else {
                 // a whole canvas
@@ -622,18 +634,44 @@ pub fn answer_refs(root: &Document, answer: &str) -> Vec<AnswerRef> {
                 })
             }
         });
-        out.push(match found {
-            Some((path, id, label)) => AnswerRef {
+        // written loosely (a chart's id as a canvas: `plan/beta`), or not
+        // where it said: the element with that id, wherever it is
+        let found = found.or_else(|| {
+            canvases_of(root)
+                .into_iter()
+                .find_map(|(path, doc)| name(doc, id).map(|l| (path, Some(id.clone()), l)))
+        });
+        // a comment: its thread
+        let comment = found.is_none().then(|| {
+            canvases_of(root).into_iter().find_map(|(path, doc)| {
+                doc.comment(id).map(|c| {
+                    let words: Vec<&str> = c.text.split_whitespace().take(6).collect();
+                    let more = if c.text.split_whitespace().count() > 6 { "…" } else { "" };
+                    (path, format!("comment: {}{more}", words.join(" ")))
+                })
+            })
+        });
+        out.push(match (found, comment.flatten()) {
+            (Some((path, id, label)), _) => AnswerRef {
                 r#ref: r,
                 path,
                 id,
                 label: Some(label),
+                comment: false,
             },
-            None => AnswerRef {
+            (None, Some((path, label))) => AnswerRef {
+                r#ref: r,
+                path,
+                id: Some(id.clone()),
+                label: Some(label),
+                comment: true,
+            },
+            (None, None) => AnswerRef {
                 r#ref: r,
                 path: canvas.to_vec(),
                 id: Some(id.clone()),
                 label: None,
+                comment: false,
             },
         });
     }

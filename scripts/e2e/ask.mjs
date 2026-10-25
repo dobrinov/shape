@@ -90,13 +90,27 @@ try {
   assert.match(saved(), /n1: Two plans: free and team/);
   assert.match(saved(), /comment c1 on n1: Two plans now \[resolved, resolution: Scope updated\]/);
 
-  // Ask: the answer is a temporary canvas drawn for the question; nothing is saved
+  // Ask: answered in the chat, each fact a link to the block it comes from
   const before = saved();
-  const ask = async (q) => {
+  const question = async (q) => {
     await p.locator(".dge-ai-fab").click();
     await p.locator(".dge-ai-item", { hasText: "Ask" }).first().click();
     await p.locator(".dge-ask-panel textarea").fill(q);
     await p.keyboard.press("Enter");
+    await p.waitForSelector(".dge-ask-a:not(.dge-muted)"); await sleep(300);
+  };
+  await question("Who owns the API?");
+  const said = p.locator(".dge-ask-a").last();
+  assert.match(await said.textContent(), /The platform team owns it \(Orders API\); nothing on the board says who owns the database\./);
+  assert.equal(await said.locator(".dge-ask-draw").count(), 0, "words only: no drawing");
+  if (process.env.SHOTS) await p.screenshot({ path: join(process.env.SHOTS, "ask-words.png") });
+  await said.locator(".dge-ref", { hasText: "Orders API" }).click(); await sleep(400);
+  assert.equal(await p.locator('.dg-node.sel[data-id="api"]').count(), 1, "its link goes to the block");
+  await p.keyboard.press("Escape");
+  // when a picture says it better, a drawing too: a temporary canvas; nothing is saved
+  const ask = async (q) => {
+    await question(q);
+    await p.locator(".dge-ask-a").last().locator(".dge-ask-draw").click();
     await p.waitForSelector(".dge-answer-bar"); await sleep(300);
   };
   await ask("Where does the API write?");
