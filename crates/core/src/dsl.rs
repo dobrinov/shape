@@ -3618,7 +3618,8 @@ pub(crate) fn map_block(doc: &Document, root: &Node, pad: &str, out: &mut String
             seen.push(c.id.clone());
             let label = c.display();
             let mut a = node_attrs(c);
-            if slug(label) != c.id {
+            // (for a model, every topic's id: it can point at any branch)
+            if slug(label) != c.id || TOPIC_IDS.with(|t| t.get()) {
                 a.insert(0, format!("id: {}", attr_value(&c.id)));
             }
             out.push_str(&format!(
@@ -3934,10 +3935,25 @@ pub(crate) fn asset_line(a: &Asset) -> String {
     format!("asset {}: {}", id_text(&a.id), a.data)
 }
 
-/// [`print`] without the images' data, for prompts: a model reads `[image:
-/// img1]` on the box and a note of what the image is, not its base64.
-/// Canvases inside the board are left out too, with a note of which there are.
+thread_local! {
+    /// While printing for a model ([`print_lean`]): each mindmap topic
+    /// says its id.
+    static TOPIC_IDS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// [`print_short`] for a model: each mindmap topic says its id too
+/// (`Embedding [id: embedding]`), so ops can point at any branch.
 pub fn print_lean(doc: &Document) -> String {
+    TOPIC_IDS.with(|t| t.set(true));
+    let out = print_short(doc);
+    TOPIC_IDS.with(|t| t.set(false));
+    out
+}
+
+/// [`print`] without the images' data: `[image: img1]` on the box and a
+/// note of what the image is, not its base64. Canvases inside the board
+/// are left out too, with a note of which there are.
+pub fn print_short(doc: &Document) -> String {
     if doc.assets.is_empty() && doc.canvases.is_empty() {
         return print(doc);
     }

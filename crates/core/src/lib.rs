@@ -692,6 +692,11 @@ mod tests {
         // a comment: its thread
         let mut c = Session::new();
         c.set_source("a: A\n\ncanvas plan: Plan {\n  b: B\n  comment on b: Which date is right for the launch, 26 Nov or 3 Dec?\n}\n");
+        // a model sees each mindmap topic's id, so it can point at any branch
+        let mut m = Session::new();
+        m.set_source("mindmap goals: Goals {\n  Fast\n    Under 1s\n}\n");
+        assert!(m.rethink_prompt(None, "", None).unwrap().contains("  Fast [id: fast]\n    Under 1s [id: under-1s]"));
+        assert_eq!(m.source("dsl").unwrap(), "mindmap goals: Goals {\n  Fast\n    Under 1s\n}\n", "the file stays as it is");
         let r = &c.answer_refs("as [[c1]] asks")[0];
         assert!(r.comment && r.path == p(&["plan"]));
         assert_eq!(r.label.as_deref(), Some("comment: Which date is right for the…"));

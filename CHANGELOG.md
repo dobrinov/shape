@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.82.1 — 2026-10-25
+
+- **The AI can reach every branch of a mindmap.** Prompts now show each mindmap topic with its id (your file is unchanged), so ✦ Rethink and Ask can change or tag any branch reliably. For example, Rethink now tags a map's technical branches so the Product perspective leaves them out.
+
 ## 0.82.0 — 2026-10-25
 
 - **Product shows the product, not how it is built.** Product, Users, Design, Marketing, Business, Investors and Client leave out anything that is only technical (tagged `tech`): architecture sections, implementation decisions, a mindmap's technical branches, on the board and in their summaries. Something tagged both still shows. ✦ Rethink and *Sort into perspectives* tag technical things `tech`, and the next Rethink after this upgrade tags what is already on your board.
