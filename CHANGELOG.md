@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.83.0 — 2026-10-26
+
+- **Shape for Mac as an app.** Download [Shape.dmg](https://github.com/dobrinov/shape/releases/latest/download/Shape.dmg), open it and drag Shape to Applications. It runs on Apple silicon and Intel Macs and is signed and notarized by Apple. Double-clicking a `.shape` file opens it in Shape, each board in its own window, and opening Shape itself starts a new board. The app finds your AI's command-line tool the way your terminal does. **Shape → Install the shape Command…** adds `shape` to Terminal; a `shape` from Homebrew stays as it is.
+- **Windows: installing the Claude skills works.** `shape skills install --global` no longer stops with *HOME not set*: the skills go into your user folder.
+- **Windows: ✦ AI actions run your AI's command-line tool**, including one installed with npm (`claude.cmd`). Before, they looked for it in a way only macOS and Linux understand.
+
 ## 0.82.2 — 2026-10-26
 
 - **The macOS downloads are signed and notarized by Apple**, so macOS opens them without the "unidentified developer" warning. Signing for Windows is on its way.

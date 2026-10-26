@@ -52,13 +52,24 @@ pub fn start_dir(from_terminal: bool) -> PathBuf {
     if from_terminal {
         return here;
     }
-    let home = std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from);
+    let home = crate::home_dir();
     match home {
         Some(h) if h.join("Documents").is_dir() => h.join("Documents"),
         Some(h) if h.is_dir() => h,
         _ => here,
+    }
+}
+
+/// A board in a process (and window) of its own, as from a terminal.
+#[cfg_attr(not(feature = "window"), allow(dead_code))]
+pub fn open_elsewhere(file: &Path) {
+    if let Ok(exe) = std::env::current_exe() {
+        let _ = crate::command(exe)
+            .arg(file)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
     }
 }
 
@@ -116,6 +127,9 @@ mod none {
         pub fn run(self, _url: &str, _name: &str) -> Result<(), String> {
             match self {}
         }
+        pub fn hand_over(self, _fallback: impl FnOnce() -> Option<PathBuf>) -> ! {
+            match self {}
+        }
     }
 }
 
@@ -148,6 +162,9 @@ mod native {
         /// what Check for Updates… found: the newer version, or why it could not tell
         #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
         Updates(Result<Option<crate::update::Update>, String>),
+        /// Shape → Install the shape Command… (in Shape.app)
+        #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+        InstallCommand,
     }
 
     /// Saves what the editor has pending, then tells us to close.
@@ -193,6 +210,33 @@ mod native {
             let made =
                 std::panic::catch_unwind(|| EventLoopBuilder::<Ev>::with_user_event().build());
             made.ok().map(|event_loop| Native { event_loop })
+        }
+
+        /// Shape.app opened from Finder or the Dock: the boards it was asked
+        /// to open come as events once it has started, not as arguments.
+        /// Each goes to a process (and window) of its own; none (the app
+        /// itself was opened): `fallback`, a new board. Then this one ends.
+        pub fn hand_over(self, fallback: impl FnOnce() -> Option<PathBuf> + 'static) -> ! {
+            let until = std::time::Instant::now() + Duration::from_millis(800);
+            let mut fallback = Some(fallback);
+            self.event_loop.run(move |event, _, flow| {
+                *flow = ControlFlow::WaitUntil(until);
+                match event {
+                    Event::Opened { urls } => {
+                        for f in urls.iter().filter_map(|u| u.to_file_path().ok()) {
+                            super::open_elsewhere(&f);
+                        }
+                        *flow = ControlFlow::Exit;
+                    }
+                    Event::NewEvents(StartCause::ResumeTimeReached { .. }) => {
+                        if let Some(f) = fallback.take().and_then(|f| f()) {
+                            super::open_elsewhere(&f);
+                        }
+                        *flow = ControlFlow::Exit;
+                    }
+                    _ => {}
+                }
+            })
         }
 
         /// Show the editor at `url` until the window closes, then end the
@@ -292,6 +336,12 @@ mod native {
                             mac::dock_icon();
                         }
                     }
+                    // more boards from Finder: each in a window of its own
+                    Event::Opened { urls } => {
+                        for f in urls.iter().filter_map(|u| u.to_file_path().ok()) {
+                            super::open_elsewhere(&f);
+                        }
+                    }
                     Event::WindowEvent {
                         event: WindowEvent::CloseRequested,
                         ..
@@ -327,6 +377,8 @@ mod native {
                     }
                     Event::UserEvent(Ev::Title(t)) => window.set_title(&super::title(&t)),
                     Event::UserEvent(Ev::Updates(found)) => tell_updates(found),
+                    #[cfg(target_os = "macos")]
+                    Event::UserEvent(Ev::InstallCommand) => mac::install_command(),
                     _ => {}
                 }
             })
@@ -444,6 +496,24 @@ mod native {
             NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(&png))
         }
 
+        /// Shape → Install the shape Command…: what happened, in a dialog.
+        pub fn install_command() {
+            use rfd::{MessageButtons, MessageDialog, MessageLevel};
+            let Some(app) = crate::app::bundle() else {
+                return;
+            };
+            let (level, title, text) = match crate::app::install_command(&app) {
+                Ok(t) => (MessageLevel::Info, "The shape command", t),
+                Err(e) => (MessageLevel::Warning, "Could not install the shape command", e),
+            };
+            MessageDialog::new()
+                .set_level(level)
+                .set_title(title)
+                .set_description(text)
+                .set_buttons(MessageButtons::Ok)
+                .show();
+        }
+
         /// Shape → About Shape: the standard panel, with the icon, the
         /// version, what Shape is and a link to the website.
         fn show_about() {
@@ -502,22 +572,25 @@ mod native {
             let about = MenuItem::with_id("about", "About Shape", true, None);
             let updates = MenuItem::with_id("updates", "Check for Updates…", true, None);
             let close = MenuItem::with_id("close", "Close Window", true, cmd(Code::KeyW));
+            let command = MenuItem::with_id("command", "Install the shape Command…", true, None);
             let menu = Menu::new();
             let sep = P::separator;
-            let app = Submenu::with_items(
-                "Shape",
-                true,
-                &[
-                    &about,
-                    &updates,
-                    &sep(),
-                    &P::hide(None),
-                    &P::hide_others(None),
-                    &P::show_all(None),
-                    &sep(),
-                    &quit,
-                ],
-            );
+            let app = Submenu::with_items("Shape", true, &[&about, &updates]);
+            // in Shape.app: the terminal command comes from the app
+            if let (Ok(app), Some(_)) = (&app, crate::app::bundle()) {
+                let _ = app.append(&command);
+            }
+            let rest: [&dyn muda::IsMenuItem; 6] = [
+                &sep(),
+                &P::hide(None),
+                &P::hide_others(None),
+                &P::show_all(None),
+                &sep(),
+                &quit,
+            ];
+            if let Ok(app) = &app {
+                let _ = app.append_items(&rest);
+            }
             let edit = Submenu::with_items(
                 "Edit",
                 true,
@@ -548,6 +621,8 @@ mod native {
                     std::thread::spawn(move || {
                         let _ = proxy.send_event(Ev::Updates(crate::update::check_now()));
                     });
+                } else if e.id == "command" {
+                    let _ = proxy.send_event(Ev::InstallCommand);
                 } else if e.id == "quit" || e.id == "close" {
                     let _ = proxy.send_event(Ev::CloseRequested);
                 }

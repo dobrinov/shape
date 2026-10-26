@@ -36,31 +36,49 @@ pub fn resolve(spec: &str) -> String {
 /// Where the subscription CLIs are looked for: the PATH, and the places
 /// their installers put them (an editor opened from Finder or a desktop
 /// launcher does not get the shell's PATH).
-pub fn search_path() -> String {
-    let mut dirs: Vec<String> = std::env::var("PATH")
-        .unwrap_or_default()
-        .split(':')
-        .filter(|d| !d.is_empty())
-        .map(String::from)
-        .collect();
-    let home = std::env::var("HOME").unwrap_or_default();
-    let more = [
-        format!("{home}/.local/bin"),
-        format!("{home}/.claude/local"),
-        format!("{home}/.npm-global/bin"),
-        format!("{home}/.bun/bin"),
-        format!("{home}/.volta/bin"),
-        "/opt/homebrew/bin".into(),
-        "/usr/local/bin".into(),
-    ];
+pub fn search_path() -> std::ffi::OsString {
+    use std::path::PathBuf;
+    let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect())
+        .unwrap_or_default();
+    let home = crate::home_dir().unwrap_or_default();
+    let mut more: Vec<PathBuf> = [
+        ".local/bin",
+        ".claude/local",
+        ".npm-global/bin",
+        ".bun/bin",
+        ".volta/bin",
+    ]
+    .iter()
+    .map(|d| home.join(d))
+    .collect();
+    if cfg!(windows) {
+        // npm's global commands (claude.cmd, codex.cmd, gemini.cmd)
+        more.extend(std::env::var_os("APPDATA").map(|d| PathBuf::from(d).join("npm")));
+    } else {
+        more.extend(["/opt/homebrew/bin", "/usr/local/bin"].map(PathBuf::from));
+    }
     for d in more {
-        if !dirs.contains(&d) && std::path::Path::new(&d).is_dir() {
+        if !dirs.contains(&d) && d.is_dir() {
             dirs.push(d);
         }
     }
-    dirs.join(":")
+    std::env::join_paths(dirs).unwrap_or_default()
 }
 
+/// `cmd` run by the shell: `sh -c`, and `cmd /C` on Windows (which has no
+/// sh; it also finds `claude.cmd` and the like that npm installs).
+#[cfg(windows)]
+fn sh(cmd: &str) -> Command {
+    use std::os::windows::process::CommandExt;
+    let mut c = crate::command("cmd");
+    c.args(["/D", "/S", "/C"])
+        .raw_arg(format!("\"{cmd}\""))
+        .env("PATH", search_path());
+    c
+}
+
+#[cfg(not(windows))]
 fn sh(cmd: &str) -> Command {
     let mut c = crate::command("sh");
     c.args(["-c", cmd]).env("PATH", search_path());
@@ -72,7 +90,11 @@ pub fn installed() -> Vec<&'static str> {
     PRESETS
         .iter()
         .filter(|(name, _)| {
-            sh(&format!("command -v {name}"))
+            sh(&if cfg!(windows) {
+                format!("where {name}")
+            } else {
+                format!("command -v {name}")
+            })
                 .output()
                 .is_ok_and(|o| o.status.success())
         })
@@ -215,7 +237,11 @@ fn unbase64(s: &str) -> Option<Vec<u8>> {
 }
 
 fn quote(p: &std::path::Path) -> String {
-    format!("'{}'", p.display().to_string().replace('\'', "'\\''"))
+    if cfg!(windows) {
+        format!("\"{}\"", p.display())
+    } else {
+        format!("'{}'", p.display().to_string().replace('\'', "'\\''"))
+    }
 }
 
 /// `cmd` and `prompt` with images handed over the way each CLI takes them:
@@ -325,7 +351,8 @@ fn run_env(cmd: &str, prompt: &str, env: &[(String, String)]) -> Result<String, 
         } else {
             err.into_owned()
         };
-        if out.status.code() == Some(127) {
+        // sh's code for it, and cmd's
+        if out.status.code() == Some(127) || (cfg!(windows) && out.status.code() == Some(9009)) {
             return Err(format!("`{cmd}`: command not found"));
         }
         return Err(format!("`{cmd}` failed: {}", err.trim()));

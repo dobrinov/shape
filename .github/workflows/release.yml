@@ -110,28 +110,16 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           bin="target/${{ matrix.target }}/release/shape"
-          # the certificate, in a keychain of its own for this run
-          kc="$RUNNER_TEMP/sign.keychain-db"
-          kpw=$(openssl rand -hex 16)
-          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security create-keychain -p "$kpw" "$kc"
-          security set-keychain-settings -lut 21600 "$kc"
-          security unlock-keychain -p "$kpw" "$kc"
-          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$kpw" "$kc" >/dev/null
-          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
-          line=$(security find-identity -v -p codesigning "$kc" | grep -m1 'Developer ID Application')
-          [ -n "$line" ] || { echo "MACOS_CERT_P12 holds no Developer ID Application certificate"; exit 1; }
-          id=$(echo "$line" | awk '{print $2}')
-          team=$(echo "$line" | sed -E 's/.*\(([A-Z0-9]+)\)"$/\1/')
-          codesign --force --options runtime --timestamp --sign "$id" "$bin"
+          scripts/macos-sign-setup.sh
+          source "$RUNNER_TEMP/sign.env"
+          codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$bin"
           codesign --verify --strict --verbose=2 "$bin"
           # notarized: Apple checks it, and Gatekeeper finds its ticket online
           # (a bare binary cannot carry the ticket stapled)
           ditto -c -k --keepParent "$bin" "$RUNNER_TEMP/shape.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/shape.zip" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$team" --wait --timeout 30m --output-format json | tee "$RUNNER_TEMP/notary.json"
+          xcrun notarytool submit "$RUNNER_TEMP/shape.zip" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$SIGN_TEAM" --wait --timeout 30m --output-format json | tee "$RUNNER_TEMP/notary.json"
           grep -q '"status":"Accepted"' "$RUNNER_TEMP/notary.json" || { echo "not notarized"; exit 1; }
-          security delete-keychain "$kc"
+          security delete-keychain "$SIGN_KEYCHAIN"
 
       # Windows: signed by SignPath (free for open source; certificate by
       # SignPath Foundation), so SmartScreen and antivirus trust it
@@ -213,8 +201,55 @@ jobs:
             ${{ steps.pkg.outputs.asset }}.sha256
           if-no-files-found: error
 
-  release:
+  # macOS: Shape.app (one universal binary) in a DMG, signed, notarized and
+  # stapled; from the two macOS builds
+  dmg:
     needs: build
+    runs-on: macos-14
+    env:
+      MACOS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' && 'yes' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bin-macos-*
+          path: bins
+          merge-multiple: true
+      - name: Shape.app in a DMG
+        shell: bash
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          version="${TAG#v}"
+          for a in arm64 x86_64; do
+            mkdir -p "bins/$a" && tar -xzf "bins/shape-${version}-macos-$a.tar.gz" -C "bins/$a"
+          done
+          if [ "$MACOS_SIGNING" = yes ]; then
+            scripts/macos-sign-setup.sh
+            source "$RUNNER_TEMP/sign.env"
+          fi
+          # one name for every version: the site links to the latest's
+          dmg="Shape.dmg"
+          scripts/macos-dmg.sh bins/arm64/shape bins/x86_64/shape "$dmg"
+          [ -z "${SIGN_KEYCHAIN:-}" ] || security delete-keychain "$SIGN_KEYCHAIN"
+          shasum -a 256 "$dmg" > "$dmg.sha256"
+          cat "$dmg.sha256"
+          echo "DMG=$dmg" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bin-dmg
+          path: |
+            ${{ env.DMG }}
+            ${{ env.DMG }}.sha256
+          if-no-files-found: error
+
+  release:
+    needs: [build, dmg]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8

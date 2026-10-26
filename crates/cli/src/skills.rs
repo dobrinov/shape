@@ -54,8 +54,10 @@ pub fn run(args: &[String], global: bool, dir: Option<PathBuf>) -> Result<(), St
         Some("install") => {
             let base = match dir {
                 Some(d) => d,
-                None if global => PathBuf::from(std::env::var_os("HOME").ok_or("HOME not set")?)
-                    .join(".claude/skills"),
+                None if global => crate::home_dir()
+                    .ok_or("no home folder (HOME or USERPROFILE)")?
+                    .join(".claude")
+                    .join("skills"),
                 None => crate::repo_root()
                     .unwrap_or(std::env::current_dir().map_err(|e| e.to_string())?)
                     .join(".claude/skills"),
@@ -161,8 +163,8 @@ fn read_back(text: &str) -> (String, Option<String>) {
 /// `.claude/skills` above the working directory.
 fn places() -> Vec<PathBuf> {
     let mut out = Vec::new();
-    if let Some(home) = std::env::var_os("HOME") {
-        out.push(PathBuf::from(home).join(".claude/skills"));
+    if let Some(home) = crate::home_dir() {
+        out.push(home.join(".claude").join("skills"));
     }
     if let Ok(mut dir) = std::env::current_dir() {
         loop {

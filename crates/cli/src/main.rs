@@ -135,6 +135,7 @@ FILE may be `-` for stdin. Formats are chosen by extension: .shape or .diagram (
 const VALUE_FLAGS: &[&str] = &[
     "-o",
     "--out",
+    "--binary",
     "--to",
     "--scale",
     "--target",
@@ -199,7 +200,9 @@ impl Args {
             "merge", "schema", "import", "logs",
         ];
         let cmd = match pos.first() {
-            Some(c) if COMMANDS.contains(&c.as_str()) || c == "install-app" => pos.remove(0),
+            Some(c) if COMMANDS.contains(&c.as_str()) || c == "install-app" || c == "make-app" => {
+                pos.remove(0)
+            }
             _ => "open".into(),
         };
         if vals.contains_key("--out") {
@@ -240,6 +243,16 @@ pub fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
         c.creation_flags(CREATE_NO_WINDOW);
     }
     c
+}
+
+/// The person's home folder: `HOME`, or `USERPROFILE` on Windows (which
+/// has no HOME unless a Unix-style shell set one).
+pub fn home_dir() -> Option<PathBuf> {
+    ["HOME", "USERPROFILE"]
+        .iter()
+        .filter_map(std::env::var_os)
+        .find(|h| !h.is_empty())
+        .map(PathBuf::from)
 }
 
 fn untitled() -> String {
@@ -871,6 +884,17 @@ fn run(args: Args) -> Result<ExitCode, String> {
                 Open::Window => Native::init(),
                 _ => None,
             };
+            // Shape.app from Finder or the Dock: the person's PATH, and the
+            // boards it was asked to open, each in a window of its own
+            if let Some(bundle) = app::bundle().filter(|_| !std::io::stdin().is_terminal()) {
+                app::login_path();
+                app::remove_old_apps(&bundle);
+                if args.pos.is_empty() {
+                    if let Some(n) = native {
+                        n.hand_over(|| prefs::draft().ok());
+                    }
+                }
+            }
             let file = match args.pos.first() {
                 Some(f) => PathBuf::from(f),
                 None => {
@@ -909,6 +933,11 @@ fn run(args: Args) -> Result<ExitCode, String> {
         }
         "install-app" => {
             app::install(args.flag("--remove"))?;
+            ok
+        }
+        "make-app" => {
+            let out = args.file(0)?;
+            app::make_app(Path::new(out), args.val("--binary").map(Path::new))?;
             ok
         }
         "new" => {

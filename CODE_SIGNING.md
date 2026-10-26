@@ -6,8 +6,9 @@ Shape's release binaries are built from this repository by its GitHub Actions
 release workflow (`.github/workflows/release.yml`), from a version tag, on
 GitHub-hosted runners. Nothing is signed that was not built there.
 
-- **macOS** binaries are signed with the maintainer's Apple Developer ID
-  certificate and notarized by Apple.
+- **macOS** binaries and `Shape.dmg` (Shape.app) are signed with the
+  maintainer's Apple Developer ID certificate and notarized by Apple; the
+  DMG has its ticket stapled.
 - **Windows** binaries: free code signing provided by
   [SignPath.io](https://about.signpath.io), certificate by
   [SignPath Foundation](https://signpath.org).

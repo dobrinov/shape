@@ -113,6 +113,8 @@ Whiteboard tools are great for talking. Their output, though, ends up in a forma
 
 ## Install
 
+**macOS app:** download [Shape.dmg](https://github.com/dobrinov/shape/releases/latest/download/Shape.dmg) (Apple silicon and Intel), open it and drag Shape to Applications. Double-clicking a `.shape` file opens it in Shape, and opening Shape itself starts a new board. For `shape` in a terminal, choose **Shape → Install the shape Command…** (it links `/usr/local/bin/shape` to the app, after asking for your password; a `shape` from Homebrew stays as it is). To upgrade, download the new DMG.
+
 **Homebrew** (macOS, Linux):
 
 ```bash
@@ -135,7 +137,7 @@ It puts `shape.exe` in `%LOCALAPPDATA%\Programs\Shape` and on your `PATH`, adds 
 curl -fsSL https://dobrinov.github.io/shape/install.sh | sh
 ```
 
-**Binaries:** download an archive for macOS (Apple silicon or Intel), Linux (x86_64 or arm64) or Windows (x86_64) from the [latest release](https://github.com/dobrinov/shape/releases/latest), unpack it and put `shape` on your `PATH` (the archive also holds `diagram`, the old name, as an alias: a link on macOS and Linux, `diagram.cmd` on Windows). `SHA256SUMS` lists the checksums.
+**Binaries:** download `Shape.dmg` or an archive for macOS (Apple silicon or Intel), Linux (x86_64 or arm64) or Windows (x86_64) from the [latest release](https://github.com/dobrinov/shape/releases/latest), unpack it and put `shape` on your `PATH` (the archive also holds `diagram`, the old name, as an alias: a link on macOS and Linux, `diagram.cmd` on Windows). `SHA256SUMS` lists the checksums.
 
 **From source:** you need Rust with the `wasm32-unknown-unknown` target, and `wasm-pack`.
 
@@ -160,7 +162,7 @@ After this, `.shape` files get their own document icon, and double-clicking one 
 
 **New versions:** once a day, the editor asks GitHub whether a newer release exists. If one does, the terminal says so (with `brew upgrade shape` when Homebrew installed it), and a *New* badge in the top bar links to the release notes. Set `SHAPE_NO_UPDATE_CHECK=1` to turn this off; it is also off when `CI` is set.
 
-**Signing:** the macOS binaries are signed with a Developer ID and notarized by Apple; Windows signing through SignPath Foundation is being set up. See [CODE_SIGNING.md](CODE_SIGNING.md) for the policy and what Shape sends over the network.
+**Signing:** the macOS app and binaries are signed with a Developer ID and notarized by Apple; Windows signing through SignPath Foundation is being set up. See [CODE_SIGNING.md](CODE_SIGNING.md) for the policy and what Shape sends over the network.
 
 ## Usage
 
