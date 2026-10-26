@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.82.2 — 2026-10-26
+
+- **The macOS downloads are signed and notarized by Apple**, so macOS opens them without the "unidentified developer" warning. Signing for Windows is on its way.
+
 ## 0.82.1 — 2026-10-25
 
 - **The AI can reach every branch of a mindmap.** Prompts now show each mindmap topic with its id (your file is unchanged), so ✦ Rethink and Ask can change or tag any branch reliably. For example, Rethink now tags a map's technical branches so the Product perspective leaves them out.
