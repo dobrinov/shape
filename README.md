@@ -113,7 +113,7 @@ Whiteboard tools are great for talking. Their output, though, ends up in a forma
 
 ## Install
 
-**macOS app:** download [Shape.dmg](https://github.com/dobrinov/shape/releases/latest/download/Shape.dmg) (Apple silicon and Intel), open it and drag Shape to Applications. Double-clicking a `.shape` file opens it in Shape, and opening Shape itself starts a new board. For `shape` in a terminal, choose **Shape → Install the shape Command…** (it links `/usr/local/bin/shape` to the app, after asking for your password; a `shape` from Homebrew stays as it is). To upgrade, download the new DMG.
+**macOS app:** download [Shape.dmg](https://github.com/dobrinov/shape/releases/latest/download/Shape.dmg) (Apple silicon and Intel), open it and drag Shape to Applications. Double-clicking a `.shape` file opens it in Shape, and opening Shape itself starts a new board. For `shape` in a terminal, choose **Shape → Install the shape Command…** (it links `/usr/local/bin/shape` to the app, after asking for your password; a `shape` from Homebrew stays as it is). To upgrade, download the new DMG; or install it with `brew install --cask dobrinov/tap/shape`, and `brew upgrade` keeps it current.
 
 **Homebrew** (macOS, Linux):
 
