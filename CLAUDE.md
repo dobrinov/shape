@@ -2,7 +2,7 @@
 
 ## Where this is going
 
-Shape (called diagram until October 2026; the repo folder, the `diagram` command alias and `.diagram` files still carry that name) is the core of an **AI-first, all-in-one project-management tool for the agentic world**: a FigJam-like board where people draw and collaborate, discover a problem, and specify *what* should happen and *how*. Principles:
+Shape (called diagram until October 2026; the `diagram` command alias and `.diagram` files still carry that name) is the core of an **AI-first, all-in-one project-management tool for the agentic world**: a FigJam-like board where people draw and collaborate, discover a problem, and specify *what* should happen and *how*. Principles:
 
 - **Simple first.** An earlier attempt (also called Shape, in `../spec`) grew a milestone-heavy flow and was dropped for being too complex. Add features only when the owner asks; prefer fewer screens and fewer concepts.
 - **Git(Hub) is the database.** Everything is text that diffs and reviews well (`.shape` files). Collaboration happens through commits and PRs, not a server.
