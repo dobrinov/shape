@@ -4,7 +4,9 @@
 //! - macOS: ~/Applications/Shape.app, a small AppleScript app (Finder hands
 //!   files over as Apple Events, not arguments) that declares the board
 //!   type (.shape, and .diagram from before the rename) and runs
-//!   `shape FILE --idle-exit`.
+//!   `shape FILE --idle-exit`. With the real Shape.app (Shape.dmg) in
+//!   /Applications or ~/Applications, nothing is made: that app does it, and
+//!   only our script copy is ever removed.
 //! - Linux: a MIME type, its icon and a .desktop entry under ~/.local/share.
 //! - Windows: a file association under HKEY_CURRENT_USER.
 //!
@@ -104,6 +106,12 @@ fn macos(remove: bool) -> Result<(), String> {
         eprintln!("{} opens .shape and .diagram files.", app.display());
         return Ok(());
     }
+    // the real app installed next to a `shape` from Homebrew: it does the job
+    if let (Some(app), false) = (real_app(), remove) {
+        remove_old_apps(&app);
+        eprintln!("{} opens .shape and .diagram files.", app.display());
+        return Ok(());
+    }
     // ~/Applications when it is ours (on some Macs root owns it); any folder
     // works for Launch Services
     let home = home()?;
@@ -118,7 +126,15 @@ fn macos(remove: bool) -> Result<(), String> {
         .chain([&before])
         .flat_map(|d| [d.join("Shape.app"), d.join("Diagram.app")])
     {
-        if old.exists() {
+        // only our script copy: the real app (from Shape.dmg) stays
+        if old.exists() && !script_app(&old) {
+            if remove {
+                eprintln!(
+                    "left {} (the Shape app: move it to the Bin to remove it)",
+                    old.display()
+                );
+            }
+        } else if old.exists() {
             let _ = crate::command(LSREGISTER).arg("-u").arg(&old).output();
             std::fs::remove_dir_all(&old).map_err(|e| format!("{}: {e}", old.display()))?;
             if remove {
@@ -353,14 +369,26 @@ pub fn remove_old_apps(keep: &Path) {
     ] {
         for name in ["Shape.app", "Diagram.app"] {
             let old = home.join(d).join(name);
-            let script = old.join("Contents/Resources/Scripts/main.scpt");
-            if script.exists() && !same_file(&old, keep) {
+            if script_app(&old) && !same_file(&old, keep) {
                 let _ = crate::command(LSREGISTER).arg("-u").arg(&old).output();
                 let _ = std::fs::remove_dir_all(&old);
             }
         }
     }
     let _ = crate::command(LSREGISTER).arg("-f").arg(keep).output();
+}
+
+fn script_app(app: &Path) -> bool {
+    app.join("Contents/Resources/Scripts/main.scpt").exists()
+}
+
+/// The real Shape.app (from Shape.dmg) in /Applications or ~/Applications.
+fn real_app() -> Option<PathBuf> {
+    let mut dirs = vec![PathBuf::from("/Applications")];
+    dirs.extend(home().ok().map(|h| h.join("Applications")));
+    dirs.into_iter()
+        .map(|d| d.join("Shape.app"))
+        .find(|a| a.join("Contents/MacOS/shape").exists() && !script_app(a))
 }
 
 /// Shape → Install the shape Command…: `shape` (and `diagram`) in

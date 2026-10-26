@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.83.1 — 2026-10-26
+
+- **`shape install-app` keeps the Mac app.** With Shape.app from Shape.dmg in Applications, `shape install-app` (from Homebrew, say) no longer replaces it with the older script copy: it lets the app open your boards. `shape install-app --remove` only removes that script copy; to remove the app, move it to the Bin.
+
 ## 0.83.0 — 2026-10-26
 
 - **Shape for Mac as an app.** Download [Shape.dmg](https://github.com/dobrinov/shape/releases/latest/download/Shape.dmg), open it and drag Shape to Applications. It runs on Apple silicon and Intel Macs and is signed and notarized by Apple. Double-clicking a `.shape` file opens it in Shape, each board in its own window, and opening Shape itself starts a new board. The app finds your AI's command-line tool the way your terminal does. **Shape → Install the shape Command…** adds `shape` to Terminal; a `shape` from Homebrew stays as it is.
